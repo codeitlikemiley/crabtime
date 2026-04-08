@@ -1,0 +1,121 @@
+import AppKit
+import SwiftUI
+import WebKit
+
+struct MarkdownPreviewView: NSViewRepresentable {
+    let markdown: String
+    var sourceURL: URL?
+    var sizingMode: MarkdownDocumentView.SizingMode = .intrinsicHeight
+    @Binding var contentHeight: CGFloat
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(contentHeight: $contentHeight)
+    }
+
+    func makeNSView(context: Context) -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        let controller = WKUserContentController()
+        controller.add(context.coordinator, name: Coordinator.heightMessageName)
+        configuration.userContentController = controller
+
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.navigationDelegate = context.coordinator
+        webView.setValue(false, forKey: "drawsBackground")
+        webView.allowsBackForwardNavigationGestures = false
+
+        context.coordinator.webView = webView
+        context.coordinator.parent = self
+        context.coordinator.loadIfNeeded()
+        context.coordinator.configureScrollBehavior()
+
+        return webView
+    }
+
+    func updateNSView(_ webView: WKWebView, context: Context) {
+        context.coordinator.parent = self
+        context.coordinator.configureScrollBehavior()
+        context.coordinator.loadIfNeeded()
+    }
+}
+
+extension MarkdownPreviewView {
+    @MainActor
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+        static let heightMessageName = "contentHeight"
+
+        var parent: MarkdownPreviewView?
+        weak var webView: WKWebView?
+        @Binding private var contentHeight: CGFloat
+        private let renderer = MarkdownHTMLRenderer()
+        private var lastRenderSignature: String?
+
+        init(contentHeight: Binding<CGFloat>) {
+            _contentHeight = contentHeight
+        }
+
+        func loadIfNeeded() {
+            guard let parent, let webView else {
+                return
+            }
+
+            let signature = "\(parent.sourceURL?.path ?? "")::\(parent.markdown.hashValue)"
+            guard signature != lastRenderSignature else {
+                return
+            }
+
+            lastRenderSignature = signature
+            let html = renderer.render(markdown: parent.markdown, sourceURL: parent.sourceURL)
+            let baseURL = parent.sourceURL?.deletingLastPathComponent()
+            webView.loadHTMLString(html, baseURL: baseURL)
+        }
+
+        func configureScrollBehavior() {
+            guard let webView, let parent else {
+                return
+            }
+
+            DispatchQueue.main.async {
+                guard let scrollView = webView.enclosingScrollView else {
+                    return
+                }
+
+                scrollView.drawsBackground = false
+                scrollView.hasVerticalScroller = parent.sizingMode == .fill
+                scrollView.hasHorizontalScroller = false
+                scrollView.autohidesScrollers = parent.sizingMode != .fill
+                scrollView.scrollerStyle = NSScroller.Style.overlay
+            }
+        }
+
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard parent?.sizingMode == .intrinsicHeight else {
+                return
+            }
+
+            guard
+                message.name == Self.heightMessageName,
+                let value = message.body as? NSNumber
+            else {
+                return
+            }
+
+            DispatchQueue.main.async {
+                self.contentHeight = max(140, CGFloat(truncating: value))
+            }
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            decidePolicyFor navigationAction: WKNavigationAction,
+            decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
+        ) {
+            guard navigationAction.navigationType == .linkActivated, let url = navigationAction.request.url else {
+                decisionHandler(.allow)
+                return
+            }
+
+            NSWorkspace.shared.open(url)
+            decisionHandler(.cancel)
+        }
+    }
+}
