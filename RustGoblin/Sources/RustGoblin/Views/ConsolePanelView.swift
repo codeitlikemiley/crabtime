@@ -18,16 +18,6 @@ struct ConsolePanelView: View {
                 Spacer()
 
                 HStack(spacing: 8) {
-                    if store.errorCount > 0 {
-                        TerminalStatPill(text: "\(store.errorCount) Error", tint: .red)
-                    }
-
-                    if store.warningCount > 0 {
-                        TerminalStatPill(text: "\(store.warningCount) Warning", tint: RustGoblinTheme.Palette.panelTint)
-                    }
-                }
-
-                HStack(spacing: 8) {
                     ConsoleTabButton(
                         title: "Output",
                         isSelected: store.selectedConsoleTab == .output,
@@ -158,23 +148,6 @@ struct ConsolePanelView: View {
     }
 }
 
-private struct TerminalStatPill: View {
-    let text: String
-    let tint: Color
-
-    var body: some View {
-        Text(text)
-            .font(.system(size: 10, weight: .semibold, design: .rounded))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(Capsule().fill(tint.opacity(0.14)))
-            .overlay {
-                Capsule()
-                    .stroke(tint.opacity(0.18), lineWidth: 1)
-            }
-            .foregroundStyle(tint)
-    }
-}
 
 private struct ConsoleTabButton: View {
     let title: String
