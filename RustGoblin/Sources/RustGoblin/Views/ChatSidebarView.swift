@@ -15,6 +15,12 @@ struct ChatSidebarView: View {
             title: "/challenge",
             detail: "Create a new Rustlings-style challenge in the current workspace.",
             template: "/challenge "
+        ),
+        ChatSlashCommand(
+            command: "grind",
+            title: "/grind",
+            detail: "Generate a batch of exercise variants (e.g., /grind linked list 5).",
+            template: "/grind "
         )
     ]
 
