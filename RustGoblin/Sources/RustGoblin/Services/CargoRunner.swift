@@ -21,14 +21,6 @@ struct CargoRunner: Sendable {
         let runnerRootURL = projectRootURL(for: exercise.sourceURL, fallbackDirectoryURL: exercise.directoryURL)
         let environment = runnerEnvironment(projectRootURL: runnerRootURL)
 
-        if let rustlingsResult = try await runRustlingsExerciseIfNeeded(
-            exercise: exercise,
-            projectRootURL: runnerRootURL,
-            environment: environment
-        ) {
-            return rustlingsResult
-        }
-
         if try await isCargoRunnerAvailable(in: runnerRootURL, environment: environment) {
             let runnerResult = try await runCargoRunner(
                 sourceURL: exercise.sourceURL,
@@ -65,6 +57,37 @@ struct CargoRunner: Sendable {
         }
 
         return try await runScriptFallback(at: sourceURL, projectRootURL: runnerRootURL, environment: environment)
+    }
+
+    func check(projectRootURL: URL) async throws -> ProcessOutput {
+        let environment = runnerEnvironment(projectRootURL: projectRootURL)
+
+        let infoTomlURL = projectRootURL.appendingPathComponent("info.toml")
+        if FileManager.default.fileExists(atPath: infoTomlURL.path),
+           ToolingHealthService.resolveExecutable(named: "rustlings") != nil {
+            return try await processRunner(
+                projectRootURL,
+                ["rustlings", "dev", "check"],
+                "rustlings dev check",
+                environment
+            )
+        }
+
+        if isCargoProjectRoot(projectRootURL) {
+            return try await processRunner(
+                projectRootURL,
+                ["cargo", "check", "--color", "never", "--message-format", "short"],
+                "cargo check",
+                environment
+            )
+        }
+
+        return ProcessOutput(
+            commandDescription: "no check available",
+            stdout: "",
+            stderr: "",
+            terminationStatus: 0
+        )
     }
 
     private func runCargoRunner(

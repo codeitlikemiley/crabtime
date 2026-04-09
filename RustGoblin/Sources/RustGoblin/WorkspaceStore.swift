@@ -1372,6 +1372,12 @@ final class WorkspaceStore {
             chatStore?.syncSelection(using: self)
 
             persistCurrentWorkspaceSnapshot()
+
+            // Run background diagnostic check
+            let rootURL = loadedWorkspace.rootURL
+            Task { [weak self] in
+                await self?.performBackgroundCheck(projectRootURL: rootURL)
+            }
         } catch {
             workspace = nil
             workspaceFileBaseline = [:]
@@ -1777,6 +1783,37 @@ final class WorkspaceStore {
             consoleOutput += "Run failed: \(error.localizedDescription)\n"
             appendSessionMessage("Run failed for \(selectedExercise.title)")
             persistCurrentWorkspaceSnapshot()
+        }
+    }
+
+    private func performBackgroundCheck(projectRootURL: URL) async {
+        appendSessionMessage("Running background check…")
+
+        do {
+            let result = try await cargoRunner.check(projectRootURL: projectRootURL)
+
+            guard result.commandDescription != "no check available" else {
+                return
+            }
+
+            appendSessionMessage("$ \(result.commandDescription)")
+            diagnostics = DiagnosticParser.parse(result.stderr)
+
+            if !result.stderr.isEmpty {
+                consoleOutput += result.stderr
+            }
+
+            let errorCount = diagnostics.filter { $0.severity == .error }.count
+            let warningCount = diagnostics.filter { $0.severity == .warning }.count
+
+            if errorCount > 0 || warningCount > 0 {
+                appendSessionMessage("Check: \(errorCount) error(s), \(warningCount) warning(s)")
+                selectedConsoleTab = .diagnostics
+            } else {
+                appendSessionMessage("Check: clean ✓")
+            }
+        } catch {
+            appendSessionMessage("Background check failed: \(error.localizedDescription)")
         }
     }
 

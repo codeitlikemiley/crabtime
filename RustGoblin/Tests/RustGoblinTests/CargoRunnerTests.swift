@@ -63,7 +63,7 @@ final class CargoRunnerTests: XCTestCase {
         XCTAssertEqual(invocations[1].environment["PROJECT_ROOT"], rootURL.path)
     }
 
-    func testRunRustlingsExerciseBuildsTestHarnessFromMirroredSolution() async throws {
+    func testRunRustlingsExerciseUsesCargoRunner() async throws {
         let recorder = ProcessInvocationRecorder()
         let runner = CargoRunner { currentDirectoryURL, arguments, commandDescription, environment in
             await recorder.record(
@@ -73,8 +73,8 @@ final class CargoRunnerTests: XCTestCase {
                 environment: environment
             )
 
-            if arguments.starts(with: ["cargo", "test", "--bin", "if3"]) {
-                return ProcessOutput(commandDescription: commandDescription, stdout: "test result: ok", stderr: "", terminationStatus: 0)
+            if arguments == ["cargo", "runner", "--help"] {
+                return ProcessOutput(commandDescription: commandDescription, stdout: "", stderr: "", terminationStatus: 0)
             }
 
             return ProcessOutput(commandDescription: commandDescription, stdout: "test result: ok", stderr: "", terminationStatus: 0)
@@ -140,12 +140,14 @@ final class CargoRunnerTests: XCTestCase {
         let invocations = await recorder.invocations
 
         XCTAssertEqual(output.terminationStatus, 0)
-        XCTAssertEqual(invocations.count, 1)
-        XCTAssertEqual(invocations.first?.currentDirectoryURL, tempRootURL)
-        XCTAssertEqual(invocations.first?.arguments, ["cargo", "test", "--bin", "if3", "--", "--color", "never"])
+        // cargo runner --help + cargo runner run <path>
+        XCTAssertEqual(invocations.count, 2)
+        XCTAssertEqual(invocations[0].arguments, ["cargo", "runner", "--help"])
+        XCTAssertEqual(invocations[1].arguments, ["cargo", "runner", "run", "exercises/03_if/if3.rs"])
+        XCTAssertEqual(invocations[1].currentDirectoryURL, tempRootURL)
     }
 
-    func testRunRustlingsExerciseWithoutTestsUsesTemporaryRustcBinaryInsteadOfCargoRunner() async throws {
+    func testRunRustlingsExerciseWithoutTestsFallsToCargoRunner() async throws {
         let recorder = ProcessInvocationRecorder()
         let runner = CargoRunner { currentDirectoryURL, arguments, commandDescription, environment in
             await recorder.record(
@@ -155,11 +157,7 @@ final class CargoRunnerTests: XCTestCase {
                 environment: environment
             )
 
-            if arguments.starts(with: ["cargo", "test", "--bin", "intro2"]) {
-                return ProcessOutput(commandDescription: commandDescription, stdout: "Hello world!", stderr: "", terminationStatus: 0)
-            }
-
-            if arguments.starts(with: ["rustc", "--edition", "2021"]) {
+            if arguments == ["cargo", "runner", "--help"] {
                 return ProcessOutput(commandDescription: commandDescription, stdout: "", stderr: "", terminationStatus: 0)
             }
 
@@ -210,8 +208,9 @@ final class CargoRunnerTests: XCTestCase {
         let invocations = await recorder.invocations
 
         XCTAssertEqual(output.terminationStatus, 0)
-        XCTAssertEqual(invocations.count, 1)
-        XCTAssertEqual(invocations.first?.arguments, ["cargo", "test", "--bin", "intro2", "--", "--color", "never"])
+        XCTAssertEqual(invocations.count, 2)
+        XCTAssertEqual(invocations[0].arguments, ["cargo", "runner", "--help"])
+        XCTAssertEqual(invocations[1].arguments, ["cargo", "runner", "run", "exercises/00_intro/intro2.rs"])
     }
 }
 
