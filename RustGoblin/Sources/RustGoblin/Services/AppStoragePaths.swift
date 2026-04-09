@@ -11,6 +11,22 @@ struct AppStoragePaths: Equatable, Sendable {
         baseURL.appendingPathComponent("clones", isDirectory: true)
     }
 
+    var importedLibraryURL: URL {
+        baseURL.appendingPathComponent("imports", isDirectory: true)
+    }
+
+    var exercismLibraryURL: URL {
+        baseURL.appendingPathComponent("exercism", isDirectory: true)
+    }
+
+    var createdWorkspaceLibraryURL: URL {
+        baseURL.appendingPathComponent("workspaces", isDirectory: true)
+    }
+
+    var baselineLibraryURL: URL {
+        baseURL.appendingPathComponent("baselines", isDirectory: true)
+    }
+
     static func live(fileManager: FileManager = .default) -> AppStoragePaths {
         let baseURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("RustGoblin", isDirectory: true)
@@ -24,5 +40,17 @@ struct AppStoragePaths: Equatable, Sendable {
     func ensureDirectories(fileManager: FileManager = .default) throws {
         try fileManager.createDirectory(at: baseURL, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: cloneLibraryURL, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: importedLibraryURL, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: exercismLibraryURL, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: createdWorkspaceLibraryURL, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: baselineLibraryURL, withIntermediateDirectories: true)
+    }
+
+    func containsManagedWorkspace(_ url: URL) -> Bool {
+        let standardizedPath = url.standardizedFileURL.path
+        return standardizedPath.hasPrefix(cloneLibraryURL.standardizedFileURL.path + "/")
+            || standardizedPath.hasPrefix(importedLibraryURL.standardizedFileURL.path + "/")
+            || standardizedPath.hasPrefix(exercismLibraryURL.standardizedFileURL.path + "/")
+            || standardizedPath.hasPrefix(createdWorkspaceLibraryURL.standardizedFileURL.path + "/")
     }
 }

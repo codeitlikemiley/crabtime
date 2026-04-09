@@ -32,6 +32,8 @@ struct MarkdownHTMLRenderer {
               background: transparent;
               color: var(--text);
               font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+              -webkit-user-select: text;
+              user-select: text;
             }
             body {
               padding: 18px 20px 28px;
@@ -82,6 +84,31 @@ struct MarkdownHTMLRenderer {
               display: block;
               white-space: pre;
               color: var(--text);
+            }
+            .code-block {
+              position: relative;
+              margin: 0 0 16px;
+            }
+            .code-block pre {
+              margin: 0;
+              padding-top: 42px;
+            }
+            .code-copy {
+              position: absolute;
+              top: 10px;
+              right: 10px;
+              border: 1px solid var(--line);
+              background: rgba(255,255,255,0.08);
+              color: var(--text);
+              border-radius: 999px;
+              padding: 6px 10px;
+              font-size: 11px;
+              font-weight: 600;
+              cursor: pointer;
+            }
+            .code-copy:hover {
+              background: rgba(244,154,112,0.18);
+              border-color: rgba(244,154,112,0.35);
             }
             table {
               width: 100%;
@@ -160,6 +187,38 @@ struct MarkdownHTMLRenderer {
               });
             }
 
+            function decorateCodeBlocks() {
+              const codeBlocks = document.querySelectorAll("pre");
+
+              codeBlocks.forEach((pre) => {
+                if (pre.parentElement?.classList.contains("code-block")) {
+                  return;
+                }
+
+                const wrapper = document.createElement("div");
+                wrapper.className = "code-block";
+
+                const button = document.createElement("button");
+                button.className = "code-copy";
+                button.type = "button";
+                button.textContent = "Copy";
+                button.addEventListener("click", () => {
+                  const code = pre.innerText;
+                  if (window.webkit?.messageHandlers?.copyCodeBlock) {
+                    window.webkit.messageHandlers.copyCodeBlock.postMessage(code);
+                  }
+                  button.textContent = "Copied";
+                  window.setTimeout(() => {
+                    button.textContent = "Copy";
+                  }, 1400);
+                });
+
+                pre.parentNode.insertBefore(wrapper, pre);
+                wrapper.appendChild(button);
+                wrapper.appendChild(pre);
+              });
+            }
+
             async function renderMarkdown() {
               marked.setOptions({
                 gfm: true,
@@ -170,6 +229,7 @@ struct MarkdownHTMLRenderer {
 
               content.innerHTML = marked.parse(markdown);
               replaceMermaidBlocks();
+              decorateCodeBlocks();
 
               if (window.mermaid) {
                 mermaid.initialize({

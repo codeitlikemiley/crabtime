@@ -1,33 +1,47 @@
 import AppKit
+import Foundation
 import Observation
 import SwiftUI
 
 @Observable
 @MainActor
 final class WorkspaceStore {
+    private static let editorKeymapDefaultsKey = "editor-keymap-mode"
+
     var workspaceLibrary: [SavedWorkspaceRecord] = []
     var workspace: ExerciseWorkspace?
     var selectedWorkspaceRootPath: String?
     var selectedExerciseID: ExerciseDocument.ID?
     var selectedExplorerFileURL: URL?
+    var selectedExplorerNodePath: String?
     var openTabs: [ActiveDocumentTab] = []
     var editorText: String = ""
     var explorerPreviewText: String = ""
+    var currentDiffText: String = ""
+    var editorKeymapMode: EditorKeymapMode = .standard
+    var vimInputMode: VimInputMode = .insert
     var searchText: String = ""
+    var explorerSearchText: String = ""
     var selectedDifficultyFilter: ExerciseDifficulty?
+    var showsOnlyTestExercises: Bool = false
     var completionFilter: ExerciseCompletionFilter = .open
     var isWorkspacePickerPresented: Bool = false
     var workspacePickerSearchText: String = ""
+    var workspacePickerFocusToken: Int = 0
     var consoleOutput: String = "Import a folder or a Rust file to start building your exercise workspace.\n"
     var sessionLog: [String] = []
     var diagnostics: [Diagnostic] = []
     var selectedConsoleTab: ConsoleTab = .output
+    var terminalDisplayMode: TerminalDisplayMode = .split
     var runState: RunState = .idle
     var lastCommandDescription: String = ""
     var lastTerminationStatus: Int32?
     var isInspectorVisible: Bool = true
+    var rightSidebarTab: RightSidebarTab = .inspector
+    var rightSidebarWidth: CGFloat = RustGoblinTheme.Layout.inspectorWidth
     var isSolutionVisible: Bool = false
     var isEditorDirty: Bool = false
+    var editorDisplayMode: EditorDisplayMode = .edit
     var contentDisplayMode: ContentDisplayMode = .split
     var sidebarMode: SidebarMode = .exercises
     var isCloneSheetPresented: Bool = false
@@ -35,6 +49,12 @@ final class WorkspaceStore {
     var cloneErrorMessage: String?
     var isCloningRepository: Bool = false
     var isSubmittingExercism: Bool = false
+    var selectedChatSessionID: UUID?
+    var chatComposerFocusToken: Int = 0
+    var exerciseSearchFocusToken: Int = 0
+    var explorerSearchFocusToken: Int = 0
+    var explorerKeyboardFocusActive: Bool = false
+    var expandedExplorerDirectoryPaths: Set<String> = []
 
     @ObservationIgnored private let importer: WorkspaceImporter
     @ObservationIgnored private let cargoRunner: CargoRunner
@@ -43,8 +63,14 @@ final class WorkspaceStore {
     @ObservationIgnored private let database: WorkspaceLibraryDatabase
     @ObservationIgnored private let repositoryCloner: RepositoryCloner
     @ObservationIgnored private let exercismCLI: ExercismCLI
+    @ObservationIgnored private let fileChangeService: WorkspaceFileChangeService
+    @ObservationIgnored private let baselineStore: WorkspaceBaselineStore
+    @ObservationIgnored private let rustlingsWorkspaceScaffolder: RustlingsWorkspaceScaffolder
+    @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var isRestoringState = false
     @ObservationIgnored private var workspaceFileBaseline: [String: Data] = [:]
+    @ObservationIgnored private var draftEditorTextByPath: [String: String] = [:]
+    @ObservationIgnored private weak var chatStore: ChatStore?
 
     init(
         appPaths: AppStoragePaths = .live(),
@@ -53,8 +79,12 @@ final class WorkspaceStore {
         sourcePresentationBuilder: SourcePresentationBuilder = SourcePresentationBuilder(),
         database: WorkspaceLibraryDatabase? = nil,
         repositoryCloner: RepositoryCloner? = nil,
-        exercismCLI: ExercismCLI? = nil
+        exercismCLI: ExercismCLI? = nil,
+        fileChangeService: WorkspaceFileChangeService = WorkspaceFileChangeService(),
+        rustlingsWorkspaceScaffolder: RustlingsWorkspaceScaffolder = RustlingsWorkspaceScaffolder(),
+        defaults: UserDefaults = .standard
     ) {
+        self.defaults = defaults
         self.appPaths = appPaths
         self.importer = importer
         self.cargoRunner = cargoRunner
@@ -77,9 +107,19 @@ final class WorkspaceStore {
         self.database = resolvedDatabase
         self.repositoryCloner = repositoryCloner ?? RepositoryCloner(cloneLibraryURL: appPaths.cloneLibraryURL)
         self.exercismCLI = exercismCLI ?? ExercismCLI()
+        self.fileChangeService = fileChangeService
+        self.baselineStore = WorkspaceBaselineStore(baselineLibraryURL: appPaths.baselineLibraryURL)
+        self.rustlingsWorkspaceScaffolder = rustlingsWorkspaceScaffolder
         self.sessionLog = bootstrapMessages
+        self.editorKeymapMode = Self.loadEditorKeymapMode(from: defaults)
+        self.vimInputMode = self.editorKeymapMode == .vim ? .normal : .insert
 
         restorePersistedLibrary()
+    }
+
+    func attachChatStore(_ chatStore: ChatStore) {
+        self.chatStore = chatStore
+        chatStore.syncSelection(using: self)
     }
 
     var hasSelection: Bool {
@@ -102,8 +142,20 @@ final class WorkspaceStore {
         showsEditorPane && isInspectorVisible
     }
 
+    var showsTerminal: Bool {
+        terminalDisplayMode != .hidden
+    }
+
+    var isTerminalMaximized: Bool {
+        terminalDisplayMode == .maximized
+    }
+
     var currentFileTree: [WorkspaceFileNode] {
-        workspace?.fileTree ?? []
+        filteredFileTree(workspace?.fileTree ?? [])
+    }
+
+    var visibleExplorerFileCount: Int {
+        countFiles(in: currentFileTree)
     }
 
     var currentOpenTabs: [ActiveDocumentTab] {
@@ -134,12 +186,45 @@ final class WorkspaceStore {
         return selectedExplorerFileURL?.pathExtension.lowercased() == "md"
     }
 
+    var activeDocumentURL: URL? {
+        selectedExplorerFileURL
+    }
+
+    var currentEditableSourceURL: URL? {
+        guard let selectedExercise else {
+            return nil
+        }
+
+        let activeURL = selectedExplorerFileURL?.standardizedFileURL ?? selectedExercise.sourceURL.standardizedFileURL
+        guard activeURL == selectedExercise.sourceURL.standardizedFileURL else {
+            return nil
+        }
+
+        return selectedExercise.sourceURL.standardizedFileURL
+    }
+
+    var isShowingDiffPreview: Bool {
+        editorDisplayMode == .diff
+    }
+
+    var canToggleDiffMode: Bool {
+        activeDocumentURL != nil
+    }
+
+    var canResetActiveDocument: Bool {
+        activeDocumentURL != nil
+    }
+
     var currentWorkspaceRecord: SavedWorkspaceRecord? {
         guard let selectedWorkspaceRootPath else {
             return workspaceLibrary.first
         }
 
         return workspaceLibrary.first { $0.rootPath == selectedWorkspaceRootPath }
+    }
+
+    var windowTitle: String {
+        workspace?.title ?? "RustGoblin"
     }
 
     var filteredWorkspaceLibrary: [SavedWorkspaceRecord] {
@@ -157,19 +242,13 @@ final class WorkspaceStore {
         }
     }
 
+    var supportsTestExerciseFilter: Bool {
+        currentWorkspaceRecord?.sourceKind == .exercism
+            && (workspace?.exercises.contains { $0.fileRole == .tests } ?? false)
+    }
+
     var availableDifficultyFilters: [ExerciseDifficulty] {
-        let difficulties = Set((workspace?.exercises ?? []).map(\.difficulty))
-        return ExerciseDifficulty.allCases.filter { difficulty in
-            guard difficulties.contains(difficulty) else {
-                return false
-            }
-
-            if !supportsRustlingsDifficultyFilters && (difficulty == .core || difficulty == .kata) {
-                return false
-            }
-
-            return difficulty != .unknown
-        } + (difficulties.contains(.unknown) ? [.unknown] : [])
+        []
     }
 
     var showsDifficultyFilters: Bool {
@@ -226,7 +305,6 @@ final class WorkspaceStore {
         let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
 
         return workspace.exercises.filter { exercise in
-            let matchesDifficulty = selectedDifficultyFilter == nil || exercise.difficulty == selectedDifficultyFilter
             let isCompleted = isExerciseCompleted(exercise)
             let matchesCompletion: Bool
             switch completionFilter {
@@ -235,6 +313,7 @@ final class WorkspaceStore {
             case .done:
                 matchesCompletion = isCompleted
             }
+            let matchesTests = !showsOnlyTestExercises || exercise.fileRole == .tests
             let matchesQuery = trimmedQuery.isEmpty || [
                 exercise.title,
                 exercise.summary,
@@ -242,7 +321,7 @@ final class WorkspaceStore {
                 currentWorkspaceRecord?.title ?? ""
             ].contains(where: { $0.localizedCaseInsensitiveContains(trimmedQuery) })
 
-            return matchesDifficulty && matchesCompletion && matchesQuery
+            return matchesCompletion && matchesTests && matchesQuery
         }
     }
 
@@ -267,7 +346,21 @@ final class WorkspaceStore {
     }
 
     var currentHintMarkdown: String {
-        selectedExercise?.hintContent ?? "Hints show up here once an exercise is loaded."
+        if let selectedExercise {
+            let trimmedHint = selectedExercise.hintContent.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedHint.isEmpty, trimmedHint != "No hints added for this exercise yet." {
+                return selectedExercise.hintContent
+            }
+        }
+
+        if isShowingMarkdownPreview {
+            let trimmedPreview = explorerPreviewText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedPreview.isEmpty {
+                return trimmedPreview
+            }
+        }
+
+        return "No hints added for this exercise yet."
     }
 
     var currentSolutionMarkdown: String? {
@@ -299,16 +392,12 @@ final class WorkspaceStore {
             && (!modifiedWorkspaceRelativePaths.isEmpty || isEditorDirty)
     }
 
-    private var supportsRustlingsDifficultyFilters: Bool {
-        let candidates = [
-            workspace?.title,
-            currentWorkspaceRecord?.title,
-            selectedWorkspaceRootPath
-        ]
+    var canResetCurrentWorkspace: Bool {
+        currentWorkspaceRecord != nil
+    }
 
-        return candidates
-            .compactMap { $0 }
-            .contains(where: { $0.localizedCaseInsensitiveContains("rustlings") })
+    var canDeleteCurrentWorkspace: Bool {
+        currentWorkspaceRecord != nil
     }
 
     var modifiedWorkspaceRelativePaths: [String] {
@@ -353,6 +442,36 @@ final class WorkspaceStore {
         }
 
         importWorkspace(from: url, sourceKind: .imported, cloneURL: nil)
+    }
+
+    func showNewWorkspacePrompt() {
+        activateApplication()
+
+        let alert = NSAlert()
+        alert.messageText = "New Workspace"
+        alert.informativeText = "Create a managed RustGoblin workspace for authoring custom Rustlings-style exercises."
+        alert.addButton(withTitle: "Create")
+        alert.addButton(withTitle: "Cancel")
+
+        let inputField = PromptTextField(frame: NSRect(x: 0, y: 0, width: 420, height: 24))
+        inputField.placeholderString = "algorithms-lab"
+        inputField.stringValue = "workspace"
+        inputField.isEditable = true
+        inputField.isSelectable = true
+        alert.accessoryView = inputField
+        let alertWindow = alert.window
+        alertWindow.initialFirstResponder = inputField
+        DispatchQueue.main.async {
+            alertWindow.makeFirstResponder(inputField)
+            inputField.selectText(nil)
+        }
+        alertWindow.makeKeyAndOrderFront(nil)
+
+        guard alert.runModal() == .alertFirstButtonReturn else {
+            return
+        }
+
+        createEmptyWorkspace(named: inputField.stringValue)
     }
 
     func showCloneSheet() {
@@ -559,7 +678,21 @@ final class WorkspaceStore {
         if isEditorDirty {
             saveSelectedExercise()
         }
-        loadWorkspace(at: url, sourceKind: sourceKind, cloneURL: cloneURL, restoreState: true)
+
+        do {
+            let managedWorkspace = try prepareWorkspaceForImport(from: url, sourceKind: sourceKind)
+            loadWorkspace(
+                at: managedWorkspace.rootURL,
+                sourceKind: sourceKind,
+                cloneURL: cloneURL,
+                originPath: managedWorkspace.originPath,
+                restoreState: true,
+                refreshBaseline: true
+            )
+        } catch {
+            consoleOutput = "Import failed: \(error.localizedDescription)\n"
+            appendSessionMessage("Import failed for \(url.path)")
+        }
     }
 
     func loadPersistedWorkspace(rootPath: String) {
@@ -571,7 +704,23 @@ final class WorkspaceStore {
             saveSelectedExercise()
         }
 
-        loadWorkspace(at: record.rootURL, sourceKind: record.sourceKind, cloneURL: record.cloneURL, restoreState: true)
+        loadWorkspace(
+            at: record.rootURL,
+            sourceKind: record.sourceKind,
+            cloneURL: record.cloneURL,
+            originPath: record.originPath,
+            restoreState: true,
+            refreshBaseline: false
+        )
+        isWorkspacePickerPresented = false
+    }
+
+    func showWorkspacePalette() {
+        isWorkspacePickerPresented = true
+        workspacePickerFocusToken &+= 1
+    }
+
+    func hideWorkspacePalette() {
         isWorkspacePickerPresented = false
     }
 
@@ -579,6 +728,8 @@ final class WorkspaceStore {
         guard let id, selectedExerciseID != id else {
             return
         }
+
+        captureDraftForActiveEditableDocument()
 
         if hasSelection, !isRestoringState {
             saveSelectedExercise()
@@ -597,23 +748,116 @@ final class WorkspaceStore {
     }
 
     func openExplorerFile(_ url: URL) {
+        selectedExplorerNodePath = url.standardizedFileURL.path
+        explorerKeyboardFocusActive = true
         registerOpenTab(url)
         activateDocument(at: url, persistState: true)
+    }
+
+    func clearConsoleOutput() {
+        consoleOutput = ""
+        if selectedConsoleTab != .output {
+            selectedConsoleTab = .output
+        }
+    }
+
+    func selectConsoleTab(_ tab: ConsoleTab) {
+        if terminalDisplayMode == .hidden {
+            terminalDisplayMode = .split
+        }
+        selectedConsoleTab = tab
+    }
+
+    func closeTab(_ tab: ActiveDocumentTab) {
+        guard let closingIndex = openTabs.firstIndex(of: tab) else {
+            return
+        }
+
+        if isEditorDirty,
+           selectedExplorerFileURL?.standardizedFileURL == tab.url.standardizedFileURL,
+           selectedExercise?.sourceURL.standardizedFileURL == tab.url.standardizedFileURL {
+            saveSelectedExercise()
+        }
+
+        let isActiveTab = selectedExplorerFileURL?.standardizedFileURL == tab.url.standardizedFileURL
+        openTabs.remove(at: closingIndex)
+
+        guard isActiveTab else {
+            persistCurrentWorkspaceSnapshot()
+            return
+        }
+
+        if let replacement = replacementTab(afterClosingAt: closingIndex) {
+            activateDocument(at: replacement.url, persistState: true)
+        } else {
+            clearActiveDocumentState()
+            persistCurrentWorkspaceSnapshot()
+        }
+    }
+
+    func closeActiveTab() {
+        guard let activePath = selectedExplorerFileURL?.standardizedFileURL.path,
+              let activeTab = openTabs.first(where: { $0.path == activePath }) else {
+            return
+        }
+
+        closeTab(activeTab)
+    }
+
+    func activateNextTab() {
+        guard let currentIndex = activeTabIndex else {
+            return
+        }
+
+        let nextIndex = (currentIndex + 1) % openTabs.count
+        activateTab(openTabs[nextIndex])
+    }
+
+    func activatePreviousTab() {
+        guard let currentIndex = activeTabIndex else {
+            return
+        }
+
+        let previousIndex = currentIndex == 0 ? openTabs.count - 1 : currentIndex - 1
+        activateTab(openTabs[previousIndex])
+    }
+
+    func activateNumberedTab(_ number: Int) {
+        guard !openTabs.isEmpty else {
+            return
+        }
+
+        let targetIndex: Int
+        if number == 0 {
+            targetIndex = openTabs.count - 1
+        } else {
+            targetIndex = number - 1
+        }
+
+        guard openTabs.indices.contains(targetIndex) else {
+            return
+        }
+
+        activateTab(openTabs[targetIndex])
     }
 
     func saveSelectedExercise() {
         guard
             var workspace,
             let selectedExerciseID,
-            let selectedIndex = workspace.exercises.firstIndex(where: { $0.id == selectedExerciseID })
+            let selectedIndex = workspace.exercises.firstIndex(where: { $0.id == selectedExerciseID }),
+            let editableURL = currentEditableSourceURL,
+            editableURL.standardizedFileURL == workspace.exercises[selectedIndex].sourceURL.standardizedFileURL
         else {
             return
         }
 
         let selectedExercise = workspace.exercises[selectedIndex]
+        let sourcePath = selectedExercise.sourceURL.standardizedFileURL.path
+        let currentText = draftEditorTextByPath[sourcePath] ?? editorText
 
         do {
-            let rebuiltSource = selectedExercise.presentation.rebuild(with: editorText)
+            let rebuiltSource = selectedExercise.presentation.rebuild(with: currentText)
             try rebuiltSource.write(to: selectedExercise.sourceURL, atomically: true, encoding: .utf8)
             let updatedPresentation = sourcePresentationBuilder.build(from: rebuiltSource)
             let existingChecks = workspace.exercises[selectedIndex].checks
@@ -624,7 +868,11 @@ final class WorkspaceStore {
                 replacement: updatedPresentation.hiddenChecks
             )
             self.workspace = workspace
+            draftEditorTextByPath.removeValue(forKey: sourcePath)
+            editorText = updatedPresentation.visibleSource
             isEditorDirty = false
+            editorDisplayMode = .edit
+            currentDiffText = ""
             appendSessionMessage("Saved \(selectedExercise.sourceURL.lastPathComponent)")
             persistCurrentWorkspaceSnapshot()
         } catch {
@@ -671,6 +919,172 @@ final class WorkspaceStore {
 
     func toggleInspector() {
         isInspectorVisible.toggle()
+        persistCurrentWorkspaceSnapshot()
+    }
+
+    func selectRightSidebarTab(_ tab: RightSidebarTab) {
+        if !isInspectorVisible {
+            isInspectorVisible = true
+        }
+
+        guard rightSidebarTab != tab else {
+            persistCurrentWorkspaceSnapshot()
+            return
+        }
+
+        rightSidebarTab = tab
+        persistCurrentWorkspaceSnapshot()
+    }
+
+    func setRightSidebarWidth(_ width: CGFloat) {
+        let fixedWidth = RustGoblinTheme.Layout.inspectorWidth
+        _ = width
+        guard abs(rightSidebarWidth - fixedWidth) > 0.5 else {
+            return
+        }
+
+        rightSidebarWidth = fixedWidth
+        persistCurrentWorkspaceSnapshot()
+    }
+
+    func focusChatComposer() {
+        selectRightSidebarTab(.chat)
+        chatComposerFocusToken += 1
+        persistCurrentWorkspaceSnapshot()
+    }
+
+    func focusInspectorSidebar() {
+        selectRightSidebarTab(.inspector)
+    }
+
+    func toggleTerminalVisibility() {
+        terminalDisplayMode = terminalDisplayMode == .hidden ? .split : .hidden
+        persistCurrentWorkspaceSnapshot()
+    }
+
+    func toggleTerminalMaximize() {
+        terminalDisplayMode = terminalDisplayMode == .maximized ? .split : .maximized
+        persistCurrentWorkspaceSnapshot()
+    }
+
+    func toggleRightSidebarVisibility() {
+        toggleInspector()
+    }
+
+    func toggleLeftColumnVisibility() {
+        toggleProblemPaneVisibility()
+    }
+
+    func showExplorerAndFocusSearch() {
+        if !showsProblemPane {
+            contentDisplayMode = .split
+        }
+        sidebarMode = .explorer
+        explorerKeyboardFocusActive = false
+        explorerSearchFocusToken += 1
+        persistCurrentWorkspaceSnapshot()
+    }
+
+    func showExerciseLibraryAndFocusSearch() {
+        if !showsProblemPane {
+            contentDisplayMode = .split
+        }
+        sidebarMode = .exercises
+        explorerKeyboardFocusActive = false
+        exerciseSearchFocusToken += 1
+        persistCurrentWorkspaceSnapshot()
+    }
+
+    func createEmptyWorkspace(named rawName: String) {
+        do {
+            let normalizedName = sanitizeWorkspaceName(rawName)
+            let workspaceRootURL = nextCreatedWorkspaceURL(named: normalizedName)
+            try rustlingsWorkspaceScaffolder.createEmptyWorkspace(named: normalizedName, at: workspaceRootURL)
+
+            loadWorkspace(
+                at: workspaceRootURL,
+                sourceKind: .created,
+                cloneURL: nil,
+                originPath: nil,
+                restoreState: false,
+                refreshBaseline: true
+            )
+
+            consoleOutput = "Created workspace: \(normalizedName)\n"
+            appendSessionMessage("Workspace created for \(normalizedName)")
+        } catch {
+            showBlockingAlert(
+                title: "New Workspace",
+                message: error.localizedDescription,
+                style: .warning
+            )
+        }
+    }
+
+    func handleChatSlashCommand(_ input: String) async throws -> String? {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("/") else {
+            return nil
+        }
+
+        let components = trimmed.split(maxSplits: 1, whereSeparator: \.isWhitespace)
+        let command = components.first?.lowercased() ?? trimmed.lowercased()
+        let argument = components.count > 1 ? String(components[1]).trimmingCharacters(in: .whitespacesAndNewlines) : ""
+
+        switch command {
+        case "/challenge":
+            return try await createWorkspaceChallenge(named: argument)
+        default:
+            throw NSError(
+                domain: "WorkspaceStore",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Unknown chat command `\(command)`. Supported commands: `/challenge <name>`."] 
+            )
+        }
+    }
+
+    func setExplorerKeyboardFocus(active: Bool) {
+        explorerKeyboardFocusActive = active
+    }
+
+    func toggleExplorerDirectory(_ node: WorkspaceFileNode) {
+        guard node.isDirectory else {
+            return
+        }
+
+        let path = node.url.standardizedFileURL.path
+        selectedExplorerNodePath = path
+        explorerKeyboardFocusActive = true
+
+        if expandedExplorerDirectoryPaths.contains(path) {
+            expandedExplorerDirectoryPaths.remove(path)
+        } else {
+            expandedExplorerDirectoryPaths.insert(path)
+        }
+    }
+
+    func selectExplorerNode(_ node: WorkspaceFileNode) {
+        selectedExplorerNodePath = node.url.standardizedFileURL.path
+        explorerKeyboardFocusActive = true
+    }
+
+    func handleExplorerKey(_ key: String) {
+        guard sidebarMode == .explorer, showsProblemPane else {
+            return
+        }
+
+        switch key.lowercased() {
+        case "j":
+            moveExplorerSelection(delta: 1)
+        case "k":
+            moveExplorerSelection(delta: -1)
+        case "h":
+            collapseExplorerSelection()
+        case "l":
+            openExplorerSelection()
+        default:
+            break
+        }
     }
 
     func selectSidebarMode(_ mode: SidebarMode) {
@@ -683,13 +1097,20 @@ final class WorkspaceStore {
     }
 
     func selectDifficultyFilter(_ filter: ExerciseDifficulty?) {
-        guard filter == nil || availableDifficultyFilters.contains(filter!) else {
-            selectedDifficultyFilter = nil
-            persistCurrentWorkspaceSnapshot()
+        selectedDifficultyFilter = filter
+        persistCurrentWorkspaceSnapshot()
+    }
+
+    func toggleTestsExerciseFilter() {
+        guard supportsTestExerciseFilter else {
+            if showsOnlyTestExercises {
+                showsOnlyTestExercises = false
+                persistCurrentWorkspaceSnapshot()
+            }
             return
         }
 
-        selectedDifficultyFilter = filter
+        showsOnlyTestExercises.toggle()
         persistCurrentWorkspaceSnapshot()
     }
 
@@ -706,22 +1127,146 @@ final class WorkspaceStore {
         persistCurrentWorkspaceSnapshot()
     }
 
+    func persistExplorerSearchTextChange() {
+        explorerKeyboardFocusActive = false
+        selectFirstVisibleExplorerEntry()
+    }
+
+    func moveExplorerSelectionDown() {
+        moveExplorerSelection(delta: 1)
+    }
+
+    func moveExplorerSelectionUp() {
+        moveExplorerSelection(delta: -1)
+    }
+
+    func activateSelectedExplorerEntry() {
+        openExplorerSelection()
+    }
+
+    func toggleEditorKeymapMode() {
+        setEditorKeymapMode(editorKeymapMode == .standard ? .vim : .standard)
+    }
+
+    func setEditorKeymapMode(_ mode: EditorKeymapMode) {
+        guard editorKeymapMode != mode else {
+            vimInputMode = mode == .vim ? .normal : .insert
+            return
+        }
+
+        editorKeymapMode = mode
+        vimInputMode = mode == .vim ? .normal : .insert
+        defaults.set(mode.rawValue, forKey: Self.editorKeymapDefaultsKey)
+    }
+
+    func setVimInputMode(_ mode: VimInputMode) {
+        guard editorKeymapMode == .vim else {
+            vimInputMode = .insert
+            return
+        }
+        vimInputMode = mode
+    }
+
     func toggleSolutionVisibility() {
         isSolutionVisible.toggle()
     }
 
     func handleEditorTextChange() {
-        isEditorDirty = editorText != selectedExercise?.presentation.visibleSource
-    }
-
-    func resetSelectedExercise() {
-        guard let selectedExercise else {
+        guard let editableURL = currentEditableSourceURL else {
+            isEditorDirty = false
             return
         }
 
-        editorText = selectedExercise.presentation.visibleSource
-        isEditorDirty = false
-        appendSessionMessage("Reset \(selectedExercise.sourceURL.lastPathComponent) to last loaded state")
+        let baseText = selectedExercise?.presentation.visibleSource ?? ""
+        let path = editableURL.standardizedFileURL.path
+
+        if editorText == baseText {
+            draftEditorTextByPath.removeValue(forKey: path)
+            isEditorDirty = false
+        } else {
+            draftEditorTextByPath[path] = editorText
+            isEditorDirty = true
+        }
+    }
+
+    func resetSelectedExercise() {
+        Task {
+            await restoreActiveDocument()
+        }
+    }
+
+    func resetCurrentWorkspace() {
+        guard let record = currentWorkspaceRecord else {
+            return
+        }
+
+        let message = """
+        This will discard all current changes for “\(record.title)” and restore the workspace back to its original imported state.
+
+        This action is destructive.
+        """
+
+        guard confirmDestructiveAction(
+            title: "Reset Workspace",
+            message: message,
+            buttonTitle: "Reset Workspace"
+        ) else {
+            return
+        }
+
+        Task {
+            await performWorkspaceReset(record)
+        }
+    }
+
+    func deleteCurrentWorkspace() {
+        guard let record = currentWorkspaceRecord else {
+            return
+        }
+
+        let deletesFiles = appPaths.containsManagedWorkspace(record.rootURL)
+        let message: String
+        if deletesFiles {
+            message = """
+            This will permanently delete the managed workspace files for “\(record.title)” and remove all related RustGoblin data.
+
+            This action is destructive.
+            """
+        } else {
+            message = """
+            This workspace lives outside RustGoblin managed storage. RustGoblin will remove it from the library and delete its saved data, but it will leave the original files on disk untouched.
+
+            This action is destructive.
+            """
+        }
+
+        guard confirmDestructiveAction(
+            title: deletesFiles ? "Delete Workspace" : "Remove Workspace",
+            message: message,
+            buttonTitle: deletesFiles ? "Delete Workspace" : "Remove Workspace"
+        ) else {
+            return
+        }
+
+        Task {
+            await performWorkspaceDeletion(record)
+        }
+    }
+
+    func toggleDiffMode() {
+        guard canToggleDiffMode else {
+            return
+        }
+
+        if editorDisplayMode == .diff {
+            editorDisplayMode = .edit
+            currentDiffText = ""
+            return
+        }
+
+        Task {
+            await prepareDiffForActiveDocument()
+        }
     }
 
     func toggleProblemMaximize() {
@@ -747,7 +1292,9 @@ final class WorkspaceStore {
                     at: mostRecentAvailableWorkspace.rootURL,
                     sourceKind: mostRecentAvailableWorkspace.sourceKind,
                     cloneURL: mostRecentAvailableWorkspace.cloneURL,
-                    restoreState: true
+                    originPath: mostRecentAvailableWorkspace.originPath,
+                    restoreState: true,
+                    refreshBaseline: false
                 )
             }
         } catch {
@@ -759,7 +1306,9 @@ final class WorkspaceStore {
         at url: URL,
         sourceKind: WorkspaceSourceKind,
         cloneURL: String?,
-        restoreState: Bool
+        originPath: String?,
+        restoreState: Bool,
+        refreshBaseline: Bool
     ) {
         do {
             var loadedWorkspace = try importer.loadWorkspace(from: url)
@@ -767,8 +1316,16 @@ final class WorkspaceStore {
             let progressLookup = try database.fetchProgress(for: rootPath)
             applyStoredProgress(progressLookup, to: &loadedWorkspace)
 
+            if refreshBaseline {
+                try baselineStore.captureBaseline(from: loadedWorkspace.rootURL)
+            }
+
             workspace = loadedWorkspace
-            workspaceFileBaseline = snapshotWorkspaceFiles(for: loadedWorkspace)
+            workspaceFileBaseline = baselineStore.loadBaselineData(for: loadedWorkspace)
+            if workspaceFileBaseline.isEmpty {
+                workspaceFileBaseline = snapshotWorkspaceFiles(for: loadedWorkspace)
+            }
+            draftEditorTextByPath = [:]
             selectedWorkspaceRootPath = rootPath
             diagnostics = []
             selectedConsoleTab = .output
@@ -776,7 +1333,14 @@ final class WorkspaceStore {
             lastCommandDescription = ""
             lastTerminationStatus = nil
             isSolutionVisible = false
+            editorDisplayMode = .edit
+            currentDiffText = ""
             contentDisplayMode = .split
+            terminalDisplayMode = .split
+            explorerSearchText = ""
+            selectedExplorerNodePath = nil
+            explorerKeyboardFocusActive = false
+            expandedExplorerDirectoryPaths = allDirectoryPaths(in: loadedWorkspace.fileTree)
             consoleOutput = "Imported \(loadedWorkspace.exercises.count) exercise(s) from \(loadedWorkspace.rootURL.lastPathComponent).\n"
             appendSessionMessage("Workspace loaded from \(loadedWorkspace.rootURL.path)")
 
@@ -786,6 +1350,7 @@ final class WorkspaceStore {
                 title: loadedWorkspace.title,
                 sourceKind: sourceKind,
                 cloneURL: cloneURL ?? existingRecord?.cloneURL,
+                originPath: originPath ?? existingRecord?.originPath,
                 addedAt: existingRecord?.addedAt ?? Date(),
                 lastOpenedAt: Date(),
                 isMissing: false
@@ -802,16 +1367,20 @@ final class WorkspaceStore {
                 clearActiveDocumentState()
             }
 
+            chatStore?.syncSelection(using: self)
+
             persistCurrentWorkspaceSnapshot()
         } catch {
             workspace = nil
             workspaceFileBaseline = [:]
+            draftEditorTextByPath = [:]
             selectedWorkspaceRootPath = nil
             selectedExerciseID = nil
             clearActiveDocumentState()
             isEditorDirty = false
             consoleOutput = "Import failed: \(error.localizedDescription)\n"
             appendSessionMessage("Import failed for \(url.path)")
+            chatStore?.syncSelection(using: self)
         }
     }
 
@@ -821,8 +1390,14 @@ final class WorkspaceStore {
 
         searchText = state.searchQuery
         selectedDifficultyFilter = state.difficultyFilter
+        showsOnlyTestExercises = supportsTestExerciseFilter ? state.showsOnlyTestExercises : false
         completionFilter = state.completionFilter
         sidebarMode = state.sidebarMode
+        rightSidebarTab = state.rightSidebarTab
+        isInspectorVisible = state.isInspectorVisible
+        rightSidebarWidth = RustGoblinTheme.Layout.inspectorWidth
+        terminalDisplayMode = state.terminalDisplayMode
+        selectedChatSessionID = state.selectedChatSessionID
         if let savedDifficulty = state.difficultyFilter,
            !availableDifficultyFilters.contains(savedDifficulty) {
             selectedDifficultyFilter = nil
@@ -853,15 +1428,22 @@ final class WorkspaceStore {
 
     private func applySelection(for exerciseID: ExerciseDocument.ID) {
         selectedExerciseID = exerciseID
-        editorText = selectedExercise?.presentation.visibleSource ?? ""
+        let sourcePath = selectedExercise?.sourceURL.standardizedFileURL.path
+        editorText = sourcePath.flatMap { draftEditorTextByPath[$0] } ?? selectedExercise?.presentation.visibleSource ?? ""
         explorerPreviewText = ""
-        isEditorDirty = false
+        isEditorDirty = sourcePath.map { draftEditorTextByPath[$0] != nil } ?? false
+        editorDisplayMode = .edit
+        currentDiffText = ""
         isSolutionVisible = false
+        selectedChatSessionID = nil
 
         if let sourceURL = selectedExercise?.sourceURL {
             selectedExplorerFileURL = sourceURL
+            selectedExplorerNodePath = sourceURL.standardizedFileURL.path
             registerOpenTab(sourceURL)
         }
+
+        chatStore?.syncSelection(using: self)
     }
 
     private func activateDocument(at url: URL, persistState: Bool) {
@@ -869,16 +1451,26 @@ final class WorkspaceStore {
             return
         }
 
+        captureDraftForActiveEditableDocument()
         selectedExplorerFileURL = url.standardizedFileURL
+        selectedExplorerNodePath = url.standardizedFileURL.path
         registerOpenTab(url)
+        editorDisplayMode = .edit
+        currentDiffText = ""
 
         if let matchingExercise = workspace.exercises.first(where: { $0.sourceURL.standardizedFileURL == url.standardizedFileURL }) {
             selectedExerciseID = matchingExercise.id
-            editorText = matchingExercise.presentation.visibleSource
-            isEditorDirty = false
+            let sourcePath = matchingExercise.sourceURL.standardizedFileURL.path
+            editorText = draftEditorTextByPath[sourcePath] ?? matchingExercise.presentation.visibleSource
+            explorerPreviewText = ""
+            isEditorDirty = draftEditorTextByPath[sourcePath] != nil
+            selectedChatSessionID = nil
         } else {
             explorerPreviewText = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+            isEditorDirty = false
         }
+
+        chatStore?.syncSelection(using: self)
 
         if persistState {
             persistCurrentWorkspaceSnapshot()
@@ -892,11 +1484,157 @@ final class WorkspaceStore {
         }
     }
 
+    private func replacementTab(afterClosingAt closingIndex: Int) -> ActiveDocumentTab? {
+        guard !openTabs.isEmpty else {
+            return nil
+        }
+
+        if closingIndex < openTabs.count {
+            return openTabs[closingIndex]
+        }
+
+        return openTabs.last
+    }
+
+    private var activeTabIndex: Int? {
+        guard let activePath = selectedExplorerFileURL?.standardizedFileURL.path else {
+            return nil
+        }
+
+        return openTabs.firstIndex(where: { $0.path == activePath })
+    }
+
     private func clearActiveDocumentState() {
         selectedExplorerFileURL = nil
+        selectedExplorerNodePath = nil
         explorerPreviewText = ""
         openTabs = []
         editorText = ""
+        currentDiffText = ""
+        editorDisplayMode = .edit
+        explorerKeyboardFocusActive = false
+        selectedChatSessionID = nil
+        chatStore?.syncSelection(using: self)
+    }
+
+    private func captureDraftForActiveEditableDocument() {
+        guard let editableURL = currentEditableSourceURL else {
+            return
+        }
+
+        let path = editableURL.standardizedFileURL.path
+        let baseText = selectedExercise?.presentation.visibleSource ?? ""
+
+        if editorText == baseText {
+            draftEditorTextByPath.removeValue(forKey: path)
+        } else {
+            draftEditorTextByPath[path] = editorText
+        }
+    }
+
+    private func currentDocumentText(for url: URL) -> String {
+        let standardizedURL = url.standardizedFileURL
+
+        if standardizedURL == currentEditableSourceURL?.standardizedFileURL {
+            return draftEditorTextByPath[standardizedURL.path] ?? editorText
+        }
+
+        if standardizedURL == selectedExplorerFileURL?.standardizedFileURL, isShowingReadonlyPreview {
+            return explorerPreviewText
+        }
+
+        return (try? String(contentsOf: standardizedURL, encoding: .utf8)) ?? ""
+    }
+
+    private func originalText(for url: URL) async throws -> String {
+        let standardizedURL = url.standardizedFileURL
+
+        if let gitRoot = try await fileChangeService.gitRepositoryRoot(for: standardizedURL),
+           let gitHeadText = try await fileChangeService.gitHeadContent(for: standardizedURL, repositoryRootURL: gitRoot) {
+            return gitHeadText
+        }
+
+        if let baselineData = workspaceFileBaseline[standardizedURL.path] {
+            return String(decoding: baselineData, as: UTF8.self)
+        }
+
+        return ""
+    }
+
+    private func prepareDiffForActiveDocument() async {
+        guard let activeDocumentURL else {
+            return
+        }
+
+        do {
+            let original = try await originalText(for: activeDocumentURL)
+            let modified = currentDocumentText(for: activeDocumentURL)
+            let diff = try await fileChangeService.diff(
+                original: original,
+                modified: modified,
+                originalLabel: "original",
+                modifiedLabel: "current"
+            )
+
+            currentDiffText = diff.isEmpty ? "No changes in this file." : diff
+            editorDisplayMode = .diff
+        } catch {
+            currentDiffText = "Diff failed: \(error.localizedDescription)"
+            editorDisplayMode = .diff
+        }
+    }
+
+    private func restoreActiveDocument() async {
+        guard let activeDocumentURL else {
+            return
+        }
+
+        do {
+            if let gitRoot = try await fileChangeService.gitRepositoryRoot(for: activeDocumentURL) {
+                try await fileChangeService.restoreFileFromGit(activeDocumentURL, repositoryRootURL: gitRoot)
+            } else if let baselineData = workspaceFileBaseline[activeDocumentURL.standardizedFileURL.path] {
+                try baselineData.write(to: activeDocumentURL, options: .atomic)
+            } else {
+                try "".write(to: activeDocumentURL, atomically: true, encoding: .utf8)
+            }
+
+            reloadDocumentState(afterExternalChangeAt: activeDocumentURL)
+            appendSessionMessage("Restored \(activeDocumentURL.lastPathComponent)")
+        } catch {
+            consoleOutput += "Restore failed: \(error.localizedDescription)\n"
+            appendSessionMessage("Restore failed for \(activeDocumentURL.lastPathComponent)")
+        }
+    }
+
+    private func reloadDocumentState(afterExternalChangeAt url: URL) {
+        guard var workspace else {
+            return
+        }
+
+        let standardizedURL = url.standardizedFileURL
+        draftEditorTextByPath.removeValue(forKey: standardizedURL.path)
+        currentDiffText = ""
+        editorDisplayMode = .edit
+
+        if let selectedIndex = workspace.exercises.firstIndex(where: { $0.sourceURL.standardizedFileURL == standardizedURL }),
+           let rebuiltSource = try? String(contentsOf: standardizedURL, encoding: .utf8) {
+            let updatedPresentation = sourcePresentationBuilder.build(from: rebuiltSource)
+            let existingChecks = workspace.exercises[selectedIndex].checks
+            workspace.exercises[selectedIndex].sourceCode = rebuiltSource
+            workspace.exercises[selectedIndex].presentation = updatedPresentation
+            workspace.exercises[selectedIndex].checks = mergeCheckStatuses(
+                existing: existingChecks,
+                replacement: updatedPresentation.hiddenChecks
+            )
+            self.workspace = workspace
+            editorText = updatedPresentation.visibleSource
+            isEditorDirty = false
+        } else {
+            explorerPreviewText = (try? String(contentsOf: standardizedURL, encoding: .utf8)) ?? ""
+            isEditorDirty = false
+        }
+
+        persistCurrentWorkspaceSnapshot()
     }
 
     private func applyStoredProgress(_ progressLookup: [String: StoredExerciseProgress], to workspace: inout ExerciseWorkspace) {
@@ -948,9 +1686,15 @@ final class WorkspaceStore {
                 activeTabPath: selectedExplorerFileURL?.standardizedFileURL.path,
                 openTabs: openTabs,
                 sidebarMode: sidebarMode,
+                isInspectorVisible: isInspectorVisible,
+                rightSidebarTab: rightSidebarTab,
+                rightSidebarWidth: rightSidebarWidth,
+                terminalDisplayMode: terminalDisplayMode,
                 searchQuery: searchText,
                 difficultyFilter: selectedDifficultyFilter,
-                completionFilter: completionFilter
+                showsOnlyTestExercises: showsOnlyTestExercises,
+                completionFilter: completionFilter,
+                selectedChatSessionID: selectedChatSessionID
             )
             try database.saveWorkspaceState(workspaceState)
 
@@ -970,6 +1714,10 @@ final class WorkspaceStore {
         } catch {
             sessionLog.insert("Persistence failed: \(error.localizedDescription)", at: 0)
         }
+    }
+
+    func persistChatSelection() {
+        persistCurrentWorkspaceSnapshot()
     }
 
     private func inferredRunState(for exercise: ExerciseDocument) -> RunState {
@@ -1065,7 +1813,6 @@ final class WorkspaceStore {
             }
 
             appendSessionMessage("Submitted \(exercise.title) to Exercism")
-            workspaceFileBaseline = snapshotWorkspaceFiles(for: workspace)
         } catch {
             consoleOutput += "Exercism submit failed: \(error.localizedDescription)\n"
             appendSessionMessage("Exercism submit failed for \(exercise.title)")
@@ -1162,6 +1909,137 @@ final class WorkspaceStore {
         }
     }
 
+    private func filteredFileTree(_ nodes: [WorkspaceFileNode]) -> [WorkspaceFileNode] {
+        let trimmedQuery = explorerSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedQuery.isEmpty else {
+            return nodes
+        }
+
+        let normalizedQuery = trimmedQuery.lowercased()
+        return nodes.compactMap { filterFileNode($0, query: normalizedQuery) }
+    }
+
+    private func filterFileNode(_ node: WorkspaceFileNode, query: String) -> WorkspaceFileNode? {
+        let pathMatches = node.url.path.lowercased().contains(query)
+        let nameMatches = node.name.lowercased().contains(query)
+
+        if node.isDirectory {
+            let filteredChildren = node.children.compactMap { filterFileNode($0, query: query) }
+            guard nameMatches || pathMatches || !filteredChildren.isEmpty else {
+                return nil
+            }
+
+            return WorkspaceFileNode(
+                id: node.id,
+                url: node.url,
+                name: node.name,
+                isDirectory: true,
+                children: filteredChildren
+            )
+        }
+
+        return (nameMatches || pathMatches) ? node : nil
+    }
+
+    private func countFiles(in nodes: [WorkspaceFileNode]) -> Int {
+        nodes.reduce(0) { partial, node in
+            partial + (node.isDirectory ? countFiles(in: node.children) : 1)
+        }
+    }
+
+    private func allDirectoryPaths(in nodes: [WorkspaceFileNode]) -> Set<String> {
+        Set(nodes.flatMap(directoryPaths(for:)))
+    }
+
+    private func directoryPaths(for node: WorkspaceFileNode) -> [String] {
+        guard node.isDirectory else {
+            return []
+        }
+
+        return [node.url.standardizedFileURL.path] + node.children.flatMap(directoryPaths(for:))
+    }
+
+    private func visibleExplorerEntries() -> [ExplorerVisibleEntry] {
+        flattenExplorerNodes(currentFileTree, depth: 0, parentPath: nil)
+    }
+
+    private func flattenExplorerNodes(
+        _ nodes: [WorkspaceFileNode],
+        depth: Int,
+        parentPath: String?
+    ) -> [ExplorerVisibleEntry] {
+        let isFiltering = !explorerSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+
+        return nodes.flatMap { node in
+            let path = node.url.standardizedFileURL.path
+            let entry = ExplorerVisibleEntry(node: node, depth: depth, parentPath: parentPath)
+            let isExpanded = isFiltering || expandedExplorerDirectoryPaths.contains(path)
+
+            if node.isDirectory, isExpanded {
+                return [entry] + flattenExplorerNodes(node.children, depth: depth + 1, parentPath: path)
+            }
+
+            return [entry]
+        }
+    }
+
+    private func moveExplorerSelection(delta: Int) {
+        let entries = visibleExplorerEntries()
+        guard !entries.isEmpty else {
+            return
+        }
+
+        let currentIndex = entries.firstIndex(where: { $0.path == selectedExplorerNodePath }) ?? (delta > 0 ? -1 : entries.count)
+        let targetIndex = min(max(currentIndex + delta, 0), entries.count - 1)
+        let entry = entries[targetIndex]
+        selectedExplorerNodePath = entry.path
+        explorerKeyboardFocusActive = true
+    }
+
+    private func selectFirstVisibleExplorerEntry() {
+        let entries = visibleExplorerEntries()
+        selectedExplorerNodePath = entries.first?.path
+    }
+
+    private func collapseExplorerSelection() {
+        let entries = visibleExplorerEntries()
+        guard let selectedPath = selectedExplorerNodePath,
+              let entry = entries.first(where: { $0.path == selectedPath }) else {
+            return
+        }
+
+        if entry.node.isDirectory, expandedExplorerDirectoryPaths.contains(entry.path) {
+            expandedExplorerDirectoryPaths.remove(entry.path)
+            return
+        }
+
+        if let parentPath = entry.parentPath {
+            selectedExplorerNodePath = parentPath
+        }
+    }
+
+    private func openExplorerSelection() {
+        let entries = visibleExplorerEntries()
+        guard let selectedPath = selectedExplorerNodePath,
+              let entry = entries.first(where: { $0.path == selectedPath }) else {
+            return
+        }
+
+        if entry.node.isDirectory {
+            if !expandedExplorerDirectoryPaths.contains(entry.path) {
+                expandedExplorerDirectoryPaths.insert(entry.path)
+                return
+            }
+
+            if let child = entries.first(where: { $0.parentPath == entry.path }) {
+                selectedExplorerNodePath = child.path
+            }
+            return
+        }
+
+        openExplorerFile(entry.node.url)
+    }
+
     private func relativePath(for fileURL: URL, rootURL: URL) -> String {
         let standardizedFileURL = fileURL.standardizedFileURL
         let standardizedRootURL = rootURL.standardizedFileURL
@@ -1173,6 +2051,230 @@ final class WorkspaceStore {
         }
 
         return standardizedFileURL.lastPathComponent
+    }
+
+    private func prepareWorkspaceForImport(
+        from url: URL,
+        sourceKind: WorkspaceSourceKind
+    ) throws -> (rootURL: URL, originPath: String?) {
+        let originRootURL = normalizedWorkspaceRoot(for: url)
+
+        if appPaths.containsManagedWorkspace(originRootURL) || sourceKind == .cloned {
+            return (originRootURL, nil)
+        }
+
+        let managedRootURL = managedWorkspaceURL(for: originRootURL, sourceKind: sourceKind)
+        try replaceWorkspaceContents(from: originRootURL, to: managedRootURL)
+        return (managedRootURL, originRootURL.path)
+    }
+
+    private func normalizedWorkspaceRoot(for url: URL) -> URL {
+        if url.pathExtension.lowercased() == "rs" {
+            return url.deletingLastPathComponent().standardizedFileURL
+        }
+
+        return url.standardizedFileURL
+    }
+
+    private func managedWorkspaceURL(for sourceRootURL: URL, sourceKind: WorkspaceSourceKind) -> URL {
+        let containerURL: URL
+        switch sourceKind {
+        case .imported:
+            containerURL = appPaths.importedLibraryURL
+        case .cloned:
+            containerURL = appPaths.cloneLibraryURL
+        case .exercism:
+            containerURL = appPaths.exercismLibraryURL
+        case .created:
+            containerURL = appPaths.createdWorkspaceLibraryURL
+        }
+
+        let slug = sourceRootURL.lastPathComponent
+            .lowercased()
+            .replacingOccurrences(of: " ", with: "-")
+            .components(separatedBy: CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_")).inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: "-")
+        let digest = sourceRootURL.standardizedFileURL.path
+            .utf8
+            .reduce(into: 5381) { hash, byte in
+                hash = ((hash << 5) &+ hash) &+ Int(byte)
+            }
+        let identifier = String(format: "%08x", abs(digest))
+        let directoryName = "\(slug.isEmpty ? "workspace" : slug)-\(identifier)"
+        return containerURL.appendingPathComponent(directoryName, isDirectory: true)
+    }
+
+    private func replaceWorkspaceContents(from sourceRootURL: URL, to destinationRootURL: URL) throws {
+        let fileManager = FileManager.default
+        if fileManager.fileExists(atPath: destinationRootURL.path) {
+            try fileManager.removeItem(at: destinationRootURL)
+        }
+
+        try fileManager.createDirectory(
+            at: destinationRootURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try fileManager.copyItem(at: sourceRootURL, to: destinationRootURL)
+    }
+
+    private func createWorkspaceChallenge(named rawName: String) async throws -> String {
+        guard let workspace, let record = currentWorkspaceRecord else {
+            throw NSError(
+                domain: "WorkspaceStore",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Open or create a workspace before using `/challenge`."] 
+            )
+        }
+
+        let trimmedName = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            throw NSError(
+                domain: "WorkspaceStore",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "Usage: `/challenge lru cache`"] 
+            )
+        }
+
+        let result = try await rustlingsWorkspaceScaffolder.createChallenge(named: trimmedName, in: workspace.rootURL)
+
+        loadWorkspace(
+            at: workspace.rootURL,
+            sourceKind: record.sourceKind,
+            cloneURL: record.cloneURL,
+            originPath: record.originPath,
+            restoreState: false,
+            refreshBaseline: true
+        )
+
+        if let createdExercise = self.workspace?.exercises.first(where: {
+            $0.sourceURL.standardizedFileURL == result.exerciseURL.standardizedFileURL
+        }) {
+            applySelection(for: createdExercise.id)
+            registerOpenTab(createdExercise.sourceURL)
+            activateDocument(at: createdExercise.sourceURL, persistState: true)
+        }
+
+        appendSessionMessage("Created challenge \(result.slug)")
+
+        var summaryLines = [
+            "Created `\(result.slug)` in the current workspace.",
+            "",
+            "- Exercise: `\(relativePath(for: result.exerciseURL, rootURL: workspace.rootURL))`",
+            "- Solution: `\(relativePath(for: result.solutionURL, rootURL: workspace.rootURL))`",
+            "- Updated: `info.toml`"
+        ]
+
+        if let devUpdateMessage = result.devUpdateMessage, !devUpdateMessage.isEmpty {
+            summaryLines += [
+                "",
+                "`rustlings dev update` / `rustlings dev check` output:",
+                "```text",
+                devUpdateMessage,
+                "```"
+            ]
+        }
+
+        return summaryLines.joined(separator: "\n")
+    }
+
+    private func performWorkspaceReset(_ record: SavedWorkspaceRecord) async {
+        let rootURL = record.rootURL
+
+        do {
+            if baselineStore.hasBaseline(for: rootURL) {
+                try baselineStore.restoreBaseline(to: rootURL)
+            } else if let originURL = record.originURL, FileManager.default.fileExists(atPath: originURL.path) {
+                try replaceWorkspaceContents(from: originURL, to: rootURL)
+                try baselineStore.captureBaseline(from: rootURL)
+            } else if record.sourceKind == .cloned, let cloneURL = record.cloneURL {
+                _ = try await repositoryCloner.clone(
+                    urlString: cloneURL,
+                    destinationURL: rootURL,
+                    replaceExisting: true
+                )
+                try baselineStore.captureBaseline(from: rootURL)
+            } else {
+                throw NSError(
+                    domain: "WorkspaceStore",
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "RustGoblin has no original baseline or recovery source for this workspace."]
+                )
+            }
+
+            loadWorkspace(
+                at: rootURL,
+                sourceKind: record.sourceKind,
+                cloneURL: record.cloneURL,
+                originPath: record.originPath,
+                restoreState: true,
+                refreshBaseline: false
+            )
+            consoleOutput += "Workspace reset: \(record.title)\n"
+            appendSessionMessage("Workspace reset for \(record.title)")
+        } catch {
+            showBlockingAlert(
+                title: "Reset Workspace",
+                message: error.localizedDescription,
+                style: .warning
+            )
+        }
+    }
+
+    private func performWorkspaceDeletion(_ record: SavedWorkspaceRecord) async {
+        do {
+            let isManaged = appPaths.containsManagedWorkspace(record.rootURL)
+            if isManaged, FileManager.default.fileExists(atPath: record.rootURL.path) {
+                try FileManager.default.removeItem(at: record.rootURL)
+            }
+
+            try? baselineStore.deleteBaseline(for: record.rootURL)
+            try database.deleteWorkspace(rootPath: record.rootPath)
+
+            workspaceLibrary.removeAll { $0.rootPath == record.rootPath }
+
+            if selectedWorkspaceRootPath == record.rootPath {
+                clearCurrentWorkspaceState()
+
+                if let nextRecord = workspaceLibrary.first(where: { !$0.isMissing }) {
+                    loadWorkspace(
+                        at: nextRecord.rootURL,
+                        sourceKind: nextRecord.sourceKind,
+                        cloneURL: nextRecord.cloneURL,
+                        originPath: nextRecord.originPath,
+                        restoreState: true,
+                        refreshBaseline: false
+                    )
+                }
+            }
+
+            consoleOutput += "Workspace removed: \(record.title)\n"
+            appendSessionMessage("Workspace removed for \(record.title)")
+        } catch {
+            showBlockingAlert(
+                title: "Delete Workspace",
+                message: error.localizedDescription,
+                style: .warning
+            )
+        }
+    }
+
+    private func clearCurrentWorkspaceState() {
+        workspace = nil
+        selectedWorkspaceRootPath = nil
+        selectedExerciseID = nil
+        workspaceFileBaseline = [:]
+        draftEditorTextByPath = [:]
+        diagnostics = []
+        runState = .idle
+        lastCommandDescription = ""
+        lastTerminationStatus = nil
+        searchText = ""
+        explorerSearchText = ""
+        clearActiveDocumentState()
+        isEditorDirty = false
+        selectedChatSessionID = nil
+        chatStore?.syncSelection(using: self)
     }
 
     private func exercismStatusMessage(for status: ExercismCLI.Status) -> String {
@@ -1298,11 +2400,67 @@ final class WorkspaceStore {
         alert.runModal()
     }
 
+    private func confirmDestructiveAction(title: String, message: String, buttonTitle: String) -> Bool {
+        activateApplication()
+
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = title
+        alert.informativeText = message
+        alert.addButton(withTitle: buttonTitle)
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
     private func appendSessionMessage(_ message: String) {
         sessionLog.insert(
             "\(Date().formatted(date: .omitted, time: .shortened))  \(message)",
             at: 0
         )
+    }
+
+    private func sanitizeWorkspaceName(_ rawName: String) -> String {
+        let normalized = rawName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "/", with: " ")
+
+        guard !normalized.isEmpty else {
+            return "workspace"
+        }
+
+        return normalized
+    }
+
+    private func nextCreatedWorkspaceURL(named rawName: String) -> URL {
+        let slug = rawName
+            .lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: "-")
+
+        let baseName = slug.isEmpty ? "workspace" : slug
+        var candidateURL = appPaths.createdWorkspaceLibraryURL.appendingPathComponent(baseName, isDirectory: true)
+        var suffix = 2
+
+        while FileManager.default.fileExists(atPath: candidateURL.path) {
+            candidateURL = appPaths.createdWorkspaceLibraryURL.appendingPathComponent("\(baseName)-\(suffix)", isDirectory: true)
+            suffix += 1
+        }
+
+        return candidateURL
+    }
+}
+
+private extension WorkspaceStore {
+    static func loadEditorKeymapMode(from defaults: UserDefaults) -> EditorKeymapMode {
+        guard
+            let rawValue = defaults.string(forKey: editorKeymapDefaultsKey),
+            let mode = EditorKeymapMode(rawValue: rawValue)
+        else {
+            return .standard
+        }
+
+        return mode
     }
 }
 
@@ -1354,5 +2512,15 @@ private enum PromptValidationError: LocalizedError {
         case .invalidExercismCommand:
             return "RustGoblin could not parse that Exercism command. Use a command like `exercism download --track=rust --exercise=hello-world`."
         }
+    }
+}
+
+private struct ExplorerVisibleEntry {
+    let node: WorkspaceFileNode
+    let depth: Int
+    let parentPath: String?
+
+    var path: String {
+        node.url.standardizedFileURL.path
     }
 }

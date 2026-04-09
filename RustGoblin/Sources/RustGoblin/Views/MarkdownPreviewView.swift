@@ -2,6 +2,30 @@ import AppKit
 import SwiftUI
 import WebKit
 
+private final class PassthroughScrollWKWebView: WKWebView {
+    var shouldPassScrollToParent = false
+
+    override func scrollWheel(with event: NSEvent) {
+        guard shouldPassScrollToParent else {
+            super.scrollWheel(with: event)
+            return
+        }
+
+        let internalScrollView = enclosingScrollView
+        var ancestor: NSView? = superview
+
+        while let current = ancestor {
+            if let outerScrollView = current.enclosingScrollView, outerScrollView !== internalScrollView {
+                outerScrollView.scrollWheel(with: event)
+                return
+            }
+            ancestor = current.superview
+        }
+
+        nextResponder?.scrollWheel(with: event)
+    }
+}
+
 struct MarkdownPreviewView: NSViewRepresentable {
     let markdown: String
     var sourceURL: URL?
@@ -16,9 +40,10 @@ struct MarkdownPreviewView: NSViewRepresentable {
         let configuration = WKWebViewConfiguration()
         let controller = WKUserContentController()
         controller.add(context.coordinator, name: Coordinator.heightMessageName)
+        controller.add(context.coordinator, name: Coordinator.copyCodeMessageName)
         configuration.userContentController = controller
 
-        let webView = WKWebView(frame: .zero, configuration: configuration)
+        let webView = PassthroughScrollWKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         webView.setValue(false, forKey: "drawsBackground")
         webView.allowsBackForwardNavigationGestures = false
@@ -42,6 +67,7 @@ extension MarkdownPreviewView {
     @MainActor
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         static let heightMessageName = "contentHeight"
+        static let copyCodeMessageName = "copyCodeBlock"
 
         var parent: MarkdownPreviewView?
         weak var webView: WKWebView?
@@ -75,6 +101,10 @@ extension MarkdownPreviewView {
             }
 
             DispatchQueue.main.async {
+                if let passthroughWebView = webView as? PassthroughScrollWKWebView {
+                    passthroughWebView.shouldPassScrollToParent = parent.sizingMode == .intrinsicHeight
+                }
+
                 guard let scrollView = webView.enclosingScrollView else {
                     return
                 }
@@ -88,19 +118,29 @@ extension MarkdownPreviewView {
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-            guard parent?.sizingMode == .intrinsicHeight else {
-                return
-            }
+            switch message.name {
+            case Self.heightMessageName:
+                guard parent?.sizingMode == .intrinsicHeight,
+                      let value = message.body as? NSNumber
+                else {
+                    return
+                }
 
-            guard
-                message.name == Self.heightMessageName,
-                let value = message.body as? NSNumber
-            else {
-                return
-            }
+                DispatchQueue.main.async {
+                    self.contentHeight = max(140, CGFloat(truncating: value))
+                }
+            case Self.copyCodeMessageName:
+                guard let code = message.body as? String else {
+                    return
+                }
 
-            DispatchQueue.main.async {
-                self.contentHeight = max(140, CGFloat(truncating: value))
+                DispatchQueue.main.async {
+                    let pasteboard = NSPasteboard.general
+                    pasteboard.clearContents()
+                    pasteboard.setString(code, forType: .string)
+                }
+            default:
+                return
             }
         }
 

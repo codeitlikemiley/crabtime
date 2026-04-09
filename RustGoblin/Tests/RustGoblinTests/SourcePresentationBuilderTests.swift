@@ -70,4 +70,24 @@ final class SourcePresentationBuilderTests: XCTestCase {
         XCTAssertTrue(rebuilt.contains("println!(\"new\")"))
         XCTAssertFalse(rebuilt.contains("println!(\"old\")"))
     }
+
+    func testBuildIgnoresIgnoredHiddenTests() {
+        let source = """
+        fn main() {}
+
+        #[cfg(test)]
+        mod tests {
+            #[test]
+            fn active_case() {}
+
+            #[test]
+            #[ignore]
+            fn skipped_case() {}
+        }
+        """
+
+        let presentation = SourcePresentationBuilder().build(from: source)
+
+        XCTAssertEqual(presentation.hiddenChecks.map(\.id), ["active_case"])
+    }
 }

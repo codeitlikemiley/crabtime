@@ -5,6 +5,7 @@ struct ExerciseDocument: Identifiable, Equatable, Sendable {
     let title: String
     let summary: String
     let difficulty: ExerciseDifficulty
+    let fileRole: ExerciseFileRole
     let sortOrder: Int?
     let directoryURL: URL
     let sourceURL: URL

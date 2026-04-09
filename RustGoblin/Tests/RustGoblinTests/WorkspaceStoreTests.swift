@@ -25,8 +25,10 @@ final class WorkspaceStoreTests: XCTestCase {
         """
         store.saveSelectedExercise()
 
+        let managedWorkspaceURL = try XCTUnwrap(store.currentWorkspaceRecord?.rootURL)
+
         let savedSource = try String(
-            contentsOf: tempWorkspaceURL.appendingPathComponent("challenge.rs"),
+            contentsOf: managedWorkspaceURL.appendingPathComponent("challenge.rs"),
             encoding: .utf8
         )
 
@@ -40,7 +42,6 @@ final class WorkspaceStoreTests: XCTestCase {
         let tempRootURL = try makeTemporaryWorkspaceRoot()
         let tempWorkspaceURL = tempRootURL.appendingPathComponent("sample_challenge")
         let appPaths = AppStoragePaths(baseURL: tempRootURL.appendingPathComponent("app-state", isDirectory: true))
-        let readmeURL = tempWorkspaceURL.appendingPathComponent("README.md")
         try FileManager.default.copyItem(at: fixtureURL, to: tempWorkspaceURL)
         defer { try? FileManager.default.removeItem(at: tempRootURL) }
 
@@ -48,13 +49,15 @@ final class WorkspaceStoreTests: XCTestCase {
 
         store.importWorkspace(from: tempWorkspaceURL)
         store.selectSidebarMode(.explorer)
-        store.openExplorerFile(tempWorkspaceURL.appendingPathComponent("README.md"))
+        let managedWorkspaceURL = try XCTUnwrap(store.currentWorkspaceRecord?.rootURL)
+        let managedReadmeURL = managedWorkspaceURL.appendingPathComponent("README.md")
+        store.openExplorerFile(managedReadmeURL)
 
-        XCTAssertEqual(store.selectedExplorerFileURL, tempWorkspaceURL.appendingPathComponent("README.md"))
+        XCTAssertEqual(store.selectedExplorerFileURL, managedReadmeURL)
         XCTAssertTrue(store.explorerPreviewText.contains("Sample Challenge"))
         XCTAssertTrue(store.isShowingExplorerPreview)
         XCTAssertTrue(store.isShowingReadonlyPreview)
-        XCTAssertTrue(store.currentOpenFiles.contains(readmeURL))
+        XCTAssertTrue(store.currentOpenFiles.contains(managedReadmeURL))
     }
 
     func testSelectExerciseRegistersSourceAsOpenTab() throws {
@@ -76,7 +79,6 @@ final class WorkspaceStoreTests: XCTestCase {
         let tempRootURL = try makeTemporaryWorkspaceRoot()
         let tempWorkspaceURL = tempRootURL.appendingPathComponent("sample_challenge")
         let appPaths = AppStoragePaths(baseURL: tempRootURL.appendingPathComponent("app-state", isDirectory: true))
-        let readmeURL = tempWorkspaceURL.appendingPathComponent("README.md")
 
         try FileManager.default.copyItem(at: fixtureURL, to: tempWorkspaceURL)
         defer { try? FileManager.default.removeItem(at: tempRootURL) }
@@ -86,22 +88,23 @@ final class WorkspaceStoreTests: XCTestCase {
         firstStore.selectSidebarMode(.explorer)
         firstStore.searchText = "sample"
         firstStore.persistSearchTextChange()
-        firstStore.selectDifficultyFilter(.core)
-        firstStore.openExplorerFile(readmeURL)
+        let managedWorkspaceURL = try XCTUnwrap(firstStore.currentWorkspaceRecord?.rootURL)
+        let managedReadmeURL = managedWorkspaceURL.appendingPathComponent("README.md")
+        firstStore.openExplorerFile(managedReadmeURL)
 
         let restoredStore = WorkspaceStore(appPaths: appPaths)
 
         XCTAssertEqual(restoredStore.workspaceLibrary.count, 1)
-        XCTAssertEqual(restoredStore.currentWorkspaceRecord?.rootPath, tempWorkspaceURL.standardizedFileURL.path)
+        XCTAssertEqual(restoredStore.currentWorkspaceRecord?.rootPath, managedWorkspaceURL.standardizedFileURL.path)
         XCTAssertEqual(restoredStore.selectedExercise?.sourceURL.lastPathComponent, "challenge.rs")
-        XCTAssertEqual(restoredStore.selectedExplorerFileURL, readmeURL)
+        XCTAssertEqual(restoredStore.selectedExplorerFileURL, managedReadmeURL)
         XCTAssertEqual(restoredStore.sidebarMode, .explorer)
         XCTAssertEqual(restoredStore.searchText, "sample")
         XCTAssertNil(restoredStore.selectedDifficultyFilter)
         XCTAssertEqual(restoredStore.currentOpenTabs.map(\.title), ["challenge.rs", "README.md"])
     }
 
-    func testSearchAndDifficultyFilterApplyToVisibleExercises() throws {
+    func testSearchFilterAppliesToVisibleExercises() throws {
         let fixtureURL = URL(fileURLWithPath: "/Volumes/goldcoders/rustgoblin/tests/fixtures/rustlings_like")
         let tempRootURL = try makeTemporaryWorkspaceRoot()
         let tempWorkspaceURL = tempRootURL.appendingPathComponent("rustlings_like")
@@ -121,8 +124,7 @@ final class WorkspaceStoreTests: XCTestCase {
 
         store.searchText = ""
         store.persistSearchTextChange()
-        store.selectDifficultyFilter(.easy)
-        XCTAssertEqual(store.visibleExercises.map(\.title), ["Variables One"])
+        XCTAssertEqual(store.visibleExercises.map(\.title), ["Variables One", "Variables Two"])
     }
 
     func testNonRustlingsWorkspaceHidesRustlingsOnlyDifficultyFilters() throws {

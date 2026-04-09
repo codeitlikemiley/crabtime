@@ -7,7 +7,7 @@ enum RustGoblinTheme {
         static let columnSpacing: CGFloat = 14
         static let sidebarWidth: CGFloat = 60
         static let problemWidth: CGFloat = 348
-        static let inspectorWidth: CGFloat = 296
+        static let inspectorWidth: CGFloat = 400
         static let cornerRadius: CGFloat = 22
         static let cardPadding: CGFloat = 16
         static let iconButtonSize: CGFloat = 34

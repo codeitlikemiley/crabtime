@@ -11,40 +11,36 @@ struct ProblemBrowserView: View {
                 WorkspaceExplorerView()
             } else {
                 VStack(alignment: .leading, spacing: 16) {
-                    HStack(alignment: .top, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            EyebrowLabel(text: "Exercise Library")
+                    VStack(alignment: .leading, spacing: 6) {
+                        EyebrowLabel(text: "Exercise Library")
 
-                            Text(store.workspace?.title ?? "Imported Exercises")
-                                .font(.title3.weight(.bold))
-                                .foregroundStyle(RustGoblinTheme.Palette.ink)
+                        Text(store.workspace?.title ?? "Imported Exercises")
+                            .font(.title3.weight(.bold))
+                            .foregroundStyle(RustGoblinTheme.Palette.ink)
 
-                            Text("Browse imported prompts, switch between exercises, and keep the brief close to the code.")
-                                .font(.footnote)
-                                .foregroundStyle(RustGoblinTheme.Palette.textMuted)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-
-                        Spacer()
-
-                        WorkspaceSidebarToolbar()
+                        Text("Browse imported prompts, switch between exercises, and keep the brief close to the code.")
+                            .font(.footnote)
+                            .foregroundStyle(RustGoblinTheme.Palette.textMuted)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
 
                     ProblemSearchField(text: $store.searchText, resultCount: store.visibleExercises.count)
                     DifficultyFilterStrip()
 
-                    VSplitView {
-                        ExerciseCatalogView()
-                            .frame(minHeight: 250)
-
-                        ProblemStatementView()
-                            .frame(minHeight: 320)
-                    }
+                    ExerciseCatalogView()
+                        .frame(maxHeight: .infinity, alignment: .top)
                 }
                 .frame(maxHeight: .infinity, alignment: .topLeading)
                 .paneCard()
             }
         }
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                if store.sidebarMode != .explorer {
+                    store.setExplorerKeyboardFocus(active: false)
+                }
+            }
+        )
     }
 }
 
@@ -52,6 +48,7 @@ private struct ProblemSearchField: View {
     @Environment(WorkspaceStore.self) private var store
     @Binding var text: String
     let resultCount: Int
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         HStack(spacing: 10) {
@@ -62,6 +59,7 @@ private struct ProblemSearchField: View {
                 .textFieldStyle(.plain)
                 .foregroundStyle(RustGoblinTheme.Palette.ink)
                 .tint(RustGoblinTheme.Palette.panelTint)
+                .focused($isFocused)
 
             Text("\(resultCount)")
                 .font(.caption.weight(.semibold))
@@ -72,6 +70,12 @@ private struct ProblemSearchField: View {
         }
         .onChange(of: text) { _, _ in
             store.persistSearchTextChange()
+        }
+        .task(id: store.exerciseSearchFocusToken) {
+            guard store.exerciseSearchFocusToken > 0 else {
+                return
+            }
+            isFocused = true
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)

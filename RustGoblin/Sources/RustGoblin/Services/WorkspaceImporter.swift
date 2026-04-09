@@ -20,7 +20,16 @@ struct WorkspaceImporter {
         }
 
         guard !candidates.isEmpty else {
-            throw ImportError.noExercisesFound(selectionURL.path)
+            guard looksLikeWorkspaceContainer(rootURL) else {
+                throw ImportError.noExercisesFound(selectionURL.path)
+            }
+
+            return ExerciseWorkspace(
+                rootURL: rootURL,
+                title: rootURL.lastPathComponent,
+                exercises: [],
+                fileTree: try buildFileTree(at: rootURL)
+            )
         }
 
         let loadedExercises = try candidates.enumerated().map { index, candidate in
@@ -158,18 +167,25 @@ struct WorkspaceImporter {
         let readmeURL = directoryContents.first { $0.lastPathComponent == "README.md" }
         let hintURL = directoryContents.first { $0.lastPathComponent == "hint.md" }
             ?? directoryContents.first { $0.lastPathComponent == "HELP.md" }
-        let solutionURL = directoryContents.first { $0.lastPathComponent == "solution.rs" }
+        let directSolutionURL = directoryContents.first { $0.lastPathComponent == "solution.rs" }
+        let mirroredSolutionURL = mirroredSolutionURL(for: candidate.sourceURL, rootURL: rootURL)
+        let solutionURL = directSolutionURL ?? mirroredSolutionURL
         let metadata = loadMetadata(for: candidate.sourceURL, in: candidate.directoryURL)
+        let fileRole = fileRole(for: candidate.sourceURL, rootURL: rootURL)
 
         let readmeContent = readContents(of: readmeURL) ?? defaultReadme(for: candidate.sourceURL)
         let hintContent = readContents(of: hintURL) ?? "No hints added for this exercise yet."
         let sourceCode = readContents(of: candidate.sourceURL) ?? ""
         let presentation = sourcePresentationBuilder.build(from: sourceCode)
         let solutionCode = readContents(of: solutionURL)
+        let solutionPresentation = solutionCode.map { sourcePresentationBuilder.build(from: $0) }
         let title = metadata.title ?? title(from: readmeContent, sourceURL: candidate.sourceURL)
         let summary = metadata.summary ?? summary(from: readmeContent)
         let difficulty = metadata.difficulty ?? ExerciseDifficulty.inferred(from: [title, summary].joined(separator: " "), fallbackIndex: fallbackIndex)
-        let checks = presentation.hiddenChecks.isEmpty
+        let derivedChecks = !presentation.hiddenChecks.isEmpty
+            ? presentation.hiddenChecks
+            : (solutionPresentation?.hiddenChecks ?? [])
+        let checks = derivedChecks.isEmpty
             ? [
                 ExerciseCheck(
                     id: "manual-run",
@@ -178,13 +194,14 @@ struct WorkspaceImporter {
                     symbolName: "play.rectangle"
                 )
             ]
-            : presentation.hiddenChecks
+            : derivedChecks
 
         let exercise = ExerciseDocument(
             id: candidate.sourceURL.standardizedFileURL,
             title: title,
             summary: summary,
             difficulty: difficulty,
+            fileRole: fileRole,
             sortOrder: metadata.order,
             directoryURL: candidate.directoryURL.standardizedFileURL,
             sourceURL: candidate.sourceURL.standardizedFileURL,
@@ -258,7 +275,12 @@ struct WorkspaceImporter {
             return false
         }
 
-        return true
+        if isDirectory(url) {
+            return true
+        }
+
+        let allowedExtensions = Set(["rs", "md", "toml"])
+        return allowedExtensions.contains(url.pathExtension.lowercased())
     }
 
     private func loadMetadata(for sourceURL: URL, in directoryURL: URL) -> ExerciseMetadata {
@@ -367,6 +389,29 @@ struct WorkspaceImporter {
         relativePathComponents(for: url, rootURL: rootURL).contains("exercises")
     }
 
+    private func fileRole(for sourceURL: URL, rootURL: URL) -> ExerciseFileRole {
+        relativePathComponents(for: sourceURL, rootURL: rootURL).contains("tests") ? .tests : .primary
+    }
+
+    private func mirroredSolutionURL(for sourceURL: URL, rootURL: URL) -> URL? {
+        let components = relativePathComponents(for: sourceURL, rootURL: rootURL)
+        guard components.first == "exercises" else {
+            return nil
+        }
+
+        var candidateURL = rootURL
+        for component in ["solutions"] + Array(components.dropFirst()) {
+            candidateURL.appendPathComponent(component)
+        }
+
+        let standardizedURL = candidateURL.standardizedFileURL
+        guard fileManager.fileExists(atPath: standardizedURL.path) else {
+            return nil
+        }
+
+        return standardizedURL
+    }
+
     private func relativePathComponents(for url: URL, rootURL: URL) -> [String] {
         let resolvedURLComponents = url.resolvingSymlinksInPath().standardizedFileURL.pathComponents
         let resolvedRootComponents = rootURL.resolvingSymlinksInPath().standardizedFileURL.pathComponents
@@ -423,6 +468,20 @@ struct WorkspaceImporter {
     private func isRegularFile(_ url: URL) -> Bool {
         var isDirectory: ObjCBool = false
         return fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) && !isDirectory.boolValue
+    }
+
+    private func looksLikeWorkspaceContainer(_ rootURL: URL) -> Bool {
+        let candidateNames = [
+            "Cargo.toml",
+            "info.toml",
+            "README.md",
+            "exercises",
+            "solutions"
+        ]
+
+        return candidateNames.contains { name in
+            fileManager.fileExists(atPath: rootURL.appendingPathComponent(name).path)
+        }
     }
 }
 

@@ -10,9 +10,18 @@ struct RepositoryCloner: Sendable {
     func clone(urlString: String) async throws -> URL {
         let repositorySpecifier = try normalizedRepositorySpecifier(from: urlString)
         let destinationURL = cloneLibraryURL.appendingPathComponent(repositoryName(from: repositorySpecifier), isDirectory: true)
+        return try await clone(urlString: urlString, destinationURL: destinationURL, replaceExisting: false)
+    }
+
+    func clone(urlString: String, destinationURL: URL, replaceExisting: Bool) async throws -> URL {
+        let repositorySpecifier = try normalizedRepositorySpecifier(from: urlString)
 
         if FileManager.default.fileExists(atPath: destinationURL.path) {
-            return destinationURL
+            if replaceExisting {
+                try FileManager.default.removeItem(at: destinationURL)
+            } else {
+                return destinationURL
+            }
         }
 
         let process = Process()

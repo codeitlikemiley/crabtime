@@ -45,10 +45,6 @@ private struct ExerciseCard: View {
     let isSelected: Bool
     let action: () -> Void
 
-    private var difficulty: ExerciseDifficulty {
-        exercise.difficulty
-    }
-
     private var passedCount: Int {
         exercise.checks.filter { $0.status == .passed }.count
     }
@@ -70,7 +66,9 @@ private struct ExerciseCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
-                        EyebrowLabel(text: difficulty.title, tint: difficulty.tint)
+                        if let badgeText {
+                            EyebrowLabel(text: badgeText, tint: badgeTint)
+                        }
 
                         Text(exercise.title)
                             .font(.headline.weight(.semibold))
@@ -92,7 +90,7 @@ private struct ExerciseCard: View {
                     .multilineTextAlignment(.leading)
 
                 HStack(spacing: 8) {
-                    MetaChip(text: exercise.sourceURL.deletingPathExtension().lastPathComponent, tint: difficulty.tint)
+                    MetaChip(text: exercise.sourceURL.deletingPathExtension().lastPathComponent, tint: roleTint)
                     MetaChip(text: "\(passedCount)/\(max(exercise.checks.count, 1)) passed", tint: statusTint)
                 }
             }
@@ -126,6 +124,31 @@ private struct ExerciseCard: View {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(RustGoblinTheme.Palette.raisedFill)
         }
+    }
+
+    private var badgeText: String? {
+        if exercise.fileRole == .tests {
+            return exercise.fileRole.title
+        }
+
+        switch exercise.difficulty {
+        case .easy, .medium, .hard:
+            return exercise.difficulty.title
+        case .core, .kata, .unknown:
+            return nil
+        }
+    }
+
+    private var badgeTint: Color {
+        if exercise.fileRole == .tests {
+            return exercise.fileRole.tint
+        }
+
+        return exercise.difficulty.tint
+    }
+
+    private var roleTint: Color {
+        exercise.fileRole == .tests ? exercise.fileRole.tint : RustGoblinTheme.Palette.textMuted
     }
 }
 

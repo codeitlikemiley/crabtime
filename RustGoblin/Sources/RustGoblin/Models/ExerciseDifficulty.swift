@@ -62,6 +62,6 @@ enum ExerciseDifficulty: String, CaseIterable, Codable, Hashable, Sendable {
             return .kata
         }
 
-        return fallbackIndex == 0 ? .core : .kata
+        return .unknown
     }
 }

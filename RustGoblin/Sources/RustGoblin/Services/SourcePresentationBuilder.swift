@@ -122,32 +122,56 @@ struct SourcePresentationBuilder: Sendable {
     }
 
     private func extractChecks(from hiddenTestsBlock: String) -> [ExerciseCheck] {
-        let pattern = #"(?m)^\s*fn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\("#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else {
-            return []
-        }
+        hiddenTestsBlock
+            .split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+            .reduce(into: ExtractionState()) { state, rawLine in
+                let line = rawLine.trimmingCharacters(in: .whitespaces)
 
-        let range = NSRange(hiddenTestsBlock.startIndex..<hiddenTestsBlock.endIndex, in: hiddenTestsBlock)
+                if line.hasPrefix("#[") {
+                    state.pendingAttributes.append(line)
+                    return
+                }
 
-        return regex.matches(in: hiddenTestsBlock, range: range).compactMap { match in
-            guard
-                let nameRange = Range(match.range(at: 1), in: hiddenTestsBlock)
-            else {
-                return nil
+                guard line.hasPrefix("fn ") else {
+                    if !line.isEmpty {
+                        state.pendingAttributes.removeAll()
+                    }
+                    return
+                }
+
+                defer { state.pendingAttributes.removeAll() }
+
+                guard
+                    state.pendingAttributes.contains(where: { $0.contains("#[test") }),
+                    !state.pendingAttributes.contains(where: { $0.contains("#[ignore") }),
+                    let signature = line.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true).last,
+                    let name = signature.split(separator: "(", maxSplits: 1, omittingEmptySubsequences: true).first
+                else {
+                    return
+                }
+
+                let identifier = String(name)
+                state.checks.append(
+                    ExerciseCheck(
+                        id: identifier,
+                        title: identifier.replacingOccurrences(of: "_", with: " ").capitalized,
+                        detail: "Hidden test: \(identifier)",
+                        symbolName: "checklist"
+                    )
+                )
             }
-
-            let name = String(hiddenTestsBlock[nameRange])
-            return ExerciseCheck(
-                id: name,
-                title: name.replacingOccurrences(of: "_", with: " ").capitalized,
-                detail: "Hidden test: \(name)",
-                symbolName: "checklist"
-            )
-        }
+            .checks
     }
 
     private func endOfLine(after index: String.Index, in source: String) -> String.Index {
         source[index...].firstIndex(of: "\n").map { source.index(after: $0) } ?? source.endIndex
+    }
+}
+
+private extension SourcePresentationBuilder {
+    struct ExtractionState {
+        var pendingAttributes: [String] = []
+        var checks: [ExerciseCheck] = []
     }
 }
 

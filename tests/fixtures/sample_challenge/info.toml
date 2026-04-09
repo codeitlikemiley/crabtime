@@ -1,0 +1,14 @@
+# RustGoblin challenge workspace
+# Add [[exercises]] entries here. `/challenge <name>` will manage this file for you.
+
+[[exercises]]
+name = "lru_cache"
+path = "exercises/lru_cache.rs"
+mode = "test"
+hint = """
+Implement Lru Cache.
+
+- Start by removing `// I AM NOT DONE`
+- Read the failing tests
+- Make the smallest working change first
+"""

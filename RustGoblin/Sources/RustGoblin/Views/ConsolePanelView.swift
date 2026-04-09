@@ -33,7 +33,7 @@ struct ConsolePanelView: View {
                         isSelected: store.selectedConsoleTab == .output,
                         badgeText: nil
                     ) {
-                        store.selectedConsoleTab = .output
+                        store.selectConsoleTab(.output)
                     }
 
                     ConsoleTabButton(
@@ -42,7 +42,7 @@ struct ConsolePanelView: View {
                         badgeText: store.diagnosticsCount == 0 ? nil : "\(store.diagnosticsCount)",
                         accentColor: store.errorCount > 0 ? .red : RustGoblinTheme.Palette.ember
                     ) {
-                        store.selectedConsoleTab = .diagnostics
+                        store.selectConsoleTab(.diagnostics)
                     }
 
                     ConsoleTabButton(
@@ -50,8 +50,28 @@ struct ConsolePanelView: View {
                         isSelected: store.selectedConsoleTab == .session,
                         badgeText: nil
                     ) {
-                        store.selectedConsoleTab = .session
+                        store.selectConsoleTab(.session)
                     }
+
+                    IconGlassButton(
+                        systemImage: "trash",
+                        helpText: "Clear output",
+                        action: store.clearConsoleOutput
+                    )
+
+                    IconGlassButton(
+                        systemImage: store.isTerminalMaximized ? "arrow.down.right.and.arrow.up.left" : "rectangle.bottomthird.inset.filled",
+                        helpText: store.isTerminalMaximized ? "Return to split view" : "Maximize terminal",
+                        isActive: store.isTerminalMaximized,
+                        action: store.toggleTerminalMaximize
+                    )
+
+                    IconGlassButton(
+                        systemImage: "terminal",
+                        helpText: "Hide terminal",
+                        isActive: true,
+                        action: store.toggleTerminalVisibility
+                    )
                 }
             }
 

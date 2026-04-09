@@ -46,7 +46,7 @@ struct InspectorSidebarView: View {
                 InspectorSection(title: "Hints") {
                     MarkdownDocumentView(
                         markdown: store.currentHintMarkdown,
-                        sourceURL: store.selectedExercise?.hintURL,
+                        sourceURL: store.selectedExercise?.hintURL ?? (store.isShowingMarkdownPreview ? store.selectedExplorerFileURL : nil),
                         sizingMode: .fill
                     )
                     .frame(minHeight: 220, maxHeight: 360)
@@ -157,7 +157,6 @@ struct InspectorSidebarView: View {
                 }
             }
         }
-        .paneCard()
     }
 
     private var statusTitle: String {

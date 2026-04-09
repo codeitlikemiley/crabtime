@@ -21,6 +21,7 @@ final class WorkspaceLibraryDatabase {
                 title TEXT NOT NULL,
                 source_kind TEXT NOT NULL,
                 clone_url TEXT,
+                origin_path TEXT,
                 added_at REAL NOT NULL,
                 last_opened_at REAL NOT NULL,
                 missing_path INTEGER NOT NULL DEFAULT 0
@@ -52,8 +53,14 @@ final class WorkspaceLibraryDatabase {
                 active_tab_path TEXT,
                 open_tabs_json TEXT NOT NULL,
                 sidebar_mode TEXT NOT NULL,
+                inspector_visible INTEGER NOT NULL DEFAULT 1,
+                right_sidebar_tab TEXT NOT NULL DEFAULT 'inspector',
+                right_sidebar_width REAL NOT NULL DEFAULT 360,
+                terminal_display_mode TEXT NOT NULL DEFAULT 'split',
                 search_query TEXT NOT NULL,
                 difficulty_filter TEXT,
+                tests_only INTEGER NOT NULL DEFAULT 0,
+                selected_chat_session_id TEXT,
                 last_saved_at REAL NOT NULL
             );
             """
@@ -61,8 +68,80 @@ final class WorkspaceLibraryDatabase {
 
         try? execute(
             """
+            ALTER TABLE workspaces
+            ADD COLUMN origin_path TEXT;
+            """
+        )
+        try? execute(
+            """
             ALTER TABLE workspace_state
             ADD COLUMN shows_completed_exercises INTEGER NOT NULL DEFAULT 0;
+            """
+        )
+        try? execute(
+            """
+            ALTER TABLE workspace_state
+            ADD COLUMN right_sidebar_tab TEXT NOT NULL DEFAULT 'inspector';
+            """
+        )
+        try? execute(
+            """
+            ALTER TABLE workspace_state
+            ADD COLUMN selected_chat_session_id TEXT;
+            """
+        )
+        try? execute(
+            """
+            ALTER TABLE workspace_state
+            ADD COLUMN right_sidebar_width REAL NOT NULL DEFAULT 360;
+            """
+        )
+        try? execute(
+            """
+            ALTER TABLE workspace_state
+            ADD COLUMN inspector_visible INTEGER NOT NULL DEFAULT 1;
+            """
+        )
+        try? execute(
+            """
+            ALTER TABLE workspace_state
+            ADD COLUMN terminal_display_mode TEXT NOT NULL DEFAULT 'split';
+            """
+        )
+        try? execute(
+            """
+            ALTER TABLE workspace_state
+            ADD COLUMN tests_only INTEGER NOT NULL DEFAULT 0;
+            """
+        )
+
+        try execute(
+            """
+            CREATE TABLE IF NOT EXISTS chat_sessions (
+                id TEXT PRIMARY KEY,
+                workspace_root_path TEXT NOT NULL,
+                exercise_path TEXT NOT NULL,
+                title TEXT NOT NULL,
+                provider_kind TEXT NOT NULL,
+                model TEXT NOT NULL,
+                backend_session_id TEXT,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL
+            );
+            """
+        )
+
+        try execute(
+            """
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at REAL NOT NULL,
+                status TEXT NOT NULL,
+                metadata_json TEXT
+            );
             """
         )
     }
@@ -74,7 +153,7 @@ final class WorkspaceLibraryDatabase {
     func fetchWorkspaces() throws -> [SavedWorkspaceRecord] {
         let statement = try prepare(
             """
-            SELECT root_path, title, source_kind, clone_url, added_at, last_opened_at, missing_path
+            SELECT root_path, title, source_kind, clone_url, origin_path, added_at, last_opened_at, missing_path
             FROM workspaces
             ORDER BY last_opened_at DESC, title ASC;
             """
@@ -89,9 +168,10 @@ final class WorkspaceLibraryDatabase {
                     title: string(at: 1, in: statement),
                     sourceKind: WorkspaceSourceKind(rawValue: string(at: 2, in: statement)) ?? .imported,
                     cloneURL: optionalString(at: 3, in: statement),
-                    addedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 4)),
-                    lastOpenedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 5)),
-                    isMissing: sqlite3_column_int(statement, 6) != 0
+                    originPath: optionalString(at: 4, in: statement),
+                    addedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 5)),
+                    lastOpenedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 6)),
+                    isMissing: sqlite3_column_int(statement, 7) != 0
                 )
             )
         }
@@ -102,7 +182,7 @@ final class WorkspaceLibraryDatabase {
     func fetchWorkspace(rootPath: String) throws -> SavedWorkspaceRecord? {
         let statement = try prepare(
             """
-            SELECT root_path, title, source_kind, clone_url, added_at, last_opened_at, missing_path
+            SELECT root_path, title, source_kind, clone_url, origin_path, added_at, last_opened_at, missing_path
             FROM workspaces
             WHERE root_path = ?;
             """
@@ -120,9 +200,10 @@ final class WorkspaceLibraryDatabase {
             title: string(at: 1, in: statement),
             sourceKind: WorkspaceSourceKind(rawValue: string(at: 2, in: statement)) ?? .imported,
             cloneURL: optionalString(at: 3, in: statement),
-            addedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 4)),
-            lastOpenedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 5)),
-            isMissing: sqlite3_column_int(statement, 6) != 0
+            originPath: optionalString(at: 4, in: statement),
+            addedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 5)),
+            lastOpenedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 6)),
+            isMissing: sqlite3_column_int(statement, 7) != 0
         )
     }
 
@@ -130,13 +211,14 @@ final class WorkspaceLibraryDatabase {
         let statement = try prepare(
             """
             INSERT INTO workspaces (
-                root_path, title, source_kind, clone_url, added_at, last_opened_at, missing_path
+                root_path, title, source_kind, clone_url, origin_path, added_at, last_opened_at, missing_path
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(root_path) DO UPDATE SET
                 title = excluded.title,
                 source_kind = excluded.source_kind,
                 clone_url = excluded.clone_url,
+                origin_path = COALESCE(excluded.origin_path, workspaces.origin_path),
                 added_at = excluded.added_at,
                 last_opened_at = excluded.last_opened_at,
                 missing_path = excluded.missing_path;
@@ -148,9 +230,10 @@ final class WorkspaceLibraryDatabase {
         bind(record.title, at: 2, in: statement)
         bind(record.sourceKind.rawValue, at: 3, in: statement)
         bind(record.cloneURL, at: 4, in: statement)
-        sqlite3_bind_double(statement, 5, record.addedAt.timeIntervalSince1970)
-        sqlite3_bind_double(statement, 6, record.lastOpenedAt.timeIntervalSince1970)
-        sqlite3_bind_int(statement, 7, record.isMissing ? 1 : 0)
+        bind(record.originPath, at: 5, in: statement)
+        sqlite3_bind_double(statement, 6, record.addedAt.timeIntervalSince1970)
+        sqlite3_bind_double(statement, 7, record.lastOpenedAt.timeIntervalSince1970)
+        sqlite3_bind_int(statement, 8, record.isMissing ? 1 : 0)
 
         guard sqlite3_step(statement) == SQLITE_DONE else {
             throw DatabaseError.executionFailed(message: String(cString: sqlite3_errmsg(database)))
@@ -188,6 +271,46 @@ final class WorkspaceLibraryDatabase {
         }
 
         return progressLookup
+    }
+
+    func deleteWorkspace(rootPath: String) throws {
+        try executeDelete(
+            """
+            DELETE FROM chat_messages
+            WHERE session_id IN (
+                SELECT id FROM chat_sessions WHERE workspace_root_path = ?
+            );
+            """,
+            value: rootPath
+        )
+        try executeDelete(
+            """
+            DELETE FROM chat_sessions
+            WHERE workspace_root_path = ?;
+            """,
+            value: rootPath
+        )
+        try executeDelete(
+            """
+            DELETE FROM exercise_progress
+            WHERE workspace_root_path = ?;
+            """,
+            value: rootPath
+        )
+        try executeDelete(
+            """
+            DELETE FROM workspace_state
+            WHERE workspace_root_path = ?;
+            """,
+            value: rootPath
+        )
+        try executeDelete(
+            """
+            DELETE FROM workspaces
+            WHERE root_path = ?;
+            """,
+            value: rootPath
+        )
     }
 
     func saveProgress(_ progressEntries: [StoredExerciseProgress], for workspaceRootPath: String) throws {
@@ -231,7 +354,7 @@ final class WorkspaceLibraryDatabase {
     func fetchWorkspaceState(for workspaceRootPath: String) throws -> WorkspaceSessionState? {
         let statement = try prepare(
             """
-            SELECT selected_exercise_path, active_tab_path, open_tabs_json, sidebar_mode, search_query, difficulty_filter, shows_completed_exercises
+            SELECT selected_exercise_path, active_tab_path, open_tabs_json, sidebar_mode, inspector_visible, right_sidebar_tab, right_sidebar_width, terminal_display_mode, search_query, difficulty_filter, tests_only, shows_completed_exercises, selected_chat_session_id
             FROM workspace_state
             WHERE workspace_root_path = ?;
             """
@@ -246,7 +369,10 @@ final class WorkspaceLibraryDatabase {
 
         let openTabs = decodeOpenTabs(from: string(at: 2, in: statement))
         let sidebarMode = SidebarMode(rawValue: string(at: 3, in: statement)) ?? .exercises
-        let difficultyFilter = optionalString(at: 5, in: statement).flatMap(ExerciseDifficulty.init(rawValue:))
+        let inspectorVisible = sqlite3_column_int(statement, 4) != 0
+        let rightSidebarTab = RightSidebarTab(rawValue: string(at: 5, in: statement)) ?? .inspector
+        let terminalDisplayMode = TerminalDisplayMode(rawValue: string(at: 7, in: statement)) ?? .split
+        let difficultyFilter = optionalString(at: 9, in: statement).flatMap(ExerciseDifficulty.init(rawValue:))
 
         return WorkspaceSessionState(
             workspaceRootPath: workspaceRootPath,
@@ -254,9 +380,15 @@ final class WorkspaceLibraryDatabase {
             activeTabPath: optionalString(at: 1, in: statement),
             openTabs: openTabs,
             sidebarMode: sidebarMode,
-            searchQuery: string(at: 4, in: statement),
+            isInspectorVisible: inspectorVisible,
+            rightSidebarTab: rightSidebarTab,
+            rightSidebarWidth: sqlite3_column_double(statement, 6),
+            terminalDisplayMode: terminalDisplayMode,
+            searchQuery: string(at: 8, in: statement),
             difficultyFilter: difficultyFilter,
-            completionFilter: sqlite3_column_int(statement, 6) != 0 ? .done : .open
+            showsOnlyTestExercises: sqlite3_column_int(statement, 10) != 0,
+            completionFilter: sqlite3_column_int(statement, 11) != 0 ? .done : .open,
+            selectedChatSessionID: optionalString(at: 12, in: statement).flatMap(UUID.init(uuidString:))
         )
     }
 
@@ -265,17 +397,23 @@ final class WorkspaceLibraryDatabase {
             """
             INSERT INTO workspace_state (
                 workspace_root_path, selected_exercise_path, active_tab_path, open_tabs_json,
-                sidebar_mode, search_query, difficulty_filter, shows_completed_exercises, last_saved_at
+                sidebar_mode, inspector_visible, right_sidebar_tab, right_sidebar_width, terminal_display_mode, search_query, difficulty_filter, tests_only, shows_completed_exercises, selected_chat_session_id, last_saved_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(workspace_root_path) DO UPDATE SET
                 selected_exercise_path = excluded.selected_exercise_path,
                 active_tab_path = excluded.active_tab_path,
                 open_tabs_json = excluded.open_tabs_json,
                 sidebar_mode = excluded.sidebar_mode,
+                inspector_visible = excluded.inspector_visible,
+                right_sidebar_tab = excluded.right_sidebar_tab,
+                right_sidebar_width = excluded.right_sidebar_width,
+                terminal_display_mode = excluded.terminal_display_mode,
                 search_query = excluded.search_query,
                 difficulty_filter = excluded.difficulty_filter,
+                tests_only = excluded.tests_only,
                 shows_completed_exercises = excluded.shows_completed_exercises,
+                selected_chat_session_id = excluded.selected_chat_session_id,
                 last_saved_at = excluded.last_saved_at;
             """
         )
@@ -286,10 +424,177 @@ final class WorkspaceLibraryDatabase {
         bind(state.activeTabPath, at: 3, in: statement)
         bind(encodeOpenTabs(state.openTabs), at: 4, in: statement)
         bind(state.sidebarMode.rawValue, at: 5, in: statement)
-        bind(state.searchQuery, at: 6, in: statement)
-        bind(state.difficultyFilter?.rawValue, at: 7, in: statement)
-        sqlite3_bind_int(statement, 8, state.completionFilter == .done ? 1 : 0)
-        sqlite3_bind_double(statement, 9, Date().timeIntervalSince1970)
+        sqlite3_bind_int(statement, 6, state.isInspectorVisible ? 1 : 0)
+        bind(state.rightSidebarTab.rawValue, at: 7, in: statement)
+        sqlite3_bind_double(statement, 8, state.rightSidebarWidth)
+        bind(state.terminalDisplayMode.rawValue, at: 9, in: statement)
+        bind(state.searchQuery, at: 10, in: statement)
+        bind(state.difficultyFilter?.rawValue, at: 11, in: statement)
+        sqlite3_bind_int(statement, 12, state.showsOnlyTestExercises ? 1 : 0)
+        sqlite3_bind_int(statement, 13, state.completionFilter == .done ? 1 : 0)
+        bind(state.selectedChatSessionID?.uuidString, at: 14, in: statement)
+        sqlite3_bind_double(statement, 15, Date().timeIntervalSince1970)
+
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            throw DatabaseError.executionFailed(message: String(cString: sqlite3_errmsg(database)))
+        }
+    }
+
+    func fetchChatSessions(workspaceRootPath: String, exercisePath: String) throws -> [ExerciseChatSession] {
+        let statement = try prepare(
+            """
+            SELECT id, workspace_root_path, exercise_path, title, provider_kind, model, backend_session_id, created_at, updated_at
+            FROM chat_sessions
+            WHERE workspace_root_path = ? AND exercise_path = ?
+            ORDER BY updated_at DESC, created_at DESC;
+            """
+        )
+        defer { sqlite3_finalize(statement) }
+
+        bind(workspaceRootPath, at: 1, in: statement)
+        bind(exercisePath, at: 2, in: statement)
+
+        var result: [ExerciseChatSession] = []
+        while sqlite3_step(statement) == SQLITE_ROW {
+            guard let id = UUID(uuidString: string(at: 0, in: statement)) else {
+                continue
+            }
+
+            result.append(
+                ExerciseChatSession(
+                    id: id,
+                    workspaceRootPath: string(at: 1, in: statement),
+                    exercisePath: string(at: 2, in: statement),
+                    title: string(at: 3, in: statement),
+                    providerKind: AIProviderKind(rawValue: string(at: 4, in: statement)) ?? .codexCLI,
+                    model: string(at: 5, in: statement),
+                    backendSessionID: optionalString(at: 6, in: statement),
+                    createdAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 7)),
+                    updatedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 8))
+                )
+            )
+        }
+
+        return result
+    }
+
+    func upsertChatSession(_ session: ExerciseChatSession) throws {
+        let statement = try prepare(
+            """
+            INSERT INTO chat_sessions (
+                id, workspace_root_path, exercise_path, title, provider_kind, model, backend_session_id, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                title = excluded.title,
+                provider_kind = excluded.provider_kind,
+                model = excluded.model,
+                backend_session_id = excluded.backend_session_id,
+                updated_at = excluded.updated_at;
+            """
+        )
+        defer { sqlite3_finalize(statement) }
+
+        bind(session.id.uuidString, at: 1, in: statement)
+        bind(session.workspaceRootPath, at: 2, in: statement)
+        bind(session.exercisePath, at: 3, in: statement)
+        bind(session.title, at: 4, in: statement)
+        bind(session.providerKind.rawValue, at: 5, in: statement)
+        bind(session.model, at: 6, in: statement)
+        bind(session.backendSessionID, at: 7, in: statement)
+        sqlite3_bind_double(statement, 8, session.createdAt.timeIntervalSince1970)
+        sqlite3_bind_double(statement, 9, session.updatedAt.timeIntervalSince1970)
+
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            throw DatabaseError.executionFailed(message: String(cString: sqlite3_errmsg(database)))
+        }
+    }
+
+    func fetchMessages(for sessionID: UUID) throws -> [ExerciseChatMessage] {
+        let statement = try prepare(
+            """
+            SELECT id, session_id, role, content, created_at, status, metadata_json
+            FROM chat_messages
+            WHERE session_id = ?
+            ORDER BY created_at ASC;
+            """
+        )
+        defer { sqlite3_finalize(statement) }
+
+        bind(sessionID.uuidString, at: 1, in: statement)
+
+        var result: [ExerciseChatMessage] = []
+        while sqlite3_step(statement) == SQLITE_ROW {
+            guard let id = UUID(uuidString: string(at: 0, in: statement)),
+                  let resolvedSessionID = UUID(uuidString: string(at: 1, in: statement))
+            else {
+                continue
+            }
+
+            result.append(
+                ExerciseChatMessage(
+                    id: id,
+                    sessionID: resolvedSessionID,
+                    role: ExerciseChatRole(rawValue: string(at: 2, in: statement)) ?? .assistant,
+                    content: string(at: 3, in: statement),
+                    createdAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 4)),
+                    status: ExerciseChatMessageStatus(rawValue: string(at: 5, in: statement)) ?? .complete,
+                    metadataJSON: optionalString(at: 6, in: statement)
+                )
+            )
+        }
+
+        return result
+    }
+
+    func insertChatMessage(_ message: ExerciseChatMessage) throws {
+        let statement = try prepare(
+            """
+            INSERT INTO chat_messages (id, session_id, role, content, created_at, status, metadata_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?);
+            """
+        )
+        defer { sqlite3_finalize(statement) }
+
+        bind(message.id.uuidString, at: 1, in: statement)
+        bind(message.sessionID.uuidString, at: 2, in: statement)
+        bind(message.role.rawValue, at: 3, in: statement)
+        bind(message.content, at: 4, in: statement)
+        sqlite3_bind_double(statement, 5, message.createdAt.timeIntervalSince1970)
+        bind(message.status.rawValue, at: 6, in: statement)
+        bind(message.metadataJSON, at: 7, in: statement)
+
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            throw DatabaseError.executionFailed(message: String(cString: sqlite3_errmsg(database)))
+        }
+    }
+
+    func deleteMessages(for sessionID: UUID) throws {
+        let statement = try prepare(
+            """
+            DELETE FROM chat_messages
+            WHERE session_id = ?;
+            """
+        )
+        defer { sqlite3_finalize(statement) }
+
+        bind(sessionID.uuidString, at: 1, in: statement)
+
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            throw DatabaseError.executionFailed(message: String(cString: sqlite3_errmsg(database)))
+        }
+    }
+
+    func deleteMessage(id: UUID) throws {
+        let statement = try prepare(
+            """
+            DELETE FROM chat_messages
+            WHERE id = ?;
+            """
+        )
+        defer { sqlite3_finalize(statement) }
+
+        bind(id.uuidString, at: 1, in: statement)
 
         guard sqlite3_step(statement) == SQLITE_DONE else {
             throw DatabaseError.executionFailed(message: String(cString: sqlite3_errmsg(database)))
@@ -308,6 +613,17 @@ final class WorkspaceLibraryDatabase {
             throw DatabaseError.prepareFailed(message: String(cString: sqlite3_errmsg(database)))
         }
         return statement
+    }
+
+    private func executeDelete(_ sql: String, value: String) throws {
+        let statement = try prepare(sql)
+        defer { sqlite3_finalize(statement) }
+
+        bind(value, at: 1, in: statement)
+
+        guard sqlite3_step(statement) == SQLITE_DONE else {
+            throw DatabaseError.executionFailed(message: String(cString: sqlite3_errmsg(database)))
+        }
     }
 
     private func bind(_ value: String?, at index: Int32, in statement: OpaquePointer?) {

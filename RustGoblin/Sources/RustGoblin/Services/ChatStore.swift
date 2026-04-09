@@ -1,0 +1,341 @@
+import Foundation
+import Observation
+
+@Observable
+@MainActor
+final class ChatStore {
+    var sessions: [ExerciseChatSession] = []
+    var messages: [ExerciseChatMessage] = []
+    var selectedSessionID: UUID?
+    var composerText: String = ""
+    var isSending: Bool = false
+    var errorMessage: String?
+
+    @ObservationIgnored private let database: WorkspaceLibraryDatabase
+    @ObservationIgnored private let providerManager: AIProviderManager
+    @ObservationIgnored private let contextBuilder: ExerciseContextBuilder
+
+    init(
+        database: WorkspaceLibraryDatabase,
+        providerManager: AIProviderManager,
+        contextBuilder: ExerciseContextBuilder = ExerciseContextBuilder()
+    ) {
+        self.database = database
+        self.providerManager = providerManager
+        self.contextBuilder = contextBuilder
+    }
+
+    var selectedSession: ExerciseChatSession? {
+        guard let selectedSessionID else {
+            return sessions.first
+        }
+        return sessions.first { $0.id == selectedSessionID }
+    }
+
+    func selectedProvider(using settingsStore: AISettingsStore) -> AIProviderKind {
+        selectedSession?.providerKind ?? settingsStore.defaultProvider
+    }
+
+    func selectedModel(using settingsStore: AISettingsStore) -> String {
+        selectedSession?.model ?? settingsStore.preference(for: settingsStore.defaultProvider).model
+    }
+
+    func syncSelection(using store: WorkspaceStore) {
+        guard
+            let workspace = store.workspace,
+            let exercise = store.selectedExercise
+        else {
+            sessions = []
+            messages = []
+            selectedSessionID = nil
+            return
+        }
+
+        do {
+            let fetchedSessions = try database.fetchChatSessions(
+                workspaceRootPath: workspace.rootURL.standardizedFileURL.path,
+                exercisePath: exercise.sourceURL.standardizedFileURL.path
+            )
+            sessions = fetchedSessions
+
+            if let savedSessionID = store.selectedChatSessionID,
+               fetchedSessions.contains(where: { $0.id == savedSessionID }) {
+                selectedSessionID = savedSessionID
+            } else {
+                selectedSessionID = fetchedSessions.first?.id
+            }
+
+            try loadMessagesForSelectedSession()
+        } catch {
+            sessions = []
+            messages = []
+            selectedSessionID = nil
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func selectSession(_ sessionID: UUID?, using store: WorkspaceStore) {
+        selectedSessionID = sessionID
+        store.selectedChatSessionID = sessionID
+        do {
+            try loadMessagesForSelectedSession()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        store.persistChatSelection()
+    }
+
+    func createSession(using store: WorkspaceStore, providerKind: AIProviderKind? = nil) {
+        guard let workspace = store.workspace, let exercise = store.selectedExercise else {
+            return
+        }
+
+        let resolvedProvider = providerKind ?? providerManager.settingsStore.defaultProvider
+        let session = ExerciseChatSession(
+            workspaceRootPath: workspace.rootURL.standardizedFileURL.path,
+            exercisePath: exercise.sourceURL.standardizedFileURL.path,
+            title: "\(exercise.title) Chat",
+            providerKind: resolvedProvider,
+            model: providerManager.displayModel(for: resolvedProvider)
+        )
+
+        do {
+            try database.upsertChatSession(session)
+            sessions.insert(session, at: 0)
+            selectSession(session.id, using: store)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func updateSelectedProvider(_ provider: AIProviderKind, using store: WorkspaceStore, settingsStore: AISettingsStore) {
+        settingsStore.setDefaultProvider(provider)
+
+        guard var session = selectedSession else {
+            return
+        }
+
+        session.providerKind = provider
+        session.model = settingsStore.preference(for: provider).model
+        session.updatedAt = Date()
+
+        do {
+            try database.upsertChatSession(session)
+            replaceSession(session)
+            store.selectedChatSessionID = session.id
+            store.persistChatSelection()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func updateSelectedModel(_ model: String, using store: WorkspaceStore, settingsStore: AISettingsStore) {
+        let resolvedProvider = selectedProvider(using: settingsStore)
+        settingsStore.updateModel(model, for: resolvedProvider)
+
+        guard var session = selectedSession else {
+            return
+        }
+
+        session.model = model.trimmingCharacters(in: .whitespacesAndNewlines)
+        session.updatedAt = Date()
+
+        do {
+            try database.upsertChatSession(session)
+            replaceSession(session)
+            store.persistChatSelection()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func clearCurrentSession(using store: WorkspaceStore) {
+        guard let session = selectedSession else {
+            return
+        }
+
+        do {
+            try database.deleteMessages(for: session.id)
+            messages = []
+            var updatedSession = session
+            updatedSession.backendSessionID = nil
+            updatedSession.updatedAt = Date()
+            try database.upsertChatSession(updatedSession)
+            replaceSession(updatedSession)
+            store.persistChatSelection()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func sendCurrentMessage(using store: WorkspaceStore) {
+        guard !isSending else {
+            return
+        }
+
+        let userMessage = composerText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !userMessage.isEmpty else {
+            return
+        }
+
+        composerText = ""
+        errorMessage = nil
+        isSending = true
+
+        Task {
+            do {
+                if let localReply = try await store.handleChatSlashCommand(userMessage) {
+                    try await handleLocalSlashCommandReply(localReply, userMessage: userMessage, using: store)
+                    return
+                }
+
+                if selectedSession == nil {
+                    await MainActor.run {
+                        createSession(using: store)
+                    }
+                }
+
+                guard let session = selectedSession else {
+                    await MainActor.run {
+                        errorMessage = "Choose an exercise before starting a chat."
+                        isSending = false
+                    }
+                    return
+                }
+
+                let outgoingMessage = ExerciseChatMessage(sessionID: session.id, role: .user, content: userMessage)
+                try database.insertChatMessage(outgoingMessage)
+                await MainActor.run {
+                    messages.append(outgoingMessage)
+                }
+
+                var updatedSession = session
+                if updatedSession.title == "\(store.selectedExercise?.title ?? "Exercise") Chat" {
+                    updatedSession.title = userMessage
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                        .prefix(48)
+                        .description
+                }
+                updatedSession.updatedAt = Date()
+                try database.upsertChatSession(updatedSession)
+
+                let context = contextBuilder.build(from: store)
+                let reply = try await providerManager.sendMessage(
+                    session: updatedSession,
+                    messages: messages + [outgoingMessage],
+                    context: context
+                )
+
+                let assistantMessage = ExerciseChatMessage(sessionID: updatedSession.id, role: .assistant, content: reply)
+                try database.insertChatMessage(assistantMessage)
+
+                await MainActor.run {
+                    replaceSession(updatedSession)
+                    messages.append(assistantMessage)
+                    isSending = false
+                    store.selectedChatSessionID = updatedSession.id
+                    store.persistChatSelection()
+                }
+            } catch {
+                let errorMessage = selectedSession.map {
+                    ExerciseChatMessage(
+                        sessionID: $0.id,
+                        role: .error,
+                        content: error.localizedDescription,
+                        status: .failed
+                    )
+                }
+                if let errorMessage {
+                    try? database.insertChatMessage(errorMessage)
+                }
+
+                await MainActor.run {
+                    if let errorMessage {
+                        self.messages.append(errorMessage)
+                    }
+                    self.errorMessage = error.localizedDescription
+                    self.isSending = false
+                }
+            }
+        }
+    }
+
+    private func handleLocalSlashCommandReply(
+        _ localReply: String,
+        userMessage: String,
+        using store: WorkspaceStore
+    ) async throws {
+        await MainActor.run {
+            syncSelection(using: store)
+        }
+
+        if selectedSession == nil {
+            await MainActor.run {
+                createSession(using: store)
+            }
+        }
+
+        guard let session = selectedSession else {
+            await MainActor.run {
+                errorMessage = localReply
+                isSending = false
+            }
+            return
+        }
+
+        let outgoingMessage = ExerciseChatMessage(sessionID: session.id, role: .user, content: userMessage)
+        try database.insertChatMessage(outgoingMessage)
+
+        var updatedSession = session
+        if updatedSession.title == "\(store.selectedExercise?.title ?? "Exercise") Chat" {
+            updatedSession.title = userMessage
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .prefix(48)
+                .description
+        }
+        updatedSession.updatedAt = Date()
+        try database.upsertChatSession(updatedSession)
+
+        let assistantMessage = ExerciseChatMessage(
+            sessionID: updatedSession.id,
+            role: .assistant,
+            content: localReply
+        )
+        try database.insertChatMessage(assistantMessage)
+
+        await MainActor.run {
+            replaceSession(updatedSession)
+            if !messages.contains(where: { $0.id == outgoingMessage.id }) {
+                messages.append(outgoingMessage)
+            }
+            messages.append(assistantMessage)
+            isSending = false
+            store.selectedChatSessionID = updatedSession.id
+            store.persistChatSelection()
+        }
+    }
+
+    func deleteMessage(_ messageID: UUID) {
+        do {
+            try database.deleteMessage(id: messageID)
+            messages.removeAll { $0.id == messageID }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func loadMessagesForSelectedSession() throws {
+        guard let sessionID = selectedSessionID else {
+            messages = []
+            return
+        }
+        messages = try database.fetchMessages(for: sessionID)
+    }
+
+    private func replaceSession(_ session: ExerciseChatSession) {
+        if let index = sessions.firstIndex(where: { $0.id == session.id }) {
+            sessions[index] = session
+            sessions.sort { $0.updatedAt > $1.updatedAt }
+        }
+    }
+}

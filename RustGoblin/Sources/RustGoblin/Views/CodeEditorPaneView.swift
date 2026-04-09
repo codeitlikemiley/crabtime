@@ -23,10 +23,19 @@ struct CodeEditorPaneView: View {
                 Spacer()
 
                 HStack(spacing: 8) {
-                    if store.isEditorDirty && !store.isShowingReadonlyPreview {
+                    if store.canToggleDiffMode {
+                        IconGlassButton(
+                            systemImage: store.isShowingDiffPreview ? "doc.text" : "arrow.left.arrow.right.square",
+                            helpText: store.isShowingDiffPreview ? "Return to editor" : "Show diff",
+                            isActive: store.isShowingDiffPreview,
+                            action: store.toggleDiffMode
+                        )
+                    }
+
+                    if store.canResetActiveDocument {
                         IconGlassButton(
                             systemImage: "arrow.counterclockwise",
-                            helpText: "Reset file to last loaded state",
+                            helpText: "Restore file",
                             action: store.resetSelectedExercise
                         )
                     }
@@ -34,6 +43,13 @@ struct CodeEditorPaneView: View {
                     if store.hasSelection {
                         RunCapsuleButton(action: store.runSelectedExercise, isEnabled: store.hasSelection && !store.isRunning)
                     }
+
+                    IconGlassButton(
+                        systemImage: "terminal",
+                        helpText: store.showsTerminal ? "Hide terminal" : "Show terminal",
+                        isActive: store.showsTerminal,
+                        action: store.toggleTerminalVisibility
+                    )
 
                     IconGlassButton(
                         systemImage: store.contentDisplayMode == .editorMaximized ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
@@ -59,6 +75,31 @@ struct CodeEditorPaneView: View {
                         .font(.caption)
                         .foregroundStyle(RustGoblinTheme.Palette.textMuted)
 
+                    Button {
+                        store.toggleEditorKeymapMode()
+                    } label: {
+                        Text(store.editorKeymapMode.title)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(store.editorKeymapMode == .vim ? RustGoblinTheme.Palette.ink : RustGoblinTheme.Palette.textMuted)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                Capsule()
+                                    .fill(store.editorKeymapMode == .vim ? RustGoblinTheme.Palette.selectionFill : RustGoblinTheme.Palette.buttonFill)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .interactivePointer()
+
+                    if store.editorKeymapMode == .vim && !store.isShowingReadonlyPreview {
+                        Text(store.vimInputMode.title)
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(store.vimInputMode == .insert ? RustGoblinTheme.Palette.moss : RustGoblinTheme.Palette.panelTint)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(RustGoblinTheme.Palette.buttonFill))
+                    }
+
                     if store.isEditorDirty && !store.isShowingReadonlyPreview {
                         Label("Unsaved", systemImage: "circle.fill")
                             .foregroundStyle(RustGoblinTheme.Palette.ember)
@@ -74,7 +115,9 @@ struct CodeEditorPaneView: View {
                 }
 
                 Group {
-                    if store.isShowingReadonlyPreview {
+                    if store.isShowingDiffPreview {
+                        ReadonlyTextPreviewView(text: store.currentDiffText)
+                    } else if store.isShowingReadonlyPreview {
                         if store.isShowingMarkdownPreview {
                             MarkdownDocumentView(
                                 markdown: store.explorerPreviewText,
@@ -85,7 +128,13 @@ struct CodeEditorPaneView: View {
                             ReadonlyTextPreviewView(text: store.explorerPreviewText)
                         }
                     } else {
-                        CodeTextEditorView(text: $store.editorText, onRun: store.runSelectedExercise)
+                        CodeTextEditorView(
+                            text: $store.editorText,
+                            keymapMode: store.editorKeymapMode,
+                            vimMode: $store.vimInputMode,
+                            onRun: store.runSelectedExercise,
+                            onSave: store.saveSelectedExercise
+                        )
                             .onChange(of: store.editorText) { _, _ in
                                 store.handleEditorTextChange()
                             }
@@ -121,31 +170,43 @@ private struct OpenFileTabsView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(store.currentOpenTabs) { tab in
-                        Button {
-                            store.activateTab(tab)
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: tabIcon(for: tab.url))
-                                    .font(.system(size: 11, weight: .semibold))
+                        HStack(spacing: 6) {
+                            Button {
+                                store.activateTab(tab)
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: tabIcon(for: tab.url))
+                                        .font(.system(size: 11, weight: .semibold))
 
-                                Text(tab.title)
-                                    .lineLimit(1)
+                                    Text(tab.title)
+                                        .lineLimit(1)
+                                }
+                                .font(.system(size: 11, weight: .semibold, design: .rounded))
                             }
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(
-                                Capsule()
-                                    .fill(selectedFileURL == tab.url ? RustGoblinTheme.Palette.selectionFill : RustGoblinTheme.Palette.buttonFill)
-                            )
-                            .overlay {
-                                Capsule()
-                                    .stroke(selectedFileURL == tab.url ? RustGoblinTheme.Palette.strongDivider : RustGoblinTheme.Palette.divider, lineWidth: 1)
+                            .buttonStyle(.plain)
+                            .interactivePointer()
+
+                            Button {
+                                store.closeTab(tab)
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(selectedFileURL == tab.url ? RustGoblinTheme.Palette.ink : RustGoblinTheme.Palette.textMuted)
+                                    .frame(width: 14, height: 14)
                             }
-                            .foregroundStyle(selectedFileURL == tab.url ? RustGoblinTheme.Palette.ink : RustGoblinTheme.Palette.textMuted)
+                            .buttonStyle(.plain)
+                            .interactivePointer()
                         }
-                        .buttonStyle(.plain)
-                        .interactivePointer()
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule()
+                                .fill(selectedFileURL == tab.url ? RustGoblinTheme.Palette.selectionFill : RustGoblinTheme.Palette.buttonFill)
+                        )
+                        .overlay {
+                            Capsule()
+                                .stroke(selectedFileURL == tab.url ? RustGoblinTheme.Palette.strongDivider : RustGoblinTheme.Palette.divider, lineWidth: 1)
+                        }
                     }
                 }
             }

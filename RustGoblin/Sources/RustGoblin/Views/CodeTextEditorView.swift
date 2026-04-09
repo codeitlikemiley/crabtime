@@ -3,10 +3,13 @@ import SwiftUI
 
 struct CodeTextEditorView: NSViewRepresentable {
     @Binding var text: String
+    var keymapMode: EditorKeymapMode = .standard
+    @Binding var vimMode: VimInputMode
     var onRun: (() -> Void)? = nil
+    var onSave: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text)
+        Coordinator(text: $text, vimMode: $vimMode)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -45,8 +48,13 @@ struct CodeTextEditorView: NSViewRepresentable {
         textView.autoresizingMask = [.width]
         textView.allowsImageEditing = false
         textView.onRun = onRun
+        textView.onSave = onSave
+        textView.keymapMode = keymapMode
+        textView.onVimModeChange = { mode in
+            context.coordinator.vimMode = mode
+        }
         context.coordinator.isApplyingProgrammaticChange = true
-        textView.string = text
+        context.coordinator.applyProgrammaticText(text, to: textView)
         context.coordinator.applyHighlighting(to: textView)
         context.coordinator.isApplyingProgrammaticChange = false
 
@@ -62,6 +70,9 @@ struct CodeTextEditorView: NSViewRepresentable {
         }
 
         textView.onRun = onRun
+        textView.onSave = onSave
+        textView.keymapMode = keymapMode
+        textView.setExternalVimMode(vimMode)
 
         guard textView.string != text else {
             return
@@ -69,7 +80,7 @@ struct CodeTextEditorView: NSViewRepresentable {
 
         let selectedRange = textView.selectedRange()
         context.coordinator.isApplyingProgrammaticChange = true
-        textView.string = text
+        context.coordinator.applyProgrammaticText(text, to: textView)
         context.coordinator.applyHighlighting(to: textView)
         textView.setSelectedRange(selectedRange.clamped(to: text.utf16.count))
         context.coordinator.isApplyingProgrammaticChange = false
@@ -79,11 +90,21 @@ struct CodeTextEditorView: NSViewRepresentable {
 extension CodeTextEditorView {
     final class Coordinator: NSObject, NSTextViewDelegate {
         @Binding private var text: String
+        @Binding fileprivate var vimMode: VimInputMode
         fileprivate weak var textView: RunAwareTextView?
         var isApplyingProgrammaticChange = false
 
-        init(text: Binding<String>) {
+        init(text: Binding<String>, vimMode: Binding<VimInputMode>) {
             _text = text
+            _vimMode = vimMode
+        }
+
+        @MainActor
+        func applyProgrammaticText(_ string: String, to textView: NSTextView) {
+            let previousAllowsUndo = textView.allowsUndo
+            textView.allowsUndo = false
+            textView.string = string
+            textView.allowsUndo = previousAllowsUndo
         }
 
         @MainActor
@@ -144,7 +165,40 @@ extension CodeTextEditorView {
 }
 
 private final class RunAwareTextView: NSTextView {
+    private static let pairedDelimiters: [Character: Character] = [
+        "{": "}",
+        "(": ")",
+        "[": "]",
+        "\"": "\""
+    ]
+
+    var keymapMode: EditorKeymapMode = .standard {
+        didSet {
+            if keymapMode == .standard {
+                setVimMode(.insert)
+            } else if vimMode == .insert {
+                setVimMode(.normal)
+            }
+        }
+    }
     var onRun: (() -> Void)?
+    var onSave: (() -> Void)?
+    var onVimModeChange: ((VimInputMode) -> Void)?
+    private var vimMode: VimInputMode = .insert
+    private var visualAnchorLocation: Int?
+    private var pendingOperator: Character?
+    private var yankRegister = ""
+
+    func setExternalVimMode(_ mode: VimInputMode) {
+        guard keymapMode == .vim else {
+            setVimMode(.insert)
+            return
+        }
+
+        if vimMode != mode {
+            setVimMode(mode)
+        }
+    }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -155,7 +209,316 @@ private final class RunAwareTextView: NSTextView {
             return true
         }
 
+        if modifiers == .command, commandCharacters == "s" {
+            onSave?()
+            return true
+        }
+
         return super.performKeyEquivalent(with: event)
+    }
+
+    override func insertText(_ insertString: Any, replacementRange: NSRange) {
+        guard shouldAutoPairDelimiters else {
+            super.insertText(insertString, replacementRange: replacementRange)
+            return
+        }
+
+        let stringValue: String
+        if let string = insertString as? String {
+            stringValue = string
+        } else if let attributedString = insertString as? NSAttributedString {
+            stringValue = attributedString.string
+        } else {
+            super.insertText(insertString, replacementRange: replacementRange)
+            return
+        }
+
+        guard stringValue.count == 1, let character = stringValue.first else {
+            super.insertText(insertString, replacementRange: replacementRange)
+            return
+        }
+
+        if let closing = Self.pairedDelimiters[character] {
+            insertPairedDelimiter(opening: character, closing: closing, replacementRange: replacementRange)
+            return
+        }
+
+        if Self.pairedDelimiters.values.contains(character), advanceThroughExistingClosingDelimiter(character, replacementRange: replacementRange) {
+            return
+        }
+
+        super.insertText(stringValue, replacementRange: replacementRange)
+    }
+
+    override func keyDown(with event: NSEvent) {
+        guard keymapMode == .vim else {
+            super.keyDown(with: event)
+            return
+        }
+
+        if event.keyCode == 53 || (event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .control && event.charactersIgnoringModifiers == "[") {
+            pendingOperator = nil
+            setVimMode(.normal)
+            return
+        }
+
+        if vimMode == .insert {
+            super.keyDown(with: event)
+            return
+        }
+
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard modifiers.isEmpty || modifiers == .shift else {
+            super.keyDown(with: event)
+            return
+        }
+
+        let characters = event.charactersIgnoringModifiers ?? ""
+        if vimMode == .visual {
+            if handleVisualKey(characters) {
+                return
+            }
+        } else if handleNormalKey(characters) {
+            return
+        }
+
+        super.keyDown(with: event)
+    }
+
+    private func handleNormalKey(_ characters: String) -> Bool {
+        guard let scalar = characters.first else {
+            return false
+        }
+
+        switch scalar {
+        case "h":
+            moveLeft(nil)
+        case "j":
+            moveDown(nil)
+        case "k":
+            moveUp(nil)
+        case "l":
+            moveRight(nil)
+        case "w":
+            moveWordRight(nil)
+        case "b":
+            moveWordLeft(nil)
+        case "0":
+            moveToBeginningOfLine(nil)
+        case "$":
+            moveToEndOfLine(nil)
+        case "i":
+            pendingOperator = nil
+            setVimMode(.insert)
+        case "a":
+            pendingOperator = nil
+            moveRight(nil)
+            setVimMode(.insert)
+        case "o":
+            pendingOperator = nil
+            openLine(below: true)
+        case "O":
+            pendingOperator = nil
+            openLine(below: false)
+        case "v":
+            pendingOperator = nil
+            visualAnchorLocation = insertionLocation
+            setVimMode(.visual)
+            updateVisualSelection()
+        case "x":
+            pendingOperator = nil
+            deleteForward(nil)
+        case "y":
+            if pendingOperator == "y" {
+                yankCurrentLine()
+                pendingOperator = nil
+            } else {
+                pendingOperator = "y"
+            }
+        case "d":
+            if pendingOperator == "d" {
+                deleteCurrentLine()
+                pendingOperator = nil
+            } else {
+                pendingOperator = "d"
+            }
+        case "p":
+            pendingOperator = nil
+            pasteRegister()
+        default:
+            pendingOperator = nil
+            return false
+        }
+
+        if scalar != "y" && scalar != "d" {
+            pendingOperator = nil
+        }
+        return true
+    }
+
+    private func handleVisualKey(_ characters: String) -> Bool {
+        guard let scalar = characters.first else {
+            return false
+        }
+
+        switch scalar {
+        case "h":
+            moveLeft(nil)
+            updateVisualSelection()
+        case "j":
+            moveDown(nil)
+            updateVisualSelection()
+        case "k":
+            moveUp(nil)
+            updateVisualSelection()
+        case "l":
+            moveRight(nil)
+            updateVisualSelection()
+        case "w":
+            moveWordRight(nil)
+            updateVisualSelection()
+        case "b":
+            moveWordLeft(nil)
+            updateVisualSelection()
+        case "0":
+            moveToBeginningOfLine(nil)
+            updateVisualSelection()
+        case "$":
+            moveToEndOfLine(nil)
+            updateVisualSelection()
+        case "y":
+            yankSelection()
+            collapseSelectionToEnd()
+            setVimMode(.normal)
+        case "d", "x":
+            deleteSelection()
+            setVimMode(.normal)
+        default:
+            return false
+        }
+
+        return true
+    }
+
+    private func setVimMode(_ mode: VimInputMode) {
+        vimMode = mode
+        if mode != .visual {
+            visualAnchorLocation = nil
+            if selectedRange().length > 0 {
+                collapseSelectionToEnd()
+            }
+        }
+        onVimModeChange?(mode)
+    }
+
+    private var insertionLocation: Int {
+        selectedRange().location
+    }
+
+    private func updateVisualSelection() {
+        guard let anchor = visualAnchorLocation else { return }
+        let current = insertionLocation
+        let lower = min(anchor, current)
+        let upper = max(anchor, current)
+        setSelectedRange(NSRange(location: lower, length: upper - lower))
+    }
+
+    private func collapseSelectionToEnd() {
+        let range = selectedRange()
+        let location = range.length > 0 ? range.location + range.length : range.location
+        setSelectedRange(NSRange(location: location, length: 0))
+    }
+
+    private func yankSelection() {
+        let range = selectedRange()
+        guard range.length > 0 else { return }
+        yankRegister = (string as NSString).substring(with: range)
+    }
+
+    private func deleteSelection() {
+        let range = selectedRange()
+        guard range.length > 0 else { return }
+        yankRegister = (string as NSString).substring(with: range)
+        insertText("", replacementRange: range)
+    }
+
+    private func yankCurrentLine() {
+        let nsString = string as NSString
+        let lineRange = nsString.lineRange(for: NSRange(location: insertionLocation, length: 0))
+        yankRegister = nsString.substring(with: lineRange)
+    }
+
+    private func deleteCurrentLine() {
+        let nsString = string as NSString
+        let lineRange = nsString.lineRange(for: NSRange(location: insertionLocation, length: 0))
+        yankRegister = nsString.substring(with: lineRange)
+        insertText("", replacementRange: lineRange)
+    }
+
+    private func pasteRegister() {
+        guard !yankRegister.isEmpty else { return }
+        insertText(yankRegister, replacementRange: selectedRange())
+    }
+
+    private func openLine(below: Bool) {
+        let nsString = string as NSString
+        let lineRange = nsString.lineRange(for: NSRange(location: insertionLocation, length: 0))
+        let insertionPoint: Int
+
+        if below {
+            insertionPoint = NSMaxRange(lineRange)
+        } else {
+            insertionPoint = lineRange.location
+        }
+
+        insertText("\n", replacementRange: NSRange(location: insertionPoint, length: 0))
+        setSelectedRange(NSRange(location: insertionPoint + (below ? 1 : 0), length: 0))
+        setVimMode(.insert)
+    }
+
+    private var shouldAutoPairDelimiters: Bool {
+        switch keymapMode {
+        case .standard:
+            true
+        case .vim:
+            vimMode == .insert
+        }
+    }
+
+    private func insertPairedDelimiter(opening: Character, closing: Character, replacementRange: NSRange) {
+        let effectiveRange = replacementRange.location == NSNotFound ? selectedRange() : replacementRange
+
+        if effectiveRange.length > 0 {
+            let selectedText = (string as NSString).substring(with: effectiveRange)
+            let wrapped = String(opening) + selectedText + String(closing)
+            super.insertText(wrapped, replacementRange: effectiveRange)
+            setSelectedRange(NSRange(location: effectiveRange.location + wrapped.utf16.count, length: 0))
+            return
+        }
+
+        let paired = String(opening) + String(closing)
+        super.insertText(paired, replacementRange: effectiveRange)
+        setSelectedRange(NSRange(location: effectiveRange.location + 1, length: 0))
+    }
+
+    private func advanceThroughExistingClosingDelimiter(_ character: Character, replacementRange: NSRange) -> Bool {
+        let effectiveRange = replacementRange.location == NSNotFound ? selectedRange() : replacementRange
+        guard effectiveRange.length == 0 else {
+            return false
+        }
+
+        let nsString = string as NSString
+        guard effectiveRange.location < nsString.length else {
+            return false
+        }
+
+        let nextCharacter = nsString.substring(with: NSRange(location: effectiveRange.location, length: 1))
+        guard nextCharacter == String(character) else {
+            return false
+        }
+
+        setSelectedRange(NSRange(location: effectiveRange.location + 1, length: 0))
+        return true
     }
 }
 

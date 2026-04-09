@@ -35,6 +35,7 @@ final class CargoRunnerTests: XCTestCase {
             title: "Hello World",
             summary: "",
             difficulty: .easy,
+            fileRole: .tests,
             sortOrder: nil,
             directoryURL: rootURL.appendingPathComponent("tests", isDirectory: true),
             sourceURL: rootURL.appendingPathComponent("tests/hello_world.rs"),
@@ -60,6 +61,161 @@ final class CargoRunnerTests: XCTestCase {
         XCTAssertEqual(invocations[1].currentDirectoryURL, rootURL)
         XCTAssertEqual(invocations[1].arguments, ["cargo", "runner", "run", "tests/hello_world.rs"])
         XCTAssertEqual(invocations[1].environment["PROJECT_ROOT"], rootURL.path)
+    }
+
+    func testRunRustlingsExerciseBuildsTestHarnessFromMirroredSolution() async throws {
+        let recorder = ProcessInvocationRecorder()
+        let runner = CargoRunner { currentDirectoryURL, arguments, commandDescription, environment in
+            await recorder.record(
+                currentDirectoryURL: currentDirectoryURL,
+                arguments: arguments,
+                commandDescription: commandDescription,
+                environment: environment
+            )
+
+            if arguments == ["rustlings", "run", "if3"] {
+                return ProcessOutput(commandDescription: commandDescription, stdout: "test result: ok", stderr: "", terminationStatus: 0)
+            }
+
+            if arguments.starts(with: ["rustc", "--test"]) {
+                return ProcessOutput(commandDescription: commandDescription, stdout: "", stderr: "", terminationStatus: 0)
+            }
+
+            return ProcessOutput(commandDescription: commandDescription, stdout: "test result: ok", stderr: "", terminationStatus: 0)
+        }
+
+        let tempRootURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempRootURL) }
+
+        let exerciseDirectoryURL = tempRootURL.appendingPathComponent("exercises/03_if", isDirectory: true)
+        let solutionDirectoryURL = tempRootURL.appendingPathComponent("solutions/03_if", isDirectory: true)
+        try FileManager.default.createDirectory(at: exerciseDirectoryURL, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: solutionDirectoryURL, withIntermediateDirectories: true)
+        try """
+        [package]
+        name = "rustlings-like"
+        version = "0.1.0"
+        edition = "2021"
+        """
+        .write(to: tempRootURL.appendingPathComponent("Cargo.toml"), atomically: true, encoding: .utf8)
+        try """
+        fn bigger(a: i32, b: i32) -> i32 {
+            todo!()
+        }
+        """
+        .write(to: exerciseDirectoryURL.appendingPathComponent("if3.rs"), atomically: true, encoding: .utf8)
+        try """
+        fn bigger(a: i32, b: i32) -> i32 {
+            if a > b { a } else { b }
+        }
+
+        #[cfg(test)]
+        mod tests {
+            #[test]
+            fn equal_numbers() {
+                assert_eq!(42, bigger(42, 42));
+            }
+        }
+        """
+        .write(to: solutionDirectoryURL.appendingPathComponent("if3.rs"), atomically: true, encoding: .utf8)
+
+        let exercise = ExerciseDocument(
+            id: exerciseDirectoryURL.appendingPathComponent("if3.rs"),
+            title: "If",
+            summary: "",
+            difficulty: .unknown,
+            fileRole: .primary,
+            sortOrder: nil,
+            directoryURL: exerciseDirectoryURL,
+            sourceURL: exerciseDirectoryURL.appendingPathComponent("if3.rs"),
+            readmeURL: nil,
+            hintURL: nil,
+            solutionURL: solutionDirectoryURL.appendingPathComponent("if3.rs"),
+            readmeContent: "",
+            hintContent: "",
+            sourceCode: "",
+            solutionCode: nil,
+            presentation: SourcePresentation(prefix: "", visibleSource: "", suffix: "", hiddenChecks: []),
+            checks: [],
+            fileNames: []
+        )
+
+        let output = try await runner.run(exercise: exercise)
+        let invocations = await recorder.invocations
+
+        XCTAssertEqual(output.terminationStatus, 0)
+        XCTAssertEqual(invocations.count, 1)
+        XCTAssertEqual(invocations.first?.currentDirectoryURL, tempRootURL)
+        XCTAssertEqual(invocations.first?.arguments, ["rustlings", "run", "if3"])
+    }
+
+    func testRunRustlingsExerciseWithoutTestsUsesTemporaryRustcBinaryInsteadOfCargoRunner() async throws {
+        let recorder = ProcessInvocationRecorder()
+        let runner = CargoRunner { currentDirectoryURL, arguments, commandDescription, environment in
+            await recorder.record(
+                currentDirectoryURL: currentDirectoryURL,
+                arguments: arguments,
+                commandDescription: commandDescription,
+                environment: environment
+            )
+
+            if arguments == ["rustlings", "run", "intro2"] {
+                return ProcessOutput(commandDescription: commandDescription, stdout: "Hello world!", stderr: "", terminationStatus: 0)
+            }
+
+            if arguments.starts(with: ["rustc", "--edition", "2021"]) {
+                return ProcessOutput(commandDescription: commandDescription, stdout: "", stderr: "", terminationStatus: 0)
+            }
+
+            return ProcessOutput(commandDescription: commandDescription, stdout: "Hello world!", stderr: "", terminationStatus: 0)
+        }
+
+        let tempRootURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempRootURL) }
+
+        let exerciseDirectoryURL = tempRootURL.appendingPathComponent("exercises/00_intro", isDirectory: true)
+        try FileManager.default.createDirectory(at: exerciseDirectoryURL, withIntermediateDirectories: true)
+        try """
+        [package]
+        name = "rustlings-like"
+        version = "0.1.0"
+        edition = "2021"
+        """
+        .write(to: tempRootURL.appendingPathComponent("Cargo.toml"), atomically: true, encoding: .utf8)
+        try """
+        fn main() {
+            println!("Hello world!");
+        }
+        """
+        .write(to: exerciseDirectoryURL.appendingPathComponent("intro2.rs"), atomically: true, encoding: .utf8)
+
+        let exercise = ExerciseDocument(
+            id: exerciseDirectoryURL.appendingPathComponent("intro2.rs"),
+            title: "Intro",
+            summary: "",
+            difficulty: .unknown,
+            fileRole: .primary,
+            sortOrder: nil,
+            directoryURL: exerciseDirectoryURL,
+            sourceURL: exerciseDirectoryURL.appendingPathComponent("intro2.rs"),
+            readmeURL: nil,
+            hintURL: nil,
+            solutionURL: nil,
+            readmeContent: "",
+            hintContent: "",
+            sourceCode: "",
+            solutionCode: nil,
+            presentation: SourcePresentation(prefix: "", visibleSource: "", suffix: "", hiddenChecks: []),
+            checks: [],
+            fileNames: []
+        )
+
+        let output = try await runner.run(exercise: exercise)
+        let invocations = await recorder.invocations
+
+        XCTAssertEqual(output.terminationStatus, 0)
+        XCTAssertEqual(invocations.count, 1)
+        XCTAssertEqual(invocations.first?.arguments, ["rustlings", "run", "intro2"])
     }
 }
 
