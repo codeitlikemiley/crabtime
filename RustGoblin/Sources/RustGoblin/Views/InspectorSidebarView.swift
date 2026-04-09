@@ -39,7 +39,7 @@ struct InspectorSidebarView: View {
                     Text("Inspector")
                         .font(.title3.weight(.bold))
                         .foregroundStyle(RustGoblinTheme.Palette.ink)
-                    Text("Hidden checks, hints, and run signals stay visible without stealing editor space.")
+                    Text("Run signals, test checks, and solution access without stealing editor space.")
                         .font(.footnote)
                         .foregroundStyle(RustGoblinTheme.Palette.textMuted)
                 }
@@ -57,24 +57,27 @@ struct InspectorSidebarView: View {
                     warningCount: store.warningCount
                 )
 
-                InspectorSection(title: "Hints") {
-                    MarkdownDocumentView(
-                        markdown: store.currentHintMarkdown,
-                        sourceURL: store.selectedExercise?.hintURL ?? (store.isShowingMarkdownPreview ? store.selectedExplorerFileURL : nil),
-                        sizingMode: .fill
+                if store.hasSolutionPreview {
+                    Button(
+                        "View Solution",
+                        systemImage: "lightbulb.max",
+                        action: store.openSolutionFile
                     )
-                    .frame(minHeight: 220, maxHeight: 360)
+                    .buttonStyle(.plain)
+                    .font(.footnote.weight(.semibold))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity)
                     .background(
-                        RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius, style: .continuous)
-                            .fill(RustGoblinTheme.Palette.subtleFill)
+                        Capsule()
+                            .fill(RustGoblinTheme.Palette.buttonFill)
                     )
                     .overlay {
-                        RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius, style: .continuous)
+                        Capsule()
                             .stroke(RustGoblinTheme.Palette.divider, lineWidth: 1)
                     }
-                    .clipShape(
-                        RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius, style: .continuous)
-                    )
+                    .foregroundStyle(RustGoblinTheme.Palette.ink)
+                    .interactivePointer()
                 }
 
                 if hasTestChecks {
@@ -106,70 +109,26 @@ struct InspectorSidebarView: View {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 10) {
-                    if store.isExercismWorkspace {
-                        Button(
-                            store.isSubmittingExercism ? "Submitting…" : "Submit to Exercism",
-                            systemImage: "paperplane.fill",
-                            action: store.submitSelectedExerciseToExercism
-                        )
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .background(
-                            Capsule()
-                                .fill(RustGoblinTheme.Palette.buttonFill)
-                        )
-                        .overlay {
-                            Capsule()
-                                .stroke(RustGoblinTheme.Palette.divider, lineWidth: 1)
-                        }
-                        .foregroundStyle(RustGoblinTheme.Palette.ink)
-                        .disabled(!store.canSubmitSelectedExerciseToExercism)
-                        .interactivePointer()
+                if store.isExercismWorkspace {
+                    Button(
+                        store.isSubmittingExercism ? "Submitting…" : "Submit to Exercism",
+                        systemImage: "paperplane.fill",
+                        action: store.submitSelectedExerciseToExercism
+                    )
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(
+                        Capsule()
+                            .fill(RustGoblinTheme.Palette.buttonFill)
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(RustGoblinTheme.Palette.divider, lineWidth: 1)
                     }
-
-                    if store.hasSolutionPreview {
-                        Button(
-                            store.isSolutionVisible ? "Hide Solution" : "Preview Solution",
-                            systemImage: store.isSolutionVisible ? "eye.slash" : "lightbulb.max",
-                            action: store.toggleSolutionVisibility
-                        )
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .background(
-                            Capsule()
-                                .fill(RustGoblinTheme.Palette.buttonFill)
-                        )
-                        .overlay {
-                            Capsule()
-                                .stroke(RustGoblinTheme.Palette.divider, lineWidth: 1)
-                        }
-                        .foregroundStyle(RustGoblinTheme.Palette.ink)
-                        .interactivePointer()
-                    }
-
-                    if let solutionMarkdown = store.currentSolutionMarkdown {
-                        InspectorSection(title: "Solution") {
-                            MarkdownDocumentView(
-                                markdown: "```rust\n\(solutionMarkdown)\n```",
-                                sizingMode: .fill
-                            )
-                            .frame(minHeight: 180, maxHeight: 320)
-                            .background(
-                                RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius, style: .continuous)
-                                    .fill(RustGoblinTheme.Palette.subtleFill)
-                            )
-                            .overlay {
-                                RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius, style: .continuous)
-                                    .stroke(RustGoblinTheme.Palette.divider, lineWidth: 1)
-                            }
-                            .clipShape(
-                                RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius, style: .continuous)
-                            )
-                        }
-                    }
+                    .foregroundStyle(RustGoblinTheme.Palette.ink)
+                    .disabled(!store.canSubmitSelectedExerciseToExercism)
+                    .interactivePointer()
                 }
             }
         }

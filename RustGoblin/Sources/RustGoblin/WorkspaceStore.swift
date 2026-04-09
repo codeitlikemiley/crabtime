@@ -1196,8 +1196,13 @@ final class WorkspaceStore {
         vimInputMode = mode
     }
 
-    func toggleSolutionVisibility() {
-        isSolutionVisible.toggle()
+    func openSolutionFile() {
+        guard let solutionURL = selectedExercise?.solutionURL,
+              FileManager.default.fileExists(atPath: solutionURL.path) else {
+            return
+        }
+
+        activateDocument(at: solutionURL, persistState: true)
     }
 
     func handleEditorTextChange() {
