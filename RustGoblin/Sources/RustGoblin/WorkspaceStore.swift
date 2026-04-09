@@ -1754,6 +1754,8 @@ final class WorkspaceStore {
             diagnostics = DiagnosticParser.parse(result.stderr)
             applyCheckResults(from: result)
 
+            appendSessionMessage("$ \(result.commandDescription)")
+
             if !result.stdout.isEmpty {
                 consoleOutput += result.stdout
             }
