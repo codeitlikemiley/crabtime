@@ -3,16 +3,28 @@ import SwiftUI
 struct InspectorSidebarView: View {
     @Environment(WorkspaceStore.self) private var store
 
+    private var testChecks: [ExerciseCheck] {
+        store.currentChecks.filter { $0.id != "manual-run" }
+    }
+
+    private var hasTestChecks: Bool {
+        !testChecks.isEmpty
+    }
+
+    private var testChecksHaveResults: Bool {
+        testChecks.contains { $0.status != .idle }
+    }
+
     private var passedChecks: Int {
-        store.currentChecks.filter { $0.status == .passed }.count
+        testChecks.filter { $0.status == .passed }.count
     }
 
     private var totalChecks: Int {
-        store.currentChecks.count
+        testChecks.count
     }
 
     private var completionRatio: Double {
-        guard totalChecks > 0 else {
+        guard totalChecks > 0, testChecksHaveResults else {
             return 0
         }
 
@@ -39,6 +51,8 @@ struct InspectorSidebarView: View {
                     passedChecks: passedChecks,
                     totalChecks: totalChecks,
                     completionRatio: completionRatio,
+                    hasTestChecks: hasTestChecks,
+                    testChecksHaveResults: testChecksHaveResults,
                     errorCount: store.errorCount,
                     warningCount: store.warningCount
                 )
@@ -63,28 +77,30 @@ struct InspectorSidebarView: View {
                     )
                 }
 
-                InspectorSection(title: "Checks") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        ForEach(store.currentChecks) { check in
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack {
-                                    Label(check.title, systemImage: check.symbolName)
-                                        .foregroundStyle(RustGoblinTheme.Palette.ink)
-                                    Spacer()
-                                    StatusBadge(text: statusText(for: check.status), tint: tint(for: check.status))
+                if hasTestChecks {
+                    InspectorSection(title: "Checks") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ForEach(testChecks) { check in
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack {
+                                        Label(check.title, systemImage: check.symbolName)
+                                            .foregroundStyle(RustGoblinTheme.Palette.ink)
+                                        Spacer()
+                                        StatusBadge(text: statusText(for: check.status), tint: tint(for: check.status))
+                                    }
+                                    Text(check.detail)
+                                        .font(.callout.monospaced())
+                                        .foregroundStyle(RustGoblinTheme.Palette.textMuted)
                                 }
-                                Text(check.detail)
-                                    .font(.callout.monospaced())
-                                    .foregroundStyle(RustGoblinTheme.Palette.textMuted)
-                            }
-                            .padding(12)
-                            .background(
-                                RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius, style: .continuous)
-                                    .fill(RustGoblinTheme.Palette.subtleFill)
-                            )
-                            .overlay {
-                                RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius, style: .continuous)
-                                    .stroke(RustGoblinTheme.Palette.divider, lineWidth: 1)
+                                .padding(12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius, style: .continuous)
+                                        .fill(RustGoblinTheme.Palette.subtleFill)
+                                )
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius, style: .continuous)
+                                        .stroke(RustGoblinTheme.Palette.divider, lineWidth: 1)
+                                }
                             }
                         }
                     }
@@ -228,8 +244,27 @@ private struct InspectorProgressCard: View {
     let passedChecks: Int
     let totalChecks: Int
     let completionRatio: Double
+    let hasTestChecks: Bool
+    let testChecksHaveResults: Bool
     let errorCount: Int
     let warningCount: Int
+
+    private var testSummaryText: String {
+        if !hasTestChecks {
+            return "No tests"
+        }
+        if !testChecksHaveResults {
+            return "Not tested yet"
+        }
+        return "\(passedChecks)/\(totalChecks) passed"
+    }
+
+    private var percentageText: String {
+        if !hasTestChecks || !testChecksHaveResults {
+            return "--"
+        }
+        return "\(Int(completionRatio * 100))%"
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -237,7 +272,7 @@ private struct InspectorProgressCard: View {
                 VStack(alignment: .leading, spacing: 6) {
                     EyebrowLabel(text: "Exercise Progress", tint: RustGoblinTheme.Palette.textMuted)
 
-                    Text(totalChecks == 0 ? "No checks yet" : "\(passedChecks)/\(totalChecks) passed")
+                    Text(testSummaryText)
                         .font(.title3.weight(.bold))
                         .foregroundStyle(RustGoblinTheme.Palette.ink)
 
@@ -248,31 +283,33 @@ private struct InspectorProgressCard: View {
 
                 Spacer()
 
-                Text(totalChecks == 0 ? "--" : "\(Int(completionRatio * 100))%")
+                Text(percentageText)
                     .font(.title2.weight(.black))
                     .foregroundStyle(RustGoblinTheme.Palette.panelTint)
             }
 
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(RustGoblinTheme.Palette.buttonFill)
+            if hasTestChecks && testChecksHaveResults {
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(RustGoblinTheme.Palette.buttonFill)
 
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    RustGoblinTheme.Palette.ember,
-                                    RustGoblinTheme.Palette.cyan
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        RustGoblinTheme.Palette.ember,
+                                        RustGoblinTheme.Palette.cyan
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
                             )
-                        )
-                        .frame(width: max(10, proxy.size.width * completionRatio))
+                            .frame(width: max(10, proxy.size.width * completionRatio))
+                    }
                 }
+                .frame(height: 8)
             }
-            .frame(height: 8)
 
             HStack(spacing: 8) {
                 if errorCount > 0 {

@@ -29,16 +29,29 @@ final class CargoRunnerTests: XCTestCase {
             return ProcessOutput(commandDescription: commandDescription, stdout: "ok", stderr: "", terminationStatus: 0)
         }
 
-        let rootURL = URL(fileURLWithPath: "/Users/uriah/Exercism/rust/hello-world")
+        let tempRootURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempRootURL) }
+
+        let testsDirectoryURL = tempRootURL.appendingPathComponent("tests", isDirectory: true)
+        try FileManager.default.createDirectory(at: testsDirectoryURL, withIntermediateDirectories: true)
+        try """
+        [package]
+        name = "hello-world"
+        version = "0.1.0"
+        edition = "2021"
+        """
+        .write(to: tempRootURL.appendingPathComponent("Cargo.toml"), atomically: true, encoding: .utf8)
+        try "fn main() {}".write(to: testsDirectoryURL.appendingPathComponent("hello_world.rs"), atomically: true, encoding: .utf8)
+
         let exercise = ExerciseDocument(
-            id: rootURL.appendingPathComponent("tests/hello_world.rs"),
+            id: testsDirectoryURL.appendingPathComponent("hello_world.rs"),
             title: "Hello World",
             summary: "",
             difficulty: .easy,
             fileRole: .tests,
             sortOrder: nil,
-            directoryURL: rootURL.appendingPathComponent("tests", isDirectory: true),
-            sourceURL: rootURL.appendingPathComponent("tests/hello_world.rs"),
+            directoryURL: testsDirectoryURL,
+            sourceURL: testsDirectoryURL.appendingPathComponent("hello_world.rs"),
             readmeURL: nil,
             hintURL: nil,
             solutionURL: nil,
@@ -56,11 +69,11 @@ final class CargoRunnerTests: XCTestCase {
 
         XCTAssertEqual(output.terminationStatus, 0)
         XCTAssertEqual(invocations.count, 2)
-        XCTAssertEqual(invocations[0].currentDirectoryURL, rootURL)
+        XCTAssertEqual(invocations[0].currentDirectoryURL, tempRootURL)
         XCTAssertEqual(invocations[0].arguments, ["cargo", "runner", "--help"])
-        XCTAssertEqual(invocations[1].currentDirectoryURL, rootURL)
+        XCTAssertEqual(invocations[1].currentDirectoryURL, tempRootURL)
         XCTAssertEqual(invocations[1].arguments, ["cargo", "runner", "run", "tests/hello_world.rs"])
-        XCTAssertEqual(invocations[1].environment["PROJECT_ROOT"], rootURL.path)
+        XCTAssertEqual(invocations[1].environment["PROJECT_ROOT"], tempRootURL.path)
     }
 
     func testRunRustlingsExerciseUsesCargoRunner() async throws {

@@ -894,6 +894,32 @@ final class WorkspaceStore {
         }
     }
 
+    func runSelectedExerciseTests() {
+        guard selectedExercise != nil else {
+            return
+        }
+
+        saveSelectedExercise()
+
+        // Find the line number of #[cfg(test)] in the editor text
+        let testLine = findTestModuleLine(in: editorText)
+
+        Task {
+            await performRun(overrideCursorLine: testLine)
+        }
+    }
+
+    private func findTestModuleLine(in source: String) -> Int? {
+        let lines = source.components(separatedBy: "\n")
+        for (index, line) in lines.enumerated() {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("#[cfg(test") {
+                return index + 1 // 1-based
+            }
+        }
+        return nil
+    }
+
     func submitSelectedExerciseToExercism() {
         guard let selectedExercise, canSubmitSelectedExerciseToExercism else {
             return
@@ -1745,7 +1771,7 @@ final class WorkspaceStore {
         !exercise.checks.isEmpty && exercise.checks.allSatisfy { $0.status == .passed }
     }
 
-    private func performRun() async {
+    private func performRun(overrideCursorLine: Int? = nil) async {
         guard let selectedExercise else {
             return
         }
@@ -1757,7 +1783,8 @@ final class WorkspaceStore {
         appendSessionMessage("Started \(selectedExercise.title)")
 
         do {
-            let result = try await cargoRunner.run(exercise: selectedExercise, cursorLine: editorCursorLine)
+            let cursorLine = overrideCursorLine ?? editorCursorLine
+            let result = try await cargoRunner.run(exercise: selectedExercise, cursorLine: cursorLine)
             lastCommandDescription = result.commandDescription
             lastTerminationStatus = result.terminationStatus
             diagnostics = DiagnosticParser.parse(result.stderr)
@@ -1798,17 +1825,25 @@ final class WorkspaceStore {
             }
 
             appendSessionMessage("$ \(result.commandDescription)")
-            diagnostics = DiagnosticParser.parse(result.stderr)
 
-            if !result.stderr.isEmpty {
-                consoleOutput += result.stderr
-            }
+            // Parse diagnostics from both stdout and stderr (rustlings outputs to stdout)
+            let combinedOutput = [result.stdout, result.stderr].joined(separator: "\n")
+            diagnostics = DiagnosticParser.parse(combinedOutput)
 
             let errorCount = diagnostics.filter { $0.severity == .error }.count
             let warningCount = diagnostics.filter { $0.severity == .warning }.count
 
-            if errorCount > 0 || warningCount > 0 {
-                appendSessionMessage("Check: \(errorCount) error(s), \(warningCount) warning(s)")
+            if result.terminationStatus != 0 || errorCount > 0 || warningCount > 0 {
+                // Show the full output in diagnostics console, not the main output
+                if errorCount > 0 || warningCount > 0 {
+                    appendSessionMessage("Check: \(errorCount) error(s), \(warningCount) warning(s)")
+                } else {
+                    // Non-zero exit but no parseable diagnostics — show the raw output in session
+                    let trimmedOutput = combinedOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmedOutput.isEmpty {
+                        appendSessionMessage("Check output:\n\(trimmedOutput)")
+                    }
+                }
                 selectedConsoleTab = .diagnostics
             } else {
                 appendSessionMessage("Check: clean ✓")
@@ -1871,7 +1906,14 @@ final class WorkspaceStore {
         }
 
         let existingChecks = workspace.exercises[selectedIndex].checks
-        let combinedOutput = [result.stdout, result.stderr].joined(separator: "\n").lowercased()
+        let combinedOutput = [result.stdout, result.stderr].joined(separator: "\n")
+        let lowerOutput = combinedOutput.lowercased()
+
+        // Detect if this was a test run by looking for test runner output markers
+        let isTestRun = lowerOutput.contains("running") && lowerOutput.contains("test")
+            || lowerOutput.contains("test result:")
+            || lowerOutput.contains("... ok")
+            || lowerOutput.contains("... failed")
 
         workspace.exercises[selectedIndex].checks = existingChecks.map { check in
             var check = check
@@ -1881,14 +1923,20 @@ final class WorkspaceStore {
                 return check
             }
 
+            // Only update test check statuses if this was actually a test run
+            guard isTestRun else {
+                return check
+            }
+
             let token = check.id.lowercased()
 
-            if combinedOutput.contains("\(token) ... ok") || combinedOutput.contains("\(token) ... passed") {
+            if lowerOutput.contains("\(token) ... ok") || lowerOutput.contains("\(token) ... passed") {
                 check.status = .passed
-            } else if combinedOutput.contains("\(token) ... failed") || combinedOutput.contains(token + " failed") {
+            } else if lowerOutput.contains("\(token) ... failed") || lowerOutput.contains(token + " failed") {
                 check.status = .failed
             } else {
-                check.status = result.terminationStatus == 0 ? .passed : .failed
+                // Test ran but this specific test wasn't found in output — leave status unchanged
+                // (could be filtered out by cargo runner context)
             }
 
             return check

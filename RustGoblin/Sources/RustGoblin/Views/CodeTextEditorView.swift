@@ -7,6 +7,7 @@ struct CodeTextEditorView: NSViewRepresentable {
     @Binding var vimMode: VimInputMode
     var onRun: (() -> Void)? = nil
     var onSave: (() -> Void)? = nil
+    var onTest: (() -> Void)? = nil
     var onCursorChange: ((Int) -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
@@ -50,6 +51,7 @@ struct CodeTextEditorView: NSViewRepresentable {
         textView.allowsImageEditing = false
         textView.onRun = onRun
         textView.onSave = onSave
+        textView.onTest = onTest
         textView.keymapMode = keymapMode
         textView.onVimModeChange = { mode in
             context.coordinator.vimMode = mode
@@ -72,6 +74,7 @@ struct CodeTextEditorView: NSViewRepresentable {
 
         textView.onRun = onRun
         textView.onSave = onSave
+        textView.onTest = onTest
         textView.keymapMode = keymapMode
         textView.setExternalVimMode(vimMode)
 
@@ -203,6 +206,7 @@ private final class RunAwareTextView: NSTextView {
     }
     var onRun: (() -> Void)?
     var onSave: (() -> Void)?
+    var onTest: (() -> Void)?
     var onVimModeChange: ((VimInputMode) -> Void)?
     private var vimMode: VimInputMode = .insert
     private var visualAnchorLocation: Int?
@@ -231,6 +235,11 @@ private final class RunAwareTextView: NSTextView {
 
         if modifiers == .command, commandCharacters == "s" {
             onSave?()
+            return true
+        }
+
+        if modifiers == .command, commandCharacters == "t" {
+            onTest?()
             return true
         }
 

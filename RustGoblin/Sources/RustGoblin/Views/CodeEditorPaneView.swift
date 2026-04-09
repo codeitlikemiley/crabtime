@@ -134,6 +134,7 @@ struct CodeEditorPaneView: View {
                             vimMode: $store.vimInputMode,
                             onRun: store.runSelectedExercise,
                             onSave: store.saveSelectedExercise,
+                            onTest: store.runSelectedExerciseTests,
                             onCursorChange: { line in store.editorCursorLine = line }
                         )
                             .onChange(of: store.editorText) { _, _ in
