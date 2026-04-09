@@ -1,5 +1,8 @@
-# RustGoblin challenge workspace
-# Add [[exercises]] entries here. `/challenge <name>` will manage this file for you.
+format_version = 1
+
+welcome_message = """Welcome to these community Rustlings exercises."""
+
+final_message = """We hope that you found the exercises helpful :D"""
 
 [[exercises]]
 name = "lru_cache"
@@ -8,7 +11,6 @@ mode = "test"
 hint = """
 Implement Lru Cache.
 
-- Start by removing `// I AM NOT DONE`
 - Read the failing tests
 - Make the smallest working change first
 """

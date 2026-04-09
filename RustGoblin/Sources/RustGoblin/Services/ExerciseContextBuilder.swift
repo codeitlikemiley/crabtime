@@ -17,6 +17,19 @@ struct ExerciseContextBuilder {
         Focus on explanation, debugging, and next steps.
         Do not rewrite the whole solution unless the user explicitly asks.
         Avoid spoilers from solution files.
+
+        RUSTLINGS EXERCISE CONVENTIONS (follow these when generating or modifying exercises):
+        - Every exercise AND solution file MUST contain a `fn main() {}` function (even if empty body).
+          This is required because each file is compiled as a separate binary target.
+        - Solution files mirror the exercise structure with the correct implementation filled in.
+          They include the SAME test cases and function signatures as the exercise.
+        - For simple syntax/familiarity exercises (e.g. fixing `printline!` to `println!`,
+          adding `let` keyword), NO test cases are needed — the exercise simply needs to compile.
+        - For more complex problems (data structures, algorithms, trait implementations),
+          include meaningful test cases in a `#[cfg(test)] mod tests { ... }` block.
+        - The more complex the problem, the MORE test cases should be included to validate correctness.
+        - Exercise files use `todo!()` macros and `// TODO:` comments for parts the learner must complete.
+        - Solution files replace `todo!()` with the working implementation and `// TODO:` with explanatory comments.
         """)
 
         sections.append("""

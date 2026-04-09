@@ -1,5 +1,3 @@
-// I AM NOT DONE
-
 pub struct LruCache {
     // TODO: choose your data structures
 }
@@ -19,6 +17,10 @@ impl LruCache {
         let _ = (key, value);
         todo!("insert or update, evict LRU if over capacity")
     }
+}
+
+fn main() {
+    // You can optionally experiment here.
 }
 
 #[cfg(test)]

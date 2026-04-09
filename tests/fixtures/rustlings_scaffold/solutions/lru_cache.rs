@@ -48,3 +48,27 @@ impl LruCache {
         self.order.push_back(key);
     }
 }
+
+fn main() {
+    // You can optionally experiment here.
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lru_basic() {
+        let mut cache = LruCache::new(2);
+        cache.put(1, 1);
+        cache.put(2, 2);
+        assert_eq!(cache.get(1), Some(1));
+        cache.put(3, 3);
+        assert_eq!(cache.get(2), None);
+        assert_eq!(cache.get(3), Some(3));
+        cache.put(4, 4);
+        assert_eq!(cache.get(1), None);
+        assert_eq!(cache.get(3), Some(3));
+        assert_eq!(cache.get(4), Some(4));
+    }
+}

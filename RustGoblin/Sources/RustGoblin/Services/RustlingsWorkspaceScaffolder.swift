@@ -69,7 +69,6 @@ struct RustlingsWorkspaceScaffolder {
         let hintBody = [
             "Implement \(title).",
             "",
-            "- Start by removing `// I AM NOT DONE`",
             "- Read the failing tests",
             "- Make the smallest working change first"
         ].joined(separator: "\n")
@@ -252,24 +251,18 @@ struct RustlingsWorkspaceScaffolder {
 
         let challengeTitle = title.isEmpty ? "Custom Challenge" : title
         let exercise = """
-        // I AM NOT DONE
+        // TODO: implement \(challengeTitle)
 
         fn main() {
-            // TODO: implement \(challengeTitle)
-        }
-
-        #[cfg(test)]
-        mod tests {
-            #[test]
-            fn placeholder() {
-                assert!(true, "Replace this placeholder test for \(challengeTitle).");
-            }
+            // You can optionally experiment here.
         }
         """
 
         let solution = """
+        // Solution for \(challengeTitle).
+
         fn main() {
-            // Sample solution for \(challengeTitle).
+            // You can optionally experiment here.
         }
         """
 
@@ -319,8 +312,6 @@ struct RustlingsWorkspaceScaffolder {
 
     private var lruExerciseTemplate: String {
         """
-        // I AM NOT DONE
-
         pub struct LruCache {
             // TODO: choose your data structures
         }
@@ -340,6 +331,10 @@ struct RustlingsWorkspaceScaffolder {
                 let _ = (key, value);
                 todo!("insert or update, evict LRU if over capacity")
             }
+        }
+
+        fn main() {
+            // You can optionally experiment here.
         }
 
         #[cfg(test)]
@@ -414,6 +409,30 @@ struct RustlingsWorkspaceScaffolder {
                     self.order.remove(position);
                 }
                 self.order.push_back(key);
+            }
+        }
+
+        fn main() {
+            // You can optionally experiment here.
+        }
+
+        #[cfg(test)]
+        mod tests {
+            use super::*;
+
+            #[test]
+            fn test_lru_basic() {
+                let mut cache = LruCache::new(2);
+                cache.put(1, 1);
+                cache.put(2, 2);
+                assert_eq!(cache.get(1), Some(1));
+                cache.put(3, 3);
+                assert_eq!(cache.get(2), None);
+                assert_eq!(cache.get(3), Some(3));
+                cache.put(4, 4);
+                assert_eq!(cache.get(1), None);
+                assert_eq!(cache.get(3), Some(3));
+                assert_eq!(cache.get(4), Some(4));
             }
         }
         """
