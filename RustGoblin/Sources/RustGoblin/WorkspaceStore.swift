@@ -2136,7 +2136,11 @@ final class WorkspaceStore {
             )
         }
 
-        let result = try await rustlingsWorkspaceScaffolder.createChallenge(named: trimmedName, in: workspace.rootURL)
+        let result = try await rustlingsWorkspaceScaffolder.createChallenge(
+            named: trimmedName,
+            in: workspace.rootURL,
+            providerManager: chatStore?.providerManager
+        )
 
         loadWorkspace(
             at: workspace.rootURL,

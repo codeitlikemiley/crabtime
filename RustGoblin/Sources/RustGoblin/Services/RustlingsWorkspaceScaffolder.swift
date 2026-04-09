@@ -20,7 +20,11 @@ struct RustlingsWorkspaceScaffolder {
         try ensureWorkspaceShell(named: rawName, at: rootURL, repairExisting: false)
     }
 
-    func createChallenge(named rawName: String, in workspaceRootURL: URL) async throws -> ChallengeResult {
+    func createChallenge(
+        named rawName: String,
+        in workspaceRootURL: URL,
+        providerManager: AIProviderManager? = nil
+    ) async throws -> ChallengeResult {
         let requestedSlug = slug(from: rawName)
         guard !requestedSlug.isEmpty else {
             throw WorkspaceChallengeError.invalidName
@@ -44,9 +48,21 @@ struct RustlingsWorkspaceScaffolder {
         let exerciseURL = exercisesURL.appendingPathComponent("\(normalizedSlug).rs", isDirectory: false)
         let solutionURL = solutionsURL.appendingPathComponent("\(normalizedSlug).rs", isDirectory: false)
 
-        let templates = templatePair(for: normalizedSlug, title: title)
-        try templates.exercise.write(to: exerciseURL, atomically: true, encoding: .utf8)
-        try templates.solution.write(to: solutionURL, atomically: true, encoding: .utf8)
+        // Step 1: Generate exercise file (AI or fallback stub)
+        let exerciseContent = await generateExerciseContent(
+            title: title,
+            providerManager: providerManager
+        )
+        try exerciseContent.write(to: exerciseURL, atomically: true, encoding: .utf8)
+
+        // Step 2: Generate solution file (AI or fallback stub) — uses exercise as context
+        let solutionContent = await generateSolutionContent(
+            title: title,
+            exerciseContent: exerciseContent,
+            providerManager: providerManager
+        )
+        try solutionContent.write(to: solutionURL, atomically: true, encoding: .utf8)
+
         try appendInfoEntryIfNeeded(slug: normalizedSlug, title: title, to: infoTomlURL)
 
         let devUpdateMessage = try await runRustlingsDevUpdateIfAvailable(in: workspaceRootURL)
@@ -244,30 +260,158 @@ struct RustlingsWorkspaceScaffolder {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func templatePair(for slug: String, title: String) -> (exercise: String, solution: String) {
-        if slug == "lru_cache" {
-            return (lruExerciseTemplate, lruSolutionTemplate)
+    // MARK: - AI-Powered Exercise Generation
+
+    private func generateExerciseContent(
+        title: String,
+        providerManager: AIProviderManager?
+    ) async -> String {
+        guard let providerManager else {
+            return fallbackExerciseStub(title: title)
         }
 
+        do {
+            let raw = try await providerManager.generate(
+                systemPrompt: exerciseSystemPrompt,
+                userMessage: "Generate a Rustlings exercise for the topic: \"\(title)\""
+            )
+            let cleaned = Self.stripMarkdownFences(from: raw)
+            guard !cleaned.isEmpty else {
+                return fallbackExerciseStub(title: title)
+            }
+            return cleaned
+        } catch {
+            return fallbackExerciseStub(title: title)
+        }
+    }
+
+    private func generateSolutionContent(
+        title: String,
+        exerciseContent: String,
+        providerManager: AIProviderManager?
+    ) async -> String {
+        guard let providerManager else {
+            return fallbackSolutionStub(title: title)
+        }
+
+        do {
+            let userMessage = """
+            Generate the solution file for this Rustlings exercise:
+
+            ```rust
+            \(exerciseContent)
+            ```
+            """
+            let raw = try await providerManager.generate(
+                systemPrompt: solutionSystemPrompt,
+                userMessage: userMessage
+            )
+            let cleaned = Self.stripMarkdownFences(from: raw)
+            guard !cleaned.isEmpty else {
+                return fallbackSolutionStub(title: title)
+            }
+            return cleaned
+        } catch {
+            return fallbackSolutionStub(title: title)
+        }
+    }
+
+    // MARK: - Prompts
+
+    private var exerciseSystemPrompt: String {
+        """
+        You are an expert Rust exercise author generating Rustlings-style exercises.
+
+        OUTPUT RULES:
+        - Output ONLY valid Rust source code. No markdown fences, no prose, no explanations.
+        - The file MUST contain a `fn main() {}` function (body can be empty or contain optional experiments).
+        - Use `todo!()` macros for parts the learner must implement.
+        - Use `// TODO:` comments to guide what needs to be done.
+        - Do NOT use `// I AM NOT DONE` or any non-standard markers.
+        - Code must compile on Rust edition 2024.
+
+        EXERCISE COMPLEXITY RULES:
+        - For simple syntax/familiarity topics (e.g. print, variables, types, borrowing):
+          NO test module needed. The exercise is "fix this code so it compiles."
+        - For algorithmic/data structure problems (e.g. LRU cache, linked list, binary search):
+          Include a `#[cfg(test)] mod tests { ... }` block with test cases.
+        - The more complex the problem, the MORE test cases you should include.
+        - Minimum 3 test cases for complex exercises, covering normal + edge cases.
+
+        STRUCTURE:
+        1. `use` imports (if needed)
+        2. Public types/functions with `todo!()` bodies
+        3. `fn main() { // You can optionally experiment here. }`
+        4. `#[cfg(test)] mod tests { ... }` (for complex exercises only)
+        """
+    }
+
+    private var solutionSystemPrompt: String {
+        """
+        You are generating the SOLUTION file for a Rustlings exercise.
+
+        OUTPUT RULES:
+        - Output ONLY valid Rust source code. No markdown fences, no prose, no explanations.
+        - Mirror the EXACT same structure as the exercise file:
+          same function signatures, same type definitions, same test module.
+        - Replace all `todo!()` with the correct working implementation.
+        - Replace `// TODO:` comments with brief explanatory comments.
+        - The code MUST contain `fn main() {}`.
+        - If the exercise has `#[cfg(test)] mod tests`, include the SAME tests (they must all pass).
+        - The code MUST pass `clippy -D warnings` on Rust edition 2024.
+        - Use idiomatic Rust patterns (entry API for HashMap, collapsed if-let chains, etc.).
+        """
+    }
+
+    // MARK: - Fallback Stubs
+
+    private func fallbackExerciseStub(title: String) -> String {
         let challengeTitle = title.isEmpty ? "Custom Challenge" : title
-        let exercise = """
+        return """
         // TODO: implement \(challengeTitle)
 
         fn main() {
             // You can optionally experiment here.
         }
         """
+    }
 
-        let solution = """
+    private func fallbackSolutionStub(title: String) -> String {
+        let challengeTitle = title.isEmpty ? "Custom Challenge" : title
+        return """
         // Solution for \(challengeTitle).
 
         fn main() {
             // You can optionally experiment here.
         }
         """
-
-        return (exercise, solution)
     }
+
+    // MARK: - Markdown Fence Stripping
+
+    static func stripMarkdownFences(from text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Strip ```rust ... ``` or ``` ... ``` wrapper
+        let fencePattern = #"^```(?:rust|rs)?\s*\n([\s\S]*?)\n```\s*$"#
+        if let regex = try? NSRegularExpression(pattern: fencePattern, options: []),
+           let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
+           let captureRange = Range(match.range(at: 1), in: trimmed) {
+            return String(trimmed[captureRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        // Also handle if there are multiple code blocks — take the first one
+        let blockPattern = #"```(?:rust|rs)?\s*\n([\s\S]*?)\n```"#
+        if let regex = try? NSRegularExpression(pattern: blockPattern, options: []),
+           let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
+           let captureRange = Range(match.range(at: 1), in: trimmed) {
+            return String(trimmed[captureRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        return trimmed
+    }
+
+    // MARK: - Canonical Workspace Templates
 
     private var canonicalCargoToml: String {
         """
@@ -307,134 +451,6 @@ struct RustlingsWorkspaceScaffolder {
         check.command = "clippy"
         check.extraArgs = ["--profile", "test"]
         cargo.targetDir = true
-        """
-    }
-
-    private var lruExerciseTemplate: String {
-        """
-        pub struct LruCache {
-            // TODO: choose your data structures
-        }
-
-        impl LruCache {
-            pub fn new(capacity: usize) -> Self {
-                let _ = capacity;
-                todo!("create a cache with the given capacity")
-            }
-
-            pub fn get(&mut self, key: i32) -> Option<i32> {
-                let _ = key;
-                todo!("return value and mark as recently used")
-            }
-
-            pub fn put(&mut self, key: i32, value: i32) {
-                let _ = (key, value);
-                todo!("insert or update, evict LRU if over capacity")
-            }
-        }
-
-        fn main() {
-            // You can optionally experiment here.
-        }
-
-        #[cfg(test)]
-        mod tests {
-            use super::*;
-
-            #[test]
-            fn test_lru_basic() {
-                let mut cache = LruCache::new(2);
-                cache.put(1, 1);
-                cache.put(2, 2);
-                assert_eq!(cache.get(1), Some(1));
-                cache.put(3, 3);
-                assert_eq!(cache.get(2), None);
-                assert_eq!(cache.get(3), Some(3));
-                cache.put(4, 4);
-                assert_eq!(cache.get(1), None);
-                assert_eq!(cache.get(3), Some(3));
-                assert_eq!(cache.get(4), Some(4));
-            }
-        }
-        """
-    }
-
-    private var lruSolutionTemplate: String {
-        """
-        use std::collections::{HashMap, VecDeque};
-
-        pub struct LruCache {
-            capacity: usize,
-            map: HashMap<i32, i32>,
-            order: VecDeque<i32>,
-        }
-
-        impl LruCache {
-            pub fn new(capacity: usize) -> Self {
-                Self {
-                    capacity,
-                    map: HashMap::new(),
-                    order: VecDeque::new(),
-                }
-            }
-
-            pub fn get(&mut self, key: i32) -> Option<i32> {
-                if let Some(&value) = self.map.get(&key) {
-                    self.promote(key);
-                    Some(value)
-                } else {
-                    None
-                }
-            }
-
-            pub fn put(&mut self, key: i32, value: i32) {
-                if let std::collections::hash_map::Entry::Occupied(mut e) = self.map.entry(key) {
-                    e.insert(value);
-                    self.promote(key);
-                    return;
-                }
-
-                if self.map.len() == self.capacity
-                    && let Some(lru) = self.order.pop_front()
-                {
-                    self.map.remove(&lru);
-                }
-
-                self.map.insert(key, value);
-                self.order.push_back(key);
-            }
-
-            fn promote(&mut self, key: i32) {
-                if let Some(position) = self.order.iter().position(|candidate| *candidate == key) {
-                    self.order.remove(position);
-                }
-                self.order.push_back(key);
-            }
-        }
-
-        fn main() {
-            // You can optionally experiment here.
-        }
-
-        #[cfg(test)]
-        mod tests {
-            use super::*;
-
-            #[test]
-            fn test_lru_basic() {
-                let mut cache = LruCache::new(2);
-                cache.put(1, 1);
-                cache.put(2, 2);
-                assert_eq!(cache.get(1), Some(1));
-                cache.put(3, 3);
-                assert_eq!(cache.get(2), None);
-                assert_eq!(cache.get(3), Some(3));
-                cache.put(4, 4);
-                assert_eq!(cache.get(1), None);
-                assert_eq!(cache.get(3), Some(3));
-                assert_eq!(cache.get(4), Some(4));
-            }
-        }
         """
     }
 

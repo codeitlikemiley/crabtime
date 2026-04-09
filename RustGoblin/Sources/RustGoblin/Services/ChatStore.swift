@@ -12,7 +12,7 @@ final class ChatStore {
     var errorMessage: String?
 
     @ObservationIgnored private let database: WorkspaceLibraryDatabase
-    @ObservationIgnored private let providerManager: AIProviderManager
+    @ObservationIgnored let providerManager: AIProviderManager
     @ObservationIgnored private let contextBuilder: ExerciseContextBuilder
 
     init(

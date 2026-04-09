@@ -67,6 +67,32 @@ struct AIProviderManager {
     }
 
     @MainActor
+    func generate(systemPrompt: String, userMessage: String) async throws -> String {
+        let provider = settingsStore.defaultProvider
+        let model = settingsStore.preference(for: provider).model
+
+        let session = ExerciseChatSession(
+            workspaceRootPath: "",
+            exercisePath: "",
+            title: "generation",
+            providerKind: provider,
+            model: model
+        )
+
+        let message = ExerciseChatMessage(
+            sessionID: session.id,
+            role: .user,
+            content: userMessage
+        )
+
+        return try await sendMessage(
+            session: session,
+            messages: [message],
+            context: systemPrompt
+        )
+    }
+
+    @MainActor
     func displayModel(for kind: AIProviderKind) -> String {
         settingsStore.preference(for: kind).model
     }
