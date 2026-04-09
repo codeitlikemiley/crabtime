@@ -2,7 +2,7 @@ import XCTest
 @testable import RustGoblin
 
 final class SourcePresentationBuilderTests: XCTestCase {
-    func testBuildHidesShebangManifestAndTests() {
+    func testBuildKeepsEntireSourceVisible() {
         let source = """
         #!/usr/bin/env -S cargo +nightly -Zscript
         ---
@@ -25,21 +25,15 @@ final class SourcePresentationBuilderTests: XCTestCase {
 
         let presentation = SourcePresentationBuilder().build(from: source)
 
-        XCTAssertEqual(
-            presentation.visibleSource,
-            """
-            fn main() {
-                println!("hello");
-            }
-
-            """
-        )
+        XCTAssertTrue(presentation.visibleSource.contains("#!/usr/bin/env"))
+        XCTAssertTrue(presentation.visibleSource.contains("fn main()"))
+        XCTAssertTrue(presentation.visibleSource.contains("mod tests"))
         XCTAssertEqual(presentation.hiddenChecks.map(\.id), ["example_case"])
-        XCTAssertTrue(presentation.prefix.contains("#!/usr/bin/env"))
-        XCTAssertTrue(presentation.suffix.contains("mod tests"))
+        XCTAssertTrue(presentation.prefix.isEmpty)
+        XCTAssertTrue(presentation.suffix.isEmpty)
     }
 
-    func testRebuildPreservesHiddenSections() {
+    func testRebuildReturnsSameContent() {
         let source = """
         #!/usr/bin/env bash
 
@@ -57,13 +51,22 @@ final class SourcePresentationBuilderTests: XCTestCase {
         """
 
         let presentation = SourcePresentationBuilder().build(from: source)
-        let rebuilt = presentation.rebuild(
-            with: """
-            fn main() {
-                println!("new");
+        let edited = """
+        #!/usr/bin/env bash
+
+        fn main() {
+            println!("new");
+        }
+
+        #[cfg(test)]
+        mod tests {
+            #[test]
+            fn smoke() {
+                assert!(true);
             }
-            """
-        )
+        }
+        """
+        let rebuilt = presentation.rebuild(with: edited)
 
         XCTAssertTrue(rebuilt.contains("#!/usr/bin/env bash"))
         XCTAssertTrue(rebuilt.contains("mod tests"))

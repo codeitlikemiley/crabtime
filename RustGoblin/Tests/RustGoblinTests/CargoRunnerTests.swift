@@ -73,12 +73,8 @@ final class CargoRunnerTests: XCTestCase {
                 environment: environment
             )
 
-            if arguments == ["rustlings", "run", "if3"] {
+            if arguments.starts(with: ["cargo", "test", "--bin", "if3"]) {
                 return ProcessOutput(commandDescription: commandDescription, stdout: "test result: ok", stderr: "", terminationStatus: 0)
-            }
-
-            if arguments.starts(with: ["rustc", "--test"]) {
-                return ProcessOutput(commandDescription: commandDescription, stdout: "", stderr: "", terminationStatus: 0)
             }
 
             return ProcessOutput(commandDescription: commandDescription, stdout: "test result: ok", stderr: "", terminationStatus: 0)
@@ -146,7 +142,7 @@ final class CargoRunnerTests: XCTestCase {
         XCTAssertEqual(output.terminationStatus, 0)
         XCTAssertEqual(invocations.count, 1)
         XCTAssertEqual(invocations.first?.currentDirectoryURL, tempRootURL)
-        XCTAssertEqual(invocations.first?.arguments, ["rustlings", "run", "if3"])
+        XCTAssertEqual(invocations.first?.arguments, ["cargo", "test", "--bin", "if3", "--", "--color", "never"])
     }
 
     func testRunRustlingsExerciseWithoutTestsUsesTemporaryRustcBinaryInsteadOfCargoRunner() async throws {
@@ -159,7 +155,7 @@ final class CargoRunnerTests: XCTestCase {
                 environment: environment
             )
 
-            if arguments == ["rustlings", "run", "intro2"] {
+            if arguments.starts(with: ["cargo", "test", "--bin", "intro2"]) {
                 return ProcessOutput(commandDescription: commandDescription, stdout: "Hello world!", stderr: "", terminationStatus: 0)
             }
 
@@ -215,7 +211,7 @@ final class CargoRunnerTests: XCTestCase {
 
         XCTAssertEqual(output.terminationStatus, 0)
         XCTAssertEqual(invocations.count, 1)
-        XCTAssertEqual(invocations.first?.arguments, ["rustlings", "run", "intro2"])
+        XCTAssertEqual(invocations.first?.arguments, ["cargo", "test", "--bin", "intro2", "--", "--color", "never"])
     }
 }
 

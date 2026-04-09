@@ -158,15 +158,19 @@ struct CargoRunner: Sendable {
         projectRootURL: URL,
         environment: [String: String]
     ) async throws -> ProcessOutput? {
-        guard ToolingHealthService.resolveExecutable(named: "rustlings") != nil else {
+        // Only use this path if the project is a Cargo workspace (has Cargo.toml with [[bin]])
+        let cargoTomlURL = projectRootURL.appendingPathComponent("Cargo.toml")
+        guard FileManager.default.fileExists(atPath: cargoTomlURL.path) else {
             return nil
         }
 
         let slug = exercise.sourceURL.deletingPathExtension().lastPathComponent
+        // Use `cargo test --bin <slug>` for non-interactive execution.
+        // `rustlings run <slug>` is an interactive watch mode that never terminates.
         return try await processRunner(
             projectRootURL,
-            ["rustlings", "run", slug],
-            "rustlings run \(slug)",
+            ["cargo", "test", "--bin", slug, "--", "--color", "never"],
+            "cargo test --bin \(slug)",
             environment
         )
     }
@@ -372,7 +376,7 @@ struct CargoRunner: Sendable {
         sourcePresentation: SourcePresentation,
         solutionPresentation: SourcePresentation
     ) -> String {
-        var merged = sourcePresentation.prefix + sourcePresentation.visibleSource
+        var merged = sourcePresentation.visibleSource
         if !merged.hasSuffix("\n") {
             merged += "\n"
         }
@@ -380,10 +384,18 @@ struct CargoRunner: Sendable {
             merged += "\n"
         }
 
-        merged += solutionPresentation.suffix.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !merged.hasSuffix("\n") {
-            merged += "\n"
+        // Extract the test module from the solution's visible source
+        let solutionSource = solutionPresentation.visibleSource
+        if let testRange = solutionSource.range(of: "#[cfg(test", options: .backwards) {
+            let testBlock = String(solutionSource[testRange.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !testBlock.isEmpty {
+                merged += testBlock
+                if !merged.hasSuffix("\n") {
+                    merged += "\n"
+                }
+            }
         }
+
         return merged
     }
 
