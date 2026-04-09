@@ -6,7 +6,7 @@ import SwiftUI
 @Observable
 @MainActor
 final class WorkspaceStore {
-    private static let editorKeymapDefaultsKey = "editor-keymap-mode"
+
 
     var workspaceLibrary: [SavedWorkspaceRecord] = []
     var workspace: ExerciseWorkspace?
@@ -19,8 +19,7 @@ final class WorkspaceStore {
     var editorCursorLine: Int = 1
     var explorerPreviewText: String = ""
     var currentDiffText: String = ""
-    var editorKeymapMode: EditorKeymapMode = .standard
-    var vimInputMode: VimInputMode = .insert
+
     var searchText: String = ""
     var explorerSearchText: String = ""
     var selectedDifficultyFilter: ExerciseDifficulty?
@@ -112,8 +111,7 @@ final class WorkspaceStore {
         self.baselineStore = WorkspaceBaselineStore(baselineLibraryURL: appPaths.baselineLibraryURL)
         self.rustlingsWorkspaceScaffolder = rustlingsWorkspaceScaffolder
         self.sessionLog = bootstrapMessages
-        self.editorKeymapMode = Self.loadEditorKeymapMode(from: defaults)
-        self.vimInputMode = self.editorKeymapMode == .vim ? .normal : .insert
+
 
         restorePersistedLibrary()
     }
@@ -1173,28 +1171,7 @@ final class WorkspaceStore {
         openExplorerSelection()
     }
 
-    func toggleEditorKeymapMode() {
-        setEditorKeymapMode(editorKeymapMode == .standard ? .vim : .standard)
-    }
 
-    func setEditorKeymapMode(_ mode: EditorKeymapMode) {
-        guard editorKeymapMode != mode else {
-            vimInputMode = mode == .vim ? .normal : .insert
-            return
-        }
-
-        editorKeymapMode = mode
-        vimInputMode = mode == .vim ? .normal : .insert
-        defaults.set(mode.rawValue, forKey: Self.editorKeymapDefaultsKey)
-    }
-
-    func setVimInputMode(_ mode: VimInputMode) {
-        guard editorKeymapMode == .vim else {
-            vimInputMode = .insert
-            return
-        }
-        vimInputMode = mode
-    }
 
     func openSolutionFile() {
         guard let solutionURL = selectedExercise?.solutionURL,
@@ -2643,18 +2620,7 @@ final class WorkspaceStore {
     }
 }
 
-private extension WorkspaceStore {
-    static func loadEditorKeymapMode(from defaults: UserDefaults) -> EditorKeymapMode {
-        guard
-            let rawValue = defaults.string(forKey: editorKeymapDefaultsKey),
-            let mode = EditorKeymapMode(rawValue: rawValue)
-        else {
-            return .standard
-        }
 
-        return mode
-    }
-}
 
 private final class PromptTextField: NSTextField {
     override init(frame frameRect: NSRect) {

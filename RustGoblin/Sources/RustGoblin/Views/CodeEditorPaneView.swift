@@ -75,30 +75,6 @@ struct CodeEditorPaneView: View {
                         .font(.caption)
                         .foregroundStyle(RustGoblinTheme.Palette.textMuted)
 
-                    Button {
-                        store.toggleEditorKeymapMode()
-                    } label: {
-                        Text(store.editorKeymapMode.title)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(store.editorKeymapMode == .vim ? RustGoblinTheme.Palette.ink : RustGoblinTheme.Palette.textMuted)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(
-                                Capsule()
-                                    .fill(store.editorKeymapMode == .vim ? RustGoblinTheme.Palette.selectionFill : RustGoblinTheme.Palette.buttonFill)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .interactivePointer()
-
-                    if store.editorKeymapMode == .vim && !store.isShowingReadonlyPreview {
-                        Text(store.vimInputMode.title)
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(store.vimInputMode == .insert ? RustGoblinTheme.Palette.moss : RustGoblinTheme.Palette.panelTint)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Capsule().fill(RustGoblinTheme.Palette.buttonFill))
-                    }
 
                     if store.isEditorDirty && !store.isShowingReadonlyPreview {
                         Label("Unsaved", systemImage: "circle.fill")
@@ -130,8 +106,6 @@ struct CodeEditorPaneView: View {
                     } else {
                         CodeTextEditorView(
                             text: $store.editorText,
-                            keymapMode: store.editorKeymapMode,
-                            vimMode: $store.vimInputMode,
                             onRun: store.runSelectedExercise,
                             onSave: store.saveSelectedExercise,
                             onTest: store.runSelectedExerciseTests,

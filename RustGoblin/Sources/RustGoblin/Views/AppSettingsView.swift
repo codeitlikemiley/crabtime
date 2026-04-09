@@ -3,7 +3,7 @@ import SwiftUI
 struct AppSettingsView: View {
     @Environment(AISettingsStore.self) private var settingsStore
     @Environment(AIModelCatalogStore.self) private var modelCatalogStore
-    @AppStorage("editor-keymap-mode") private var editorKeymapModeRawValue = EditorKeymapMode.standard.rawValue
+
     @State private var toolingStatus: [ToolHealthStatus] = []
     @State private var secretDrafts: [String: String] = [:]
 
@@ -14,8 +14,6 @@ struct AppSettingsView: View {
         TabView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    editorCard
-
                     providerDefaultsCard
 
                     ForEach(AIProviderKind.defaultChatProviders) { kind in
@@ -48,35 +46,6 @@ struct AppSettingsView: View {
         }
     }
 
-    private var editorCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Editor")
-                .font(.title3.weight(.bold))
-
-            Picker("Keymap", selection: Binding(
-                get: {
-                    EditorKeymapMode(rawValue: editorKeymapModeRawValue) ?? .standard
-                },
-                set: { newValue in
-                    editorKeymapModeRawValue = newValue.rawValue
-                }
-            )) {
-                ForEach(EditorKeymapMode.allCases, id: \.self) { mode in
-                    Text(mode.title).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-
-            Text("Use Standard editing or enable Vim modes globally. Vim mode starts in NORMAL and uses INSERT when editing.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .padding(18)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(RustGoblinTheme.Palette.panelFill)
-        )
-    }
 
     private var providerDefaultsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
