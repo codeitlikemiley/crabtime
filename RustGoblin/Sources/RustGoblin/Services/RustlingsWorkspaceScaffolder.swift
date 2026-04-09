@@ -10,6 +10,13 @@ struct RustlingsWorkspaceScaffolder {
         let devUpdateMessage: String?
     }
 
+    struct DrillResult: Sendable {
+        let topic: String
+        let count: Int
+        let created: [ChallengeResult]
+        let failed: Int
+    }
+
     private let fileManager: FileManager
 
     init(fileManager: FileManager = .default) {
@@ -73,6 +80,108 @@ struct RustlingsWorkspaceScaffolder {
             exerciseURL: exerciseURL,
             solutionURL: solutionURL,
             devUpdateMessage: devUpdateMessage
+        )
+    }
+
+    func createDrill(
+        topic: String,
+        count: Int,
+        in workspaceRootURL: URL,
+        providerManager: AIProviderManager? = nil,
+        onProgress: @Sendable @MainActor (Int, Int, String) -> Void = { _, _, _ in }
+    ) async throws -> DrillResult {
+        let clampedCount = max(1, min(count, 100))
+        let baseSlug = slug(from: topic)
+        guard !baseSlug.isEmpty else {
+            throw WorkspaceChallengeError.invalidName
+        }
+
+        try ensureWorkspaceShell(named: workspaceRootURL.lastPathComponent, at: workspaceRootURL, repairExisting: true)
+
+        let exercisesURL = workspaceRootURL.appendingPathComponent("exercises", isDirectory: true)
+        let solutionsURL = workspaceRootURL.appendingPathComponent("solutions", isDirectory: true)
+        let infoTomlURL = workspaceRootURL.appendingPathComponent("info.toml", isDirectory: false)
+
+        try fileManager.createDirectory(at: exercisesURL, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: solutionsURL, withIntermediateDirectories: true)
+        if !fileManager.fileExists(atPath: infoTomlURL.path) {
+            try canonicalInfoTomlHeader.write(to: infoTomlURL, atomically: true, encoding: .utf8)
+        }
+
+        var created: [ChallengeResult] = []
+        var failedCount = 0
+        var previousThemes: [String] = []
+
+        for i in 1...clampedCount {
+            let numberedSlug = "\(baseSlug)\(i)"
+            let title = prettifiedTitle(from: baseSlug.replacingOccurrences(of: "_", with: " "))
+            let numberedTitle = "\(title) (\(i)/\(clampedCount))"
+
+            let normalizedSlug = nextAvailableSlug(basedOn: numberedSlug, in: exercisesURL)
+            let exerciseURL = exercisesURL.appendingPathComponent("\(normalizedSlug).rs", isDirectory: false)
+            let solutionURL = solutionsURL.appendingPathComponent("\(normalizedSlug).rs", isDirectory: false)
+
+            await onProgress(i, clampedCount, normalizedSlug)
+
+            let variationContext = drillVariationContext(
+                topic: title,
+                index: i,
+                total: clampedCount,
+                previousThemes: previousThemes
+            )
+
+            let exerciseContent = await generateExerciseContent(
+                title: title,
+                providerManager: providerManager,
+                variationContext: variationContext
+            )
+
+            do {
+                try exerciseContent.write(to: exerciseURL, atomically: true, encoding: .utf8)
+
+                let solutionContent = await generateSolutionContent(
+                    title: title,
+                    exerciseContent: exerciseContent,
+                    providerManager: providerManager
+                )
+                try solutionContent.write(to: solutionURL, atomically: true, encoding: .utf8)
+                try appendInfoEntryIfNeeded(slug: normalizedSlug, title: numberedTitle, to: infoTomlURL)
+
+                created.append(ChallengeResult(
+                    title: numberedTitle,
+                    slug: normalizedSlug,
+                    exerciseURL: exerciseURL,
+                    solutionURL: solutionURL,
+                    devUpdateMessage: nil
+                ))
+
+                // Track theme for variation in next iteration
+                let firstLine = exerciseContent.components(separatedBy: .newlines)
+                    .first(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) ?? normalizedSlug
+                previousThemes.append(firstLine)
+            } catch {
+                failedCount += 1
+            }
+        }
+
+        // Run dev update once at the end instead of per-exercise
+        let devUpdateMessage = try await runRustlingsDevUpdateIfAvailable(in: workspaceRootURL)
+        var finalResults = created
+        if let last = finalResults.last {
+            finalResults[finalResults.count - 1] = ChallengeResult(
+                title: last.title,
+                slug: last.slug,
+                exerciseURL: last.exerciseURL,
+                solutionURL: last.solutionURL,
+                devUpdateMessage: devUpdateMessage
+            )
+        }
+
+        return DrillResult(
+            topic: topic,
+            count: clampedCount,
+            created: finalResults,
+            failed: failedCount
         )
     }
 
@@ -264,16 +373,22 @@ struct RustlingsWorkspaceScaffolder {
 
     private func generateExerciseContent(
         title: String,
-        providerManager: AIProviderManager?
+        providerManager: AIProviderManager?,
+        variationContext: String? = nil
     ) async -> String {
         guard let providerManager else {
             return fallbackExerciseStub(title: title)
         }
 
         do {
+            var userMessage = "Generate a Rustlings exercise for the topic: \"\(title)\""
+            if let variationContext, !variationContext.isEmpty {
+                userMessage += "\n\n\(variationContext)"
+            }
+
             let raw = try await providerManager.generate(
                 systemPrompt: exerciseSystemPrompt,
-                userMessage: "Generate a Rustlings exercise for the topic: \"\(title)\""
+                userMessage: userMessage
             )
             let cleaned = Self.stripMarkdownFences(from: raw)
             guard !cleaned.isEmpty else {
@@ -361,6 +476,40 @@ struct RustlingsWorkspaceScaffolder {
         - The code MUST pass `clippy -D warnings` on Rust edition 2024.
         - Use idiomatic Rust patterns (entry API for HashMap, collapsed if-let chains, etc.).
         """
+    }
+
+    // MARK: - Drill Variation
+
+    private func drillVariationContext(
+        topic: String,
+        index: Int,
+        total: Int,
+        previousThemes: [String]
+    ) -> String {
+        var parts: [String] = []
+
+        parts.append("VARIATION REQUIREMENT: This is exercise \(index) of \(total) in a drill series on \"\(topic)\".")
+        parts.append("Each exercise MUST teach a DIFFERENT aspect or use a DIFFERENT approach.")
+
+        if index == 1 {
+            parts.append("Start with the fundamentals — the simplest form of the concept.")
+        } else if index <= total / 3 {
+            parts.append("Focus on basic/introductory difficulty. Build on fundamentals with slightly more complexity.")
+        } else if index <= (total * 2) / 3 {
+            parts.append("Focus on intermediate difficulty. Introduce edge cases, generics, or multiple data structures.")
+        } else {
+            parts.append("Focus on advanced difficulty. Use complex patterns, performance constraints, or real-world scenarios.")
+        }
+
+        if !previousThemes.isEmpty {
+            let summaries = previousThemes.enumerated()
+                .map { "  \($0.offset + 1). \($0.element)" }
+                .suffix(10) // Keep context window small — only last 10
+                .joined(separator: "\n")
+            parts.append("Previous exercises already covered these themes (DO NOT repeat them):\n\(summaries)")
+        }
+
+        return parts.joined(separator: "\n")
     }
 
     // MARK: - Fallback Stubs

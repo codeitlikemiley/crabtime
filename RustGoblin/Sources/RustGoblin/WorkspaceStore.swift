@@ -1034,11 +1034,13 @@ final class WorkspaceStore {
         switch command {
         case "/challenge":
             return try await createWorkspaceChallenge(named: argument)
+        case "/drill":
+            return try await createWorkspaceDrill(argument: argument)
         default:
             throw NSError(
                 domain: "WorkspaceStore",
                 code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Unknown chat command `\(command)`. Supported commands: `/challenge <name>`."] 
+                userInfo: [NSLocalizedDescriptionKey: "Unknown chat command `\(command)`. Supported commands: `/challenge <name>`, `/drill <topic> <count>`."] 
             )
         }
     }
@@ -2177,6 +2179,99 @@ final class WorkspaceStore {
                 "`rustlings dev update` / `rustlings dev check` output:",
                 "```text",
                 devUpdateMessage,
+                "```"
+            ]
+        }
+
+        return summaryLines.joined(separator: "\n")
+    }
+
+    private func createWorkspaceDrill(argument: String) async throws -> String {
+        guard let workspace, let record = currentWorkspaceRecord else {
+            throw NSError(
+                domain: "WorkspaceStore",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Open or create a workspace before using `/drill`."] 
+            )
+        }
+
+        let parts = argument.trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(whereSeparator: \.isWhitespace)
+
+        guard parts.count >= 2,
+              let count = Int(parts.last!),
+              count > 0 else {
+            throw NSError(
+                domain: "WorkspaceStore",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "Usage: `/drill linked list 5`\n\nThe last argument must be a positive number."] 
+            )
+        }
+
+        let topic = parts.dropLast().joined(separator: " ")
+        guard !topic.isEmpty else {
+            throw NSError(
+                domain: "WorkspaceStore",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "Usage: `/drill linked list 5`"] 
+            )
+        }
+
+        appendSessionMessage("Starting drill: \(count)× \(topic)")
+
+        let result = try await rustlingsWorkspaceScaffolder.createDrill(
+            topic: topic,
+            count: count,
+            in: workspace.rootURL,
+            providerManager: chatStore?.providerManager,
+            onProgress: { [weak self] current, total, slug in
+                self?.appendSessionMessage("[\(current)/\(total)] Generating \(slug)…")
+            }
+        )
+
+        loadWorkspace(
+            at: workspace.rootURL,
+            sourceKind: record.sourceKind,
+            cloneURL: record.cloneURL,
+            originPath: record.originPath,
+            restoreState: false,
+            refreshBaseline: true
+        )
+
+        // Select the first generated exercise
+        if let firstCreated = result.created.first,
+           let firstExercise = self.workspace?.exercises.first(where: {
+               $0.sourceURL.standardizedFileURL == firstCreated.exerciseURL.standardizedFileURL
+           }) {
+            applySelection(for: firstExercise.id)
+            registerOpenTab(firstExercise.sourceURL)
+            activateDocument(at: firstExercise.sourceURL, persistState: true)
+        }
+
+        appendSessionMessage("Drill complete: \(result.created.count)/\(result.count) exercises created")
+
+        var summaryLines = [
+            "**Drill complete:** `\(result.topic)`",
+            "",
+            "Created **\(result.created.count)** of \(result.count) exercises."
+        ]
+
+        if result.failed > 0 {
+            summaryLines.append("\(result.failed) exercise(s) failed to generate.")
+        }
+
+        summaryLines.append("")
+
+        for item in result.created {
+            summaryLines.append("- `\(item.slug)`")
+        }
+
+        if let devMsg = result.created.last?.devUpdateMessage, !devMsg.isEmpty {
+            summaryLines += [
+                "",
+                "`rustlings dev update` / `rustlings dev check` output:",
+                "```text",
+                devMsg,
                 "```"
             ]
         }
