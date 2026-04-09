@@ -1034,13 +1034,13 @@ final class WorkspaceStore {
         switch command {
         case "/challenge":
             return try await createWorkspaceChallenge(named: argument)
-        case "/drill":
+        case "/grind":
             return try await createWorkspaceDrill(argument: argument)
         default:
             throw NSError(
                 domain: "WorkspaceStore",
                 code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Unknown chat command `\(command)`. Supported commands: `/challenge <name>`, `/drill <topic> <count>`."] 
+                userInfo: [NSLocalizedDescriptionKey: "Unknown chat command `\(command)`. Supported commands: `/challenge <name>`, `/grind <topic> <count>`."] 
             )
         }
     }
@@ -2191,7 +2191,7 @@ final class WorkspaceStore {
             throw NSError(
                 domain: "WorkspaceStore",
                 code: 2,
-                userInfo: [NSLocalizedDescriptionKey: "Open or create a workspace before using `/drill`."] 
+                userInfo: [NSLocalizedDescriptionKey: "Open or create a workspace before using `/grind`."] 
             )
         }
 
@@ -2204,7 +2204,7 @@ final class WorkspaceStore {
             throw NSError(
                 domain: "WorkspaceStore",
                 code: 3,
-                userInfo: [NSLocalizedDescriptionKey: "Usage: `/drill linked list 5`\n\nThe last argument must be a positive number."] 
+                userInfo: [NSLocalizedDescriptionKey: "Usage: `/grind linked list 5`\n\nThe last argument must be a positive number."] 
             )
         }
 
@@ -2213,7 +2213,7 @@ final class WorkspaceStore {
             throw NSError(
                 domain: "WorkspaceStore",
                 code: 3,
-                userInfo: [NSLocalizedDescriptionKey: "Usage: `/drill linked list 5`"] 
+                userInfo: [NSLocalizedDescriptionKey: "Usage: `/grind linked list 5`"] 
             )
         }
 
