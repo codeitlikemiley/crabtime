@@ -388,16 +388,16 @@ struct RustlingsWorkspaceScaffolder {
             }
 
             pub fn put(&mut self, key: i32, value: i32) {
-                if self.map.contains_key(&key) {
-                    self.map.insert(key, value);
+                if let std::collections::hash_map::Entry::Occupied(mut e) = self.map.entry(key) {
+                    e.insert(value);
                     self.promote(key);
                     return;
                 }
 
-                if self.map.len() == self.capacity {
-                    if let Some(lru) = self.order.pop_front() {
-                        self.map.remove(&lru);
-                    }
+                if self.map.len() == self.capacity
+                    && let Some(lru) = self.order.pop_front()
+                {
+                    self.map.remove(&lru);
                 }
 
                 self.map.insert(key, value);
