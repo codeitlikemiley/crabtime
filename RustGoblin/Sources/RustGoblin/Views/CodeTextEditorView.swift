@@ -7,9 +7,10 @@ struct CodeTextEditorView: NSViewRepresentable {
     @Binding var vimMode: VimInputMode
     var onRun: (() -> Void)? = nil
     var onSave: (() -> Void)? = nil
+    var onCursorChange: ((Int) -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text, vimMode: $vimMode)
+        Coordinator(text: $text, vimMode: $vimMode, onCursorChange: onCursorChange)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -93,10 +94,12 @@ extension CodeTextEditorView {
         @Binding fileprivate var vimMode: VimInputMode
         fileprivate weak var textView: RunAwareTextView?
         var isApplyingProgrammaticChange = false
+        private var onCursorChange: ((Int) -> Void)?
 
-        init(text: Binding<String>, vimMode: Binding<VimInputMode>) {
+        init(text: Binding<String>, vimMode: Binding<VimInputMode>, onCursorChange: ((Int) -> Void)? = nil) {
             _text = text
             _vimMode = vimMode
+            self.onCursorChange = onCursorChange
         }
 
         @MainActor
@@ -120,6 +123,23 @@ extension CodeTextEditorView {
             applyHighlighting(to: textView)
             textView.setSelectedRange(selection.clamped(to: textView.string.utf16.count))
             text = textView.string
+        }
+
+        @MainActor
+        func textViewDidChangeSelection(_ notification: Notification) {
+            guard let textView, !isApplyingProgrammaticChange else { return }
+            let location = textView.selectedRange().location
+            let nsString = textView.string as NSString
+            let lineRange = nsString.lineRange(for: NSRange(location: min(location, nsString.length), length: 0))
+            var lineNumber = 1
+            var index = 0
+            while index < lineRange.location && index < nsString.length {
+                if nsString.character(at: index) == 0x000A { // newline
+                    lineNumber += 1
+                }
+                index += 1
+            }
+            onCursorChange?(lineNumber)
         }
 
         @MainActor

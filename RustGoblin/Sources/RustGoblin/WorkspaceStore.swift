@@ -16,6 +16,7 @@ final class WorkspaceStore {
     var selectedExplorerNodePath: String?
     var openTabs: [ActiveDocumentTab] = []
     var editorText: String = ""
+    var editorCursorLine: Int = 1
     var explorerPreviewText: String = ""
     var currentDiffText: String = ""
     var editorKeymapMode: EditorKeymapMode = .standard
@@ -1756,7 +1757,7 @@ final class WorkspaceStore {
         appendSessionMessage("Started \(selectedExercise.title)")
 
         do {
-            let result = try await cargoRunner.run(exercise: selectedExercise)
+            let result = try await cargoRunner.run(exercise: selectedExercise, cursorLine: editorCursorLine)
             lastCommandDescription = result.commandDescription
             lastTerminationStatus = result.terminationStatus
             diagnostics = DiagnosticParser.parse(result.stderr)

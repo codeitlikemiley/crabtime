@@ -133,7 +133,8 @@ struct CodeEditorPaneView: View {
                             keymapMode: store.editorKeymapMode,
                             vimMode: $store.vimInputMode,
                             onRun: store.runSelectedExercise,
-                            onSave: store.saveSelectedExercise
+                            onSave: store.saveSelectedExercise,
+                            onCursorChange: { line in store.editorCursorLine = line }
                         )
                             .onChange(of: store.editorText) { _, _ in
                                 store.handleEditorTextChange()

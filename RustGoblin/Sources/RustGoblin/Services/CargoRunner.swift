@@ -17,7 +17,7 @@ struct CargoRunner: Sendable {
         }
     }
 
-    func run(exercise: ExerciseDocument) async throws -> ProcessOutput {
+    func run(exercise: ExerciseDocument, cursorLine: Int? = nil) async throws -> ProcessOutput {
         let runnerRootURL = projectRootURL(for: exercise.sourceURL, fallbackDirectoryURL: exercise.directoryURL)
         let environment = runnerEnvironment(projectRootURL: runnerRootURL)
 
@@ -25,6 +25,7 @@ struct CargoRunner: Sendable {
             let runnerResult = try await runCargoRunner(
                 sourceURL: exercise.sourceURL,
                 projectRootURL: runnerRootURL,
+                cursorLine: cursorLine,
                 environment: environment
             )
 
@@ -93,14 +94,21 @@ struct CargoRunner: Sendable {
     private func runCargoRunner(
         sourceURL: URL,
         projectRootURL: URL,
+        cursorLine: Int? = nil,
         environment: [String: String]
     ) async throws -> ProcessOutput {
         let targetPath = runnerTargetPath(for: sourceURL, relativeTo: projectRootURL)
+        let targetArg: String
+        if let cursorLine, cursorLine > 0 {
+            targetArg = "\(targetPath):\(cursorLine)"
+        } else {
+            targetArg = targetPath
+        }
 
         return try await processRunner(
             projectRootURL,
-            ["cargo", "runner", "run", targetPath],
-            "cargo runner run \(targetPath)",
+            ["cargo", "runner", "run", targetArg],
+            "cargo runner run \(targetArg)",
             environment
         )
     }
