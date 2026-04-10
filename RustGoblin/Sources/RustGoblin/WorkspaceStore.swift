@@ -50,7 +50,13 @@ final class WorkspaceStore {
     var isWorkspacePickerPresented: Bool = false
     var workspacePickerSearchText: String = ""
     var workspacePickerFocusToken: Int = 0
-    var consoleOutput: String = "Import a folder or a Rust file to start building your exercise workspace.\n"
+    var consoleOutput: String = "Import a folder or a Rust file to start building your exercise workspace.\n" {
+        didSet {
+            if consoleOutput.count > 100_000 {
+                consoleOutput = String(consoleOutput.suffix(90_000))
+            }
+        }
+    }
     var sessionLog: [String] = []
     var diagnostics: [Diagnostic] = []
     var selectedDiagnosticIndex: Int = 0
@@ -3213,6 +3219,9 @@ final class WorkspaceStore {
             "\(Date().formatted(date: .omitted, time: .shortened))  \(message)",
             at: 0
         )
+        if sessionLog.count > 4000 {
+            sessionLog.removeLast(sessionLog.count - 4000)
+        }
     }
 
     private func sanitizeWorkspaceName(_ rawName: String) -> String {
