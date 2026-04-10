@@ -204,12 +204,13 @@ struct ToolingHealthService {
     }
 
     static func resolveExecutable(named executableName: String) -> URL? {
-        let environment = ProcessInfo.processInfo.environment
+        let environment = DependencyManager.shared.defaultEnvironment
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
         let defaultCandidates = [
             "/opt/homebrew/bin/\(executableName)",
             "/usr/local/bin/\(executableName)",
             "/usr/bin/\(executableName)",
-            "/Users/uriah/.cargo/bin/\(executableName)"
+            "\(homeDir)/.cargo/bin/\(executableName)"
         ].map(URL.init(fileURLWithPath:))
 
         let pathCandidates = (environment["PATH"] ?? "")
@@ -239,6 +240,7 @@ struct ToolingHealthService {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
         process.standardInput = stdinPipe
+        process.environment = DependencyManager.shared.defaultEnvironment
 
         let stdoutTask = Task.detached {
             try stdoutPipe.fileHandleForReading.readToEnd() ?? Data()

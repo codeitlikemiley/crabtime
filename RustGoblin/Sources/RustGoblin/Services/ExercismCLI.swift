@@ -275,6 +275,7 @@ struct ExercismCLI: Sendable {
         process.currentDirectoryURL = currentDirectoryURL
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
+        process.environment = DependencyManager.shared.defaultEnvironment
 
         let stdoutTask = Task.detached {
             try stdoutPipe.fileHandleForReading.readToEnd() ?? Data()

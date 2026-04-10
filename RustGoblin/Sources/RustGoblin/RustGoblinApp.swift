@@ -76,26 +76,42 @@ struct WorkspaceSceneRoot: View {
         _chatStore = State(initialValue: chatStore)
     }
 
+    @State private var dependencyManager = DependencyManager.shared
+
     var body: some View {
-        MainSplitView()
-            .environment(workspaceStore)
-            .environment(chatStore)
-            .environment(services.aiSettingsStore)
-            .environment(services.modelCatalogStore)
-            .frame(minWidth: 1360, minHeight: 860)
-            .preferredColorScheme(.dark)
-            .focusedSceneValue(\.workspaceStore, workspaceStore)
-            .task(id: initialWorkspaceRootPath) {
-                guard !didApplyInitialWorkspace else {
-                    return
-                }
+        Group {
+            if dependencyManager.status == .ready {
+                MainSplitView()
+                    .environment(workspaceStore)
+                    .environment(chatStore)
+                    .environment(services.aiSettingsStore)
+                    .environment(services.modelCatalogStore)
+                    .focusedSceneValue(\.workspaceStore, workspaceStore)
+                    .task(id: initialWorkspaceRootPath) {
+                        guard !didApplyInitialWorkspace else {
+                            return
+                        }
 
-                didApplyInitialWorkspace = true
+                        didApplyInitialWorkspace = true
 
-                if let initialWorkspaceRootPath {
-                    workspaceStore.loadPersistedWorkspace(rootPath: initialWorkspaceRootPath)
+                        if let initialWorkspaceRootPath {
+                            workspaceStore.loadPersistedWorkspace(rootPath: initialWorkspaceRootPath)
+                        }
+                    }
+            } else {
+                SetupWizardView(
+                    status: dependencyManager.status,
+                    onInstall: {
+                        Task { await dependencyManager.installMissingDependencies() }
+                    }
+                )
+                .task {
+                    await dependencyManager.checkDependencies()
                 }
             }
+        }
+        .frame(minWidth: 1360, minHeight: 860)
+        .preferredColorScheme(.dark)
     }
 }
 

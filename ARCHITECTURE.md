@@ -1,78 +1,29 @@
-# Architecture: RustGoblin 2.0
+# RustGoblin Architecture
 
-## System Shape
-RustGoblin is currently implemented as a Swift package executable with a SwiftUI app entry point. The package is good for fast local iteration, but App Store shipping still requires a separate macOS app bundle target.
+RustGoblin is constructed natively in Swift and SwiftUI, leveraging a reactive state architecture that bridges the gap between Apple's display frameworks and low-level CLI tooling commonly used in the Rust ecosystem.
 
-## UI Architecture
-- `WorkspaceStore` is the single `@Observable` app state owner.
-- `MainSplitView` composes a stable four-area workbench:
-  - workspace sidebar
-  - problem browser
-  - editor workbench
-  - inspector
-- Each major pane is its own view type.
-- Liquid Glass is applied at the pane level to keep the interface coherent and avoid ad hoc blur layers.
+## Core Concepts
 
-## Data Model
-- `ExerciseWorkspace`
-  - root import URL
-  - workspace title
-  - list of `ExerciseDocument`
-- `ExerciseDocument`
-  - source file URLs and loaded contents
-  - parsed summary and checks
-  - optional hint and solution assets
-- `Diagnostic`
-  - parsed compiler feedback
-- `ProcessOutput`
-  - stdout, stderr, exit status, and command metadata
+### WorkspaceStore (State Management)
+At the heart of RustGoblin lies the `@MainActor` `WorkspaceStore`. It provides centralized state management for the entire application, functioning similarly to a Redux store but utilizing Swift's observation regime (`@Observable` / `@Published` equivalents in the Observation framework). 
 
-## Import Pipeline
-- `WorkspaceImporter` accepts either a Rust source file or a directory.
-- For single-file imports:
-  - use the file directly as the active source
-- For directory imports:
-  - detect whether the selected directory is itself an exercise
-  - recursively discover nested exercise directories
-  - build `ExerciseDocument` values from filesystem artifacts
-- Source preference order:
-  - `challenge.rs`
-  - `src/main.rs`
-  - `src/lib.rs`
-  - first non-solution `.rs` file
+It governs:
+- **Navigation & Selection**: Which project node, tab, or layout (`leftSidebarTab`, `rightSidebarTab`) is active.
+- **Process Emulation**: Managing references to active tasks such as `cargo runner run` or `cargo test`.
+- **Keyboard Shortcuts**: Bridging global key commands (`cmd+shft+e`, `cmd+j`) to view models or state toggles.
 
-## Execution Pipeline
-- `WorkspaceStore` saves the editor draft before execution.
-- `CargoRunner` chooses execution mode:
-  - `cargo +nightly -Zscript <file>` for script exercises
-  - `cargo test --color never` for Cargo projects
-- `DiagnosticParser` extracts lightweight compiler diagnostics from stderr.
+### DependencyManager
+Handles ambient CLI requirements by resolving universal `PATH` strings (integrating `~/.cargo/bin`, Homebrew locations, etc). The IDE leverages this manager on launch. If core utilities (like `cargo`, `rustc`, or `exercism`) are absent, it prompts an async download-and-install workflow before unblocking the main UI thread.
 
-## Why The Layout Is Stable
-- The old implementation relied on split-view behavior that could aggressively reclaim space and push content around.
-- The rebuilt workbench uses explicit pane widths for support surfaces and leaves the editor as the flexible column.
-- Hide/show behavior removes whole panes cleanly rather than rebalancing the entire interface unpredictably.
+### Process Isolation & Terminal Emulation
+Instead of bundling a complete terminal emulator like iTerm or alacritty, RustGoblin captures raw stdout/stderr from decoupled `Process` elements.
+- **CargoRunner**: Constructs targeted command-line operations (e.g. `cargo check --message-format short`). It maps structured output into `ExerciseCheck` models mapped to the Inspector overlay.
+- **PTY System**: For certain interactive tasks, the app utilizes basic PTY creation to spoof an interactive TTY output so colors or terminal-specific rendering functions succeed in standard outputs.
 
-## Packaging Reality
+### AI Integration
+The app implements a flexible `AIProviderManager` resolving context via strategy implementations (like `ExerciseContextBuilder`). When a user asks an AI agent a question, the system bundles:
+- The current open file.
+- Active workspace structure.
+- Present diagnostic outputs or compiler failures.
 
-### What Works Today
-- `swift build`
-- `swift test`
-- `xcodebuild build`
-- `xcodebuild archive`
-
-### What The Current Archive Produces
-- A universal binary installed under `usr/local/bin` inside the archive.
-- Not an App Store-ready `.app` bundle.
-
-### What Is Required For App Store Shipping
-- A dedicated Xcode macOS app target that embeds these Swift sources.
-- Code signing and notarization settings.
-- Sandboxing entitlements.
-- File access strategy for user-selected exercise folders.
-- Export options for App Store Connect submission.
-
-## Recommended Next Packaging Step
-- Keep the package as the app’s core module for development.
-- Add a thin Xcode app wrapper target for shipping.
-- Move App Store-specific entitlements and signing settings into that wrapper instead of burying them inside the learning logic.
+This deeply embeds prompt-engineering directly into the IDE workflow.

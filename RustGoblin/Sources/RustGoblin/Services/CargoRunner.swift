@@ -244,7 +244,7 @@ struct CargoRunner: Sendable {
     }
 
     private func runnerEnvironment(projectRootURL: URL) -> [String: String] {
-        var environment = ProcessInfo.processInfo.environment
+        var environment = DependencyManager.shared.defaultEnvironment
         environment["PROJECT_ROOT"] = projectRootURL.path
         return environment
     }
