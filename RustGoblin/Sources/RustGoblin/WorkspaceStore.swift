@@ -1518,12 +1518,24 @@ final class WorkspaceStore {
     func focusInspectorList() {
         if lastFocusTarget == .inspectorList {
             lastFocusTarget = .editor
-            NotificationCenter.default.post(name: .focusTextEditorRequested, object: nil)
+            let savedOffset = editorCursorOffset
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                NotificationCenter.default.post(
+                    name: .restoreCursorPositionRequested,
+                    object: nil,
+                    userInfo: ["offset": savedOffset]
+                )
+            }
         } else {
             lastFocusTarget = .inspectorList
             isInspectorVisible = true
             rightSidebarTab = .inspector
             inspectorListFocusToken += 1
+            // Resign text editor so the InspectorKeyBridge global monitor
+            // can capture j/k/arrows/enter without them typing into the file.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                NSApp.keyWindow?.makeFirstResponder(NSApp.keyWindow)
+            }
         }
         persistCurrentWorkspaceSnapshot()
     }

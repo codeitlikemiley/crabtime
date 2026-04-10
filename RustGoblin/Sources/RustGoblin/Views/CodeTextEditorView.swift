@@ -168,10 +168,14 @@ extension CodeTextEditorView {
 
         @MainActor
         func applyProgrammaticText(_ string: String, to textView: NSTextView) {
-            let previousAllowsUndo = textView.allowsUndo
             textView.allowsUndo = false
             textView.string = string
-            textView.allowsUndo = previousAllowsUndo
+            textView.allowsUndo = true
+            // Clear any unbalanced undo groups left by the programmatic set.
+            // Without this, Cmd+Z can trigger undoNestedGroup on an open group
+            // whose target has been deallocated → bad pointer crash.
+            textView.undoManager?.removeAllActions()
+            textView.window?.undoManager?.removeAllActions()
         }
 
         @MainActor

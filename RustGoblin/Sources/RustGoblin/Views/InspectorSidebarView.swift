@@ -150,47 +150,72 @@ struct InspectorSidebarView: View {
                     }
                 }
 
+
                 if hasTestChecks {
                     InspectorSection(title: "Checks") {
-                        VStack(alignment: .leading, spacing: 10) {
-                            ForEach(testChecks) { check in
-                                VStack(alignment: .leading, spacing: 6) {
-                                    HStack {
-                                        Label(check.title, systemImage: check.symbolName)
-                                            .foregroundStyle(RustGoblinTheme.Palette.ink)
-                                        Spacer()
-                                        StatusBadge(text: statusText(for: check.status), tint: tint(for: check.status))
+                        ScrollViewReader { scrollProxy in
+                            VStack(alignment: .leading, spacing: 10) {
+                                ForEach(testChecks) { check in
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        HStack {
+                                            Label(check.title, systemImage: check.symbolName)
+                                                .foregroundStyle(RustGoblinTheme.Palette.ink)
+                                            Spacer()
+                                            StatusBadge(text: statusText(for: check.status), tint: tint(for: check.status))
+                                        }
+                                        Text(check.detail)
+                                            .font(.callout.monospaced())
+                                            .foregroundStyle(RustGoblinTheme.Palette.textMuted)
                                     }
-                                    Text(check.detail)
-                                        .font(.callout.monospaced())
-                                        .foregroundStyle(RustGoblinTheme.Palette.textMuted)
+                                    .padding(12)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius, style: .continuous)
+                                            .fill(focusedCheckID == check.id
+                                                ? RustGoblinTheme.Palette.panelTint.opacity(0.12)
+                                                : RustGoblinTheme.Palette.subtleFill)
+                                    )
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius, style: .continuous)
+                                            .stroke(
+                                                focusedCheckID == check.id
+                                                    ? RustGoblinTheme.Palette.panelTint.opacity(0.5)
+                                                    : RustGoblinTheme.Palette.divider,
+                                                lineWidth: focusedCheckID == check.id ? 1.5 : 1
+                                            )
+                                    }
+                                    .id(check.id)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        focusedCheckID = check.id
+                                        store.jumpToTestCheck(check)
+                                    }
+                                    .interactivePointer()
                                 }
-                                .padding(12)
-                                .background(
-                                    RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius, style: .continuous)
-                                        .fill(focusedCheckID == check.id
-                                            ? RustGoblinTheme.Palette.panelTint.opacity(0.12)
-                                            : RustGoblinTheme.Palette.subtleFill)
-                                )
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius, style: .continuous)
-                                        .stroke(
-                                            focusedCheckID == check.id
-                                                ? RustGoblinTheme.Palette.panelTint.opacity(0.5)
-                                                : RustGoblinTheme.Palette.divider,
-                                            lineWidth: focusedCheckID == check.id ? 1.5 : 1
-                                        )
+                            }
+                            .onChange(of: focusedCheckID) { _, newID in
+                                if let id = newID {
+                                    withAnimation(.easeOut(duration: 0.15)) {
+                                        scrollProxy.scrollTo(id, anchor: .center)
+                                    }
                                 }
-                                .id(check.id)
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    focusedCheckID = check.id
-                                    store.jumpToTestCheck(check)
-                                }
-                                .interactivePointer()
                             }
                         }
                     }
+                    // Inspector key bridge — active only when lastFocusTarget == .inspectorList
+                    .background(
+                        InspectorKeyBridge(
+                            isEnabled: store.lastFocusTarget == .inspectorList,
+                            checks: testChecks,
+                            focusedCheckID: focusedCheckID,
+                            onFocus: { id in focusedCheckID = id },
+                            onActivate: {
+                                if let id = focusedCheckID,
+                                   let check = testChecks.first(where: { $0.id == id }) {
+                                    store.jumpToTestCheck(check)
+                                }
+                            }
+                        )
+                    )
                 }
 
             }
@@ -397,5 +422,112 @@ private struct StatusBadge: View {
             .padding(.vertical, 4)
             .background(tint.opacity(0.18), in: Capsule())
             .foregroundStyle(tint)
+    }
+}
+
+// MARK: - Inspector Keyboard Navigation Bridge
+
+private struct InspectorKeyBridge: NSViewRepresentable {
+    let isEnabled: Bool
+    let checks: [ExerciseCheck]
+    let focusedCheckID: String?
+    let onFocus: (String) -> Void
+    let onActivate: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(checks: checks, focusedCheckID: focusedCheckID, onFocus: onFocus, onActivate: onActivate)
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        context.coordinator.startMonitoring()
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.isEnabled = isEnabled
+        context.coordinator.checks = checks
+        context.coordinator.focusedCheckID = focusedCheckID
+        context.coordinator.onFocus = onFocus
+        context.coordinator.onActivate = onActivate
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.stopMonitoring()
+    }
+
+    final class Coordinator: @unchecked Sendable {
+        var isEnabled: Bool
+        var checks: [ExerciseCheck]
+        var focusedCheckID: String?
+        var onFocus: (String) -> Void
+        var onActivate: () -> Void
+        private var monitor: Any?
+
+        init(checks: [ExerciseCheck], focusedCheckID: String?, onFocus: @escaping (String) -> Void, onActivate: @escaping () -> Void) {
+            self.isEnabled = true
+            self.checks = checks
+            self.focusedCheckID = focusedCheckID
+            self.onFocus = onFocus
+            self.onActivate = onActivate
+        }
+
+        func startMonitoring() {
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self, self.isEnabled else { return event }
+
+                // Don't intercept when a text view/field is editing
+                let isTextEditing = MainActor.assumeIsolated {
+                    NSApp.keyWindow?.firstResponder is NSTextView
+                }
+                guard !isTextEditing else { return event }
+
+                let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                let chars = event.charactersIgnoringModifiers?.lowercased()
+
+                // j / Arrow Down / Ctrl+N → move selection down
+                if modifiers.isEmpty, (chars == "j" || event.keyCode == 125) {
+                    MainActor.assumeIsolated { self.moveSelection(by: 1) }
+                    return nil
+                }
+                if modifiers == .control, chars == "n" {
+                    MainActor.assumeIsolated { self.moveSelection(by: 1) }
+                    return nil
+                }
+
+                // k / Arrow Up / Ctrl+P → move selection up
+                if modifiers.isEmpty, (chars == "k" || event.keyCode == 126) {
+                    MainActor.assumeIsolated { self.moveSelection(by: -1) }
+                    return nil
+                }
+                if modifiers == .control, chars == "p" {
+                    MainActor.assumeIsolated { self.moveSelection(by: -1) }
+                    return nil
+                }
+
+                // Enter / Return → jump to test in editor
+                if modifiers.isEmpty, [36, 76].contains(event.keyCode) {
+                    MainActor.assumeIsolated { self.onActivate() }
+                    return nil
+                }
+
+                return event
+            }
+        }
+
+        func stopMonitoring() {
+            if let monitor {
+                NSEvent.removeMonitor(monitor)
+                self.monitor = nil
+            }
+        }
+
+        @MainActor
+        private func moveSelection(by delta: Int) {
+            guard !checks.isEmpty else { return }
+            let currentIndex = checks.firstIndex(where: { $0.id == focusedCheckID }) ?? -1
+            let nextIndex = max(0, min(checks.count - 1, currentIndex + delta))
+            onFocus(checks[nextIndex].id)
+        }
     }
 }
