@@ -2,6 +2,7 @@ import SwiftUI
 
 struct InspectorSidebarView: View {
     @Environment(WorkspaceStore.self) private var store
+    @State private var focusedCheckID: String?
 
     private var testChecks: [ExerciseCheck] {
         store.currentChecks.filter { $0.id != "manual-run" }
@@ -80,6 +81,75 @@ struct InspectorSidebarView: View {
                     .interactivePointer()
                 }
 
+                if store.isExercismWorkspace, let slug = store.workspace?.rootURL.lastPathComponent {
+                    if store.exercismCompletedExercises.contains(slug) {
+                        HStack(spacing: 8) {
+                            Button(action: {
+                                if let url = URL(string: "https://exercism.org/tracks/rust/exercises/\(slug)") {
+                                    NSWorkspace.shared.open(url)
+                                }
+                            }) {
+                                Label("View on Exercism", systemImage: "arrow.up.right.square")
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(
+                                Capsule().fill(RustGoblinTheme.Palette.buttonFill)
+                            )
+                            .overlay {
+                                Capsule().stroke(RustGoblinTheme.Palette.divider, lineWidth: 1)
+                            }
+                            .foregroundStyle(RustGoblinTheme.Palette.ink)
+                            .interactivePointer()
+
+                            Button(action: store.submitSelectedExerciseToExercism) {
+                                if store.isSubmittingExercism {
+                                    ProgressView().controlSize(.small)
+                                } else {
+                                    Image(systemName: "arrow.triangle.2.circlepath")
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(
+                                Capsule().fill(RustGoblinTheme.Palette.buttonFill)
+                            )
+                            .overlay {
+                                Capsule().stroke(RustGoblinTheme.Palette.divider, lineWidth: 1)
+                            }
+                            .foregroundStyle(RustGoblinTheme.Palette.textMuted)
+                            .disabled(!store.canSubmitSelectedExerciseToExercism)
+                            .help("Submit Update")
+                            .interactivePointer()
+                        }
+                    } else {
+                        Button(action: store.submitSelectedExerciseToExercism) {
+                            HStack(spacing: 6) {
+                                if store.isSubmittingExercism {
+                                    ProgressView().controlSize(.small)
+                                } else {
+                                    Image(systemName: "paperplane.fill")
+                                }
+                                Text(store.isSubmittingExercism ? "Submitting…" : "Submit to Exercism")
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(
+                            Capsule().fill(RustGoblinTheme.Palette.buttonFill)
+                        )
+                        .overlay {
+                            Capsule().stroke(RustGoblinTheme.Palette.divider, lineWidth: 1)
+                        }
+                        .foregroundStyle(RustGoblinTheme.Palette.ink)
+                        .disabled(!store.canSubmitSelectedExerciseToExercism)
+                        .interactivePointer()
+                    }
+                }
+
                 if hasTestChecks {
                     InspectorSection(title: "Checks") {
                         VStack(alignment: .leading, spacing: 10) {
@@ -98,38 +168,37 @@ struct InspectorSidebarView: View {
                                 .padding(12)
                                 .background(
                                     RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius, style: .continuous)
-                                        .fill(RustGoblinTheme.Palette.subtleFill)
+                                        .fill(focusedCheckID == check.id
+                                            ? RustGoblinTheme.Palette.panelTint.opacity(0.12)
+                                            : RustGoblinTheme.Palette.subtleFill)
                                 )
                                 .overlay {
                                     RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius, style: .continuous)
-                                        .stroke(RustGoblinTheme.Palette.divider, lineWidth: 1)
+                                        .stroke(
+                                            focusedCheckID == check.id
+                                                ? RustGoblinTheme.Palette.panelTint.opacity(0.5)
+                                                : RustGoblinTheme.Palette.divider,
+                                            lineWidth: focusedCheckID == check.id ? 1.5 : 1
+                                        )
                                 }
+                                .id(check.id)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    focusedCheckID = check.id
+                                    store.jumpToTestCheck(check)
+                                }
+                                .interactivePointer()
                             }
                         }
                     }
                 }
 
-                if store.isExercismWorkspace {
-                    Button(
-                        store.isSubmittingExercism ? "Submitting…" : "Submit to Exercism",
-                        systemImage: "paperplane.fill",
-                        action: store.submitSelectedExerciseToExercism
-                    )
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(
-                        Capsule()
-                            .fill(RustGoblinTheme.Palette.buttonFill)
-                    )
-                    .overlay {
-                        Capsule()
-                            .stroke(RustGoblinTheme.Palette.divider, lineWidth: 1)
-                    }
-                    .foregroundStyle(RustGoblinTheme.Palette.ink)
-                    .disabled(!store.canSubmitSelectedExerciseToExercism)
-                    .interactivePointer()
-                }
+            }
+        }
+        .task(id: store.inspectorListFocusToken) {
+            guard store.inspectorListFocusToken > 0 else { return }
+            if let firstCheck = testChecks.first {
+                focusedCheckID = firstCheck.id
             }
         }
     }

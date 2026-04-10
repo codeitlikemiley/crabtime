@@ -72,11 +72,42 @@ struct WorkspaceBaselineStore: Sendable {
         return baselineLibraryURL.appendingPathComponent(identifier, isDirectory: true)
     }
 
+    private static let excludedDirectoryNames: Set<String> = [
+        "target", ".git", ".build", "node_modules", ".DS_Store", "Cargo.lock"
+    ]
+
     private func copyDirectory(from sourceURL: URL, to destinationURL: URL) throws {
         let fileManager = FileManager.default
-        let parentURL = destinationURL.deletingLastPathComponent()
-        try fileManager.createDirectory(at: parentURL, withIntermediateDirectories: true)
-        try fileManager.copyItem(at: sourceURL, to: destinationURL)
+        try fileManager.createDirectory(at: destinationURL, withIntermediateDirectories: true)
+        try copyDirectoryContentsSelectively(from: sourceURL, to: destinationURL, fileManager: fileManager)
+    }
+
+    private func copyDirectoryContentsSelectively(
+        from sourceURL: URL,
+        to destinationURL: URL,
+        fileManager: FileManager
+    ) throws {
+        let children = try fileManager.contentsOfDirectory(
+            at: sourceURL,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: []
+        )
+
+        for child in children {
+            let name = child.lastPathComponent
+            if Self.excludedDirectoryNames.contains(name) { continue }
+
+            let destination = destinationURL.appendingPathComponent(name)
+            var isDir: ObjCBool = false
+            fileManager.fileExists(atPath: child.path, isDirectory: &isDir)
+
+            if isDir.boolValue {
+                try fileManager.createDirectory(at: destination, withIntermediateDirectories: true)
+                try copyDirectoryContentsSelectively(from: child, to: destination, fileManager: fileManager)
+            } else {
+                try fileManager.copyItem(at: child, to: destination)
+            }
+        }
     }
 
     private func relativePath(for fileURL: URL, rootURL: URL) -> String {

@@ -62,6 +62,9 @@ struct WorkspaceExplorerView: View {
                 isEnabled: store.sidebarMode == .explorer && store.explorerKeyboardFocusActive,
                 onKeyPress: { key in
                     store.handleExplorerKey(key)
+                },
+                onActivate: {
+                    store.activateSelectedExplorerEntry()
                 }
             )
         )
@@ -110,7 +113,12 @@ private struct ExplorerSearchField: View {
                 isEnabled: isFocused,
                 onMoveUp: store.moveExplorerSelectionUp,
                 onMoveDown: store.moveExplorerSelectionDown,
-                onActivate: store.activateSelectedExplorerEntry
+                onActivate: store.activateSelectedExplorerEntry,
+                onDismiss: {
+                    isFocused = false
+                    text = ""
+                    store.setExplorerKeyboardFocus(active: true)
+                }
             )
         )
         .padding(.horizontal, 12)
@@ -131,9 +139,10 @@ private struct ExplorerSearchKeyBridge: NSViewRepresentable {
     let onMoveUp: () -> Void
     let onMoveDown: () -> Void
     let onActivate: () -> Void
+    let onDismiss: () -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onMoveUp: onMoveUp, onMoveDown: onMoveDown, onActivate: onActivate, isEnabled: isEnabled)
+        Coordinator(onMoveUp: onMoveUp, onMoveDown: onMoveDown, onActivate: onActivate, onDismiss: onDismiss, isEnabled: isEnabled)
     }
 
     func makeNSView(context: Context) -> NSView {
@@ -148,24 +157,27 @@ private struct ExplorerSearchKeyBridge: NSViewRepresentable {
         context.coordinator.onMoveUp = onMoveUp
         context.coordinator.onMoveDown = onMoveDown
         context.coordinator.onActivate = onActivate
+        context.coordinator.onDismiss = onDismiss
     }
 
     static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
         coordinator.stopMonitoring()
     }
 
-    final class Coordinator {
+    final class Coordinator: @unchecked Sendable {
         var onMoveUp: () -> Void
         var onMoveDown: () -> Void
         var onActivate: () -> Void
+        var onDismiss: () -> Void
         var isEnabled: Bool
         private weak var hostView: NSView?
         private var monitor: Any?
 
-        init(onMoveUp: @escaping () -> Void, onMoveDown: @escaping () -> Void, onActivate: @escaping () -> Void, isEnabled: Bool) {
+        init(onMoveUp: @escaping () -> Void, onMoveDown: @escaping () -> Void, onActivate: @escaping () -> Void, onDismiss: @escaping () -> Void, isEnabled: Bool) {
             self.onMoveUp = onMoveUp
             self.onMoveDown = onMoveDown
             self.onActivate = onActivate
+            self.onDismiss = onDismiss
             self.isEnabled = isEnabled
         }
 
@@ -215,6 +227,14 @@ private struct ExplorerSearchKeyBridge: NSViewRepresentable {
 
                 if modifiers.isEmpty, [36, 76].contains(event.keyCode) {
                     self.onActivate()
+                    return nil
+                }
+
+                // Escape → dismiss search
+                if modifiers.isEmpty, event.keyCode == 53 {
+                    MainActor.assumeIsolated {
+                        self.onDismiss()
+                    }
                     return nil
                 }
 
@@ -282,6 +302,12 @@ private struct WorkspaceExplorerNodeView: View {
                             .foregroundStyle(RustGoblinTheme.Palette.ink)
                             .lineLimit(1)
 
+                        if store.isEnriching(exerciseURL: node.url) {
+                            ProgressView()
+                                .controlSize(.mini)
+                                .tint(RustGoblinTheme.Palette.ember)
+                        }
+
                         Spacer()
                     }
                     .padding(.leading, CGFloat(depth) * 14 + 24)
@@ -290,7 +316,10 @@ private struct WorkspaceExplorerNodeView: View {
                     .background(rowBackground)
                     .overlay {
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(rowBorder, lineWidth: 1)
+                            .stroke(store.isEnriching(exerciseURL: node.url)
+                                ? RustGoblinTheme.Palette.ember.opacity(0.45)
+                                : rowBorder,
+                                lineWidth: 1)
                     }
                 }
                 .buttonStyle(.plain)
@@ -326,9 +355,10 @@ private struct WorkspaceExplorerNodeView: View {
 private struct ExplorerKeyEventBridge: NSViewRepresentable {
     let isEnabled: Bool
     let onKeyPress: (String) -> Void
+    let onActivate: () -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onKeyPress: onKeyPress)
+        Coordinator(onKeyPress: onKeyPress, onActivate: onActivate)
     }
 
     func makeNSView(context: Context) -> NSView {
@@ -339,6 +369,7 @@ private struct ExplorerKeyEventBridge: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSView, context: Context) {
         context.coordinator.onKeyPress = onKeyPress
+        context.coordinator.onActivate = onActivate
         context.coordinator.startMonitoring(isEnabled: isEnabled)
     }
 
@@ -346,13 +377,15 @@ private struct ExplorerKeyEventBridge: NSViewRepresentable {
         coordinator.stopMonitoring()
     }
 
-    final class Coordinator {
+    final class Coordinator: @unchecked Sendable {
         var onKeyPress: (String) -> Void
+        var onActivate: () -> Void
         private var monitor: Any?
         private var isEnabled = false
 
-        init(onKeyPress: @escaping (String) -> Void) {
+        init(onKeyPress: @escaping (String) -> Void, onActivate: @escaping () -> Void) {
             self.onKeyPress = onKeyPress
+            self.onActivate = onActivate
         }
 
         func startMonitoring(isEnabled: Bool) {
@@ -368,10 +401,7 @@ private struct ExplorerKeyEventBridge: NSViewRepresentable {
                         return event
                     }
 
-                    guard self.isEnabled,
-                          event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty,
-                          let characters = event.charactersIgnoringModifiers?.lowercased(),
-                          ["h", "j", "k", "l"].contains(characters) else {
+                    guard self.isEnabled else {
                         return event
                     }
 
@@ -382,8 +412,56 @@ private struct ExplorerKeyEventBridge: NSViewRepresentable {
                         return event
                     }
 
-                    self.onKeyPress(characters)
-                    return nil
+                    let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                    let chars = event.charactersIgnoringModifiers?.lowercased()
+
+                    // h/j/k/l vim keys
+                    if modifiers.isEmpty,
+                       let characters = chars,
+                       ["h", "j", "k", "l"].contains(characters) {
+                        self.onKeyPress(characters)
+                        return nil
+                    }
+
+                    // Arrow keys
+                    if modifiers.isEmpty {
+                        if event.keyCode == 125 { // Down
+                            self.onKeyPress("j")
+                            return nil
+                        }
+                        if event.keyCode == 126 { // Up
+                            self.onKeyPress("k")
+                            return nil
+                        }
+                        if event.keyCode == 123 { // Left
+                            self.onKeyPress("h")
+                            return nil
+                        }
+                        if event.keyCode == 124 { // Right
+                            self.onKeyPress("l")
+                            return nil
+                        }
+                    }
+
+                    // Ctrl+N/P
+                    if modifiers == .control, chars == "n" {
+                        self.onKeyPress("j")
+                        return nil
+                    }
+                    if modifiers == .control, chars == "p" {
+                        self.onKeyPress("k")
+                        return nil
+                    }
+
+                    // Enter/Return → open selected file
+                    if modifiers.isEmpty, [36, 76].contains(event.keyCode) {
+                        MainActor.assumeIsolated {
+                            self.onActivate()
+                        }
+                        return nil
+                    }
+
+                    return event
                 }
             } else {
                 stopMonitoring()

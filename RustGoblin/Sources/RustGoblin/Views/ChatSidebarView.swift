@@ -8,6 +8,7 @@ struct ChatSidebarView: View {
     @Environment(AIModelCatalogStore.self) private var modelCatalogStore
     @FocusState private var isComposerFocused: Bool
     @State private var selectedSlashCommandID: String?
+    @State private var elapsedSeconds: Int = 0
 
     private let slashCommands: [ChatSlashCommand] = [
         ChatSlashCommand(
@@ -15,12 +16,6 @@ struct ChatSidebarView: View {
             title: "/challenge",
             detail: "Create a new Rustlings-style challenge in the current workspace.",
             template: "/challenge "
-        ),
-        ChatSlashCommand(
-            command: "grind",
-            title: "/grind",
-            detail: "Generate a batch of exercise variants (e.g., /grind linked list 5).",
-            template: "/grind "
         )
     ]
 
@@ -50,6 +45,18 @@ struct ChatSidebarView: View {
         }
         .onChange(of: isComposerFocused) { _, _ in
             syncSlashCommandSelection()
+        }
+        .onChange(of: chatStore.isSending) { _, isSending in
+            if isSending {
+                elapsedSeconds = 0
+            }
+        }
+        .task(id: chatStore.isSending) {
+            guard chatStore.isSending else { return }
+            while chatStore.isSending {
+                try? await Task.sleep(for: .seconds(1))
+                if chatStore.isSending { elapsedSeconds += 1 }
+            }
         }
     }
 
@@ -316,7 +323,7 @@ struct ChatSidebarView: View {
                             ProgressView()
                                 .controlSize(.small)
                                 .tint(RustGoblinTheme.Palette.ink)
-                            Text("Thinking…")
+                            Text(elapsedSeconds > 0 ? "\(elapsedSeconds)s…" : "Generating…")
                         } else {
                             Image(systemName: "arrow.up.circle.fill")
                             Text("Send")
@@ -551,6 +558,7 @@ private struct ChatComposerKeyBridge: NSViewRepresentable {
         coordinator.stopMonitoring()
     }
 
+    @MainActor
     final class Coordinator {
         var isEnabled: Bool
         var isShowingSlashCommandMenu: Bool

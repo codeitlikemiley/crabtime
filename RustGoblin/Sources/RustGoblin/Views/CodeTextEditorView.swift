@@ -1,15 +1,30 @@
 import AppKit
 import SwiftUI
 
+extension Notification.Name {
+    static let goToLineRequested = Notification.Name("goToLineRequested")
+    static let focusTextEditorRequested = Notification.Name("focusTextEditorRequested")
+    static let saveCursorPositionRequested = Notification.Name("saveCursorPositionRequested")
+    static let restoreCursorPositionRequested = Notification.Name("restoreCursorPositionRequested")
+}
+
 struct CodeTextEditorView: NSViewRepresentable {
     @Binding var text: String
     var onRun: (() -> Void)? = nil
     var onSave: (() -> Void)? = nil
     var onTest: (() -> Void)? = nil
     var onCursorChange: ((Int) -> Void)? = nil
+    /// Fires on every cursor movement with the raw byte offset (NSRange.location).
+    /// Used to continuously track cursor position for reliable restoration.
+    var onCursorOffsetChange: ((Int) -> Void)? = nil
+    var onSaveCursorPosition: ((Int, String) -> Void)? = nil
+    var showLineNumbers: Bool = true
+    var goToLine: Int? = nil
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text, onCursorChange: onCursorChange)
+        let coordinator = Coordinator(text: $text, onCursorChange: onCursorChange, onCursorOffsetChange: onCursorOffsetChange)
+        coordinator.onSaveCursorPosition = onSaveCursorPosition
+        return coordinator
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -34,8 +49,7 @@ struct CodeTextEditorView: NSViewRepresentable {
         textView.smartInsertDeleteEnabled = false
         textView.allowsUndo = true
         textView.drawsBackground = false
-        textView.textContainerInset = NSSize(width: 16, height: 18)
-        textView.font = .monospacedSystemFont(ofSize: 15, weight: .regular)
+        textView.font = SyntaxHighlighter.font
         textView.textColor = NSColor(calibratedRed: 0.95, green: 0.95, blue: 0.97, alpha: 1)
         textView.insertionPointColor = NSColor(calibratedRed: 0.95, green: 0.95, blue: 0.97, alpha: 1)
         textView.delegate = context.coordinator
@@ -50,6 +64,11 @@ struct CodeTextEditorView: NSViewRepresentable {
         textView.onRun = onRun
         textView.onSave = onSave
         textView.onTest = onTest
+
+        // Configure line numbers via left-only inset
+        textView.showLineNumbers = showLineNumbers
+        textView.updateGutter()
+
         context.coordinator.isApplyingProgrammaticChange = true
         context.coordinator.applyProgrammaticText(text, to: textView)
         context.coordinator.applyHighlighting(to: textView)
@@ -57,6 +76,15 @@ struct CodeTextEditorView: NSViewRepresentable {
 
         scrollView.documentView = textView
         context.coordinator.textView = textView
+
+        // Observe scroll changes to redraw line numbers
+        NotificationCenter.default.addObserver(
+            context.coordinator,
+            selector: #selector(Coordinator.viewDidScroll),
+            name: NSView.boundsDidChangeNotification,
+            object: scrollView.contentView
+        )
+        scrollView.contentView.postsBoundsChangedNotifications = true
 
         return scrollView
     }
@@ -69,6 +97,14 @@ struct CodeTextEditorView: NSViewRepresentable {
         textView.onRun = onRun
         textView.onSave = onSave
         textView.onTest = onTest
+
+        if textView.showLineNumbers != showLineNumbers {
+            textView.showLineNumbers = showLineNumbers
+            textView.updateGutter()
+            textView.needsDisplay = true
+        }
+
+        // Handle go-to-line is now done via notification (see Coordinator.handleGoToLine)
 
         guard textView.string != text else {
             return
@@ -88,11 +124,46 @@ extension CodeTextEditorView {
         @Binding private var text: String
         fileprivate weak var textView: RunAwareTextView?
         var isApplyingProgrammaticChange = false
+        var clearGoToLine: (() -> Void)?
         private var onCursorChange: ((Int) -> Void)?
+        private var onCursorOffsetChange: ((Int) -> Void)?
+        /// Callback to persist cursor offset for a specific file path.
+        var onSaveCursorPosition: ((Int, String) -> Void)?
 
-        init(text: Binding<String>, onCursorChange: ((Int) -> Void)? = nil) {
+        init(text: Binding<String>, onCursorChange: ((Int) -> Void)? = nil, onCursorOffsetChange: ((Int) -> Void)? = nil) {
             _text = text
             self.onCursorChange = onCursorChange
+            self.onCursorOffsetChange = onCursorOffsetChange
+            super.init()
+
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(handleGoToLine(_:)),
+                name: .goToLineRequested,
+                object: nil
+            )
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(handleFocusEditor(_:)),
+                name: .focusTextEditorRequested,
+                object: nil
+            )
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(handleSaveCursorPosition(_:)),
+                name: .saveCursorPositionRequested,
+                object: nil
+            )
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(handleRestoreCursorPosition(_:)),
+                name: .restoreCursorPositionRequested,
+                object: nil
+            )
+        }
+
+        deinit {
+            NotificationCenter.default.removeObserver(self)
         }
 
         @MainActor
@@ -116,18 +187,22 @@ extension CodeTextEditorView {
             applyHighlighting(to: textView)
             textView.setSelectedRange(selection.clamped(to: textView.string.utf16.count))
             text = textView.string
+            textView.updateGutter()
         }
 
         @MainActor
         func textViewDidChangeSelection(_ notification: Notification) {
             guard let textView, !isApplyingProgrammaticChange else { return }
             let location = textView.selectedRange().location
+            // Always track raw byte offset — used for reliable cursor restoration
+            // after terminal toggle, regardless of first-responder state.
+            onCursorOffsetChange?(location)
             let nsString = textView.string as NSString
             let lineRange = nsString.lineRange(for: NSRange(location: min(location, nsString.length), length: 0))
             var lineNumber = 1
             var index = 0
             while index < lineRange.location && index < nsString.length {
-                if nsString.character(at: index) == 0x000A { // newline
+                if nsString.character(at: index) == 0x000A {
                     lineNumber += 1
                 }
                 index += 1
@@ -137,47 +212,77 @@ extension CodeTextEditorView {
 
         @MainActor
         func applyHighlighting(to textView: NSTextView) {
-            guard let textStorage = textView.textStorage else {
-                return
-            }
+            SyntaxHighlighter.apply(to: textView, fileExtension: "rs")
+        }
 
-            let string = textView.string
-            let fullRange = NSRange(location: 0, length: string.utf16.count)
-            let palette = RustSyntaxPalette.current
+        @objc func viewDidScroll(_ notification: Notification) {
+            textView?.needsDisplay = true
+        }
 
-            textStorage.beginEditing()
-            textStorage.setAttributes(
-                [
-                    .font: NSFont.monospacedSystemFont(ofSize: 15, weight: .regular),
-                    .foregroundColor: palette.foreground
-                ],
-                range: fullRange
-            )
+        @MainActor
+        @objc func handleGoToLine(_ notification: Notification) {
+            guard let textView,
+                  let line = notification.userInfo?["line"] as? Int,
+                  line > 0 else { return }
 
-            for rule in RustSyntaxRule.allCases {
-                rule.regex.enumerateMatches(in: string, range: fullRange) { match, _, _ in
-                    guard let match else {
-                        return
-                    }
-
-                    textStorage.addAttribute(
-                        .foregroundColor,
-                        value: palette.color(for: rule),
-                        range: match.range
-                    )
+            let nsString = textView.string as NSString
+            var currentLine = 1
+            var charIndex = 0
+            // Find start of target line
+            while currentLine < line, charIndex < nsString.length {
+                if nsString.character(at: charIndex) == 0x000A {
+                    currentLine += 1
                 }
+                charIndex += 1
             }
+            // Move to end of this line
+            var endOfLine = charIndex
+            while endOfLine < nsString.length {
+                if nsString.character(at: endOfLine) == 0x000A { break }
+                endOfLine += 1
+            }
+            let targetRange = NSRange(location: min(endOfLine, nsString.length), length: 0)
+            textView.setSelectedRange(targetRange)
+            textView.scrollRangeToVisible(targetRange)
 
-            textStorage.endEditing()
-            textView.typingAttributes = [
-                .font: NSFont.monospacedSystemFont(ofSize: 15, weight: .regular),
-                .foregroundColor: palette.foreground
-            ]
+            // Focus the text editor so cursor is active
+            textView.window?.makeFirstResponder(textView)
+        }
+
+        @MainActor
+        @objc func handleFocusEditor(_ notification: Notification) {
+            guard let textView else { return }
+            let savedRange = textView.selectedRange()
+            textView.window?.makeFirstResponder(textView)
+            // Restore cursor position — makeFirstResponder can sometimes reset it
+            textView.setSelectedRange(savedRange.clamped(to: textView.string.utf16.count))
+        }
+
+        @MainActor
+        @objc func handleSaveCursorPosition(_ notification: Notification) {
+            guard let textView,
+                  let path = notification.userInfo?["path"] as? String else { return }
+            let offset = textView.selectedRange().location
+            onSaveCursorPosition?(offset, path)
+        }
+
+        @MainActor
+        @objc func handleRestoreCursorPosition(_ notification: Notification) {
+            guard let textView,
+                  let offset = notification.userInfo?["offset"] as? Int else { return }
+            let maxOffset = textView.string.utf16.count
+            let clampedOffset = min(offset, maxOffset)
+            let range = NSRange(location: clampedOffset, length: 0)
+            textView.setSelectedRange(range)
+            textView.scrollRangeToVisible(range)
+            textView.window?.makeFirstResponder(textView)
         }
     }
 }
 
-private final class RunAwareTextView: NSTextView {
+// MARK: - RunAwareTextView with inline line numbers
+
+final class RunAwareTextView: NSTextView {
     private static let pairedDelimiters: [Character: Character] = [
         "{": "}",
         "(": ")",
@@ -185,9 +290,128 @@ private final class RunAwareTextView: NSTextView {
         "\"": "\""
     ]
 
+    private static let lineNumFont = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+    private static let lineNumColor = NSColor(calibratedRed: 0.48, green: 0.54, blue: 0.63, alpha: 0.7)
+    private static let gutterBg = NSColor(calibratedRed: 0.06, green: 0.07, blue: 0.10, alpha: 1)
+
     var onRun: (() -> Void)?
     var onSave: (() -> Void)?
     var onTest: (() -> Void)?
+    var showLineNumbers: Bool = false
+    private var gutterWidth: CGFloat = 0
+
+    /// Compute gutter width based on total line count, then shift the text container.
+    func updateGutter() {
+        guard showLineNumbers else {
+            gutterWidth = 0
+            textContainerInset = NSSize(width: 16, height: 18)
+            return
+        }
+
+        let lineCount = max(1, string.components(separatedBy: "\n").count)
+        let digits = max(2, String(lineCount).count)  // at least 2 digits wide
+        let sampleString = String(repeating: "0", count: digits) as NSString
+        let digitWidth = sampleString.size(withAttributes: [.font: Self.lineNumFont]).width
+        gutterWidth = ceil(digitWidth + 20)  // padding on both sides of numbers
+
+        // textContainerInset.width applies to BOTH sides equally.
+        // We use it for the left gutter. The right waste is acceptable.
+        textContainerInset = NSSize(width: gutterWidth, height: 18)
+    }
+
+    override var textContainerOrigin: NSPoint {
+        // Shift text container right by gutter width, but only add normal padding on top
+        if showLineNumbers {
+            return NSPoint(x: gutterWidth, y: textContainerInset.height)
+        }
+        return super.textContainerOrigin
+    }
+
+    // MARK: - Drawing
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+
+        guard showLineNumbers else { return }
+
+        // The dirtyRect may NOT include the gutter (inset) area.
+        // Use the full visible rect to draw line numbers.
+        let visibleRect = enclosingScrollView?.documentVisibleRect ?? bounds
+
+        NSGraphicsContext.current?.saveGraphicsState()
+        // Expand clip to include gutter area
+        NSBezierPath(rect: visibleRect).setClip()
+
+        // Draw gutter background
+        let gutterRect = NSRect(x: visibleRect.origin.x, y: visibleRect.origin.y,
+                                 width: gutterWidth, height: visibleRect.height)
+        Self.gutterBg.setFill()
+        gutterRect.fill()
+
+        drawLineNumbers(in: visibleRect)
+
+        NSGraphicsContext.current?.restoreGraphicsState()
+    }
+
+    private func drawLineNumbers(in visibleRect: NSRect) {
+        guard let layoutManager, let textContainer else { return }
+
+        let origin = textContainerOrigin
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: Self.lineNumFont,
+            .foregroundColor: Self.lineNumColor
+        ]
+
+        let nsString = string as NSString
+        let totalLength = nsString.length
+
+        guard totalLength > 0 else {
+            drawNumber("1", y: origin.y, attrs: attrs)
+            return
+        }
+
+        // Convert visible rect from view coords to container coords
+        let containerRect = visibleRect.offsetBy(dx: -origin.x, dy: -origin.y)
+        let visibleGlyphRange = layoutManager.glyphRange(forBoundingRect: containerRect, in: textContainer)
+        let visibleCharRange = layoutManager.characterRange(forGlyphRange: visibleGlyphRange, actualGlyphRange: nil)
+
+        // Count lines before visible range
+        var lineNumber = 1
+        var i = 0
+        while i < visibleCharRange.location {
+            if nsString.character(at: i) == 0x000A { lineNumber += 1 }
+            i += 1
+        }
+
+        // Draw visible line numbers
+        var charIndex = visibleCharRange.location
+        while charIndex < NSMaxRange(visibleCharRange) {
+            let lineRange = nsString.lineRange(for: NSRange(location: charIndex, length: 0))
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: lineRange, actualCharacterRange: nil)
+            let lineRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+            // Convert from container coords to view coords
+            let y = lineRect.origin.y + origin.y
+            drawNumber("\(lineNumber)", y: y, attrs: attrs)
+            lineNumber += 1
+            charIndex = NSMaxRange(lineRange)
+        }
+
+        // Handle trailing newline
+        if charIndex == totalLength, totalLength > 0, nsString.character(at: totalLength - 1) == 0x000A {
+            let lastGlyphIndex = layoutManager.glyphIndexForCharacter(at: max(0, totalLength - 1))
+            let lastRect = layoutManager.lineFragmentRect(forGlyphAt: lastGlyphIndex, effectiveRange: nil)
+            let y = lastRect.origin.y + lastRect.height + origin.y
+            drawNumber("\(lineNumber)", y: y, attrs: attrs)
+        }
+    }
+
+    private func drawNumber(_ string: String, y: CGFloat, attrs: [NSAttributedString.Key: Any]) {
+        let size = (string as NSString).size(withAttributes: attrs)
+        let x = gutterWidth - size.width - 6
+        (string as NSString).draw(at: NSPoint(x: x, y: y), withAttributes: attrs)
+    }
+
+    // MARK: - Key handling
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -210,6 +434,8 @@ private final class RunAwareTextView: NSTextView {
 
         return super.performKeyEquivalent(with: event)
     }
+
+    // MARK: - Auto-pairing
 
     override func insertText(_ insertString: Any, replacementRange: NSRange) {
         guard shouldAutoPairDelimiters else {
@@ -243,8 +469,6 @@ private final class RunAwareTextView: NSTextView {
 
         super.insertText(stringValue, replacementRange: replacementRange)
     }
-
-
 
     private var shouldAutoPairDelimiters: Bool {
         return true
@@ -284,76 +508,6 @@ private final class RunAwareTextView: NSTextView {
 
         setSelectedRange(NSRange(location: effectiveRange.location + 1, length: 0))
         return true
-    }
-}
-
-private enum RustSyntaxRule: CaseIterable {
-    case keyword
-    case type
-    case string
-    case number
-    case comment
-    case attribute
-    case macro
-
-    var regex: NSRegularExpression {
-        switch self {
-        case .keyword:
-            return try! NSRegularExpression(pattern: #"\b(fn|let|mut|pub|use|mod|struct|enum|impl|match|if|else|loop|while|for|in|return|async|await|move|where|trait|const|static|crate|self|super)\b"#)
-        case .type:
-            return try! NSRegularExpression(pattern: #"\b(i8|i16|i32|i64|i128|isize|u8|u16|u32|u64|u128|usize|f32|f64|bool|String|str|Self|Option|Result|Vec)\b"#)
-        case .string:
-            return try! NSRegularExpression(pattern: #""([^"\\]|\\.)*""#)
-        case .number:
-            return try! NSRegularExpression(pattern: #"\b\d+(\.\d+)?\b"#)
-        case .comment:
-            return try! NSRegularExpression(pattern: #"(?m)//.*$"#)
-        case .attribute:
-            return try! NSRegularExpression(pattern: #"#\[[^\]]+\]"#)
-        case .macro:
-            return try! NSRegularExpression(pattern: #"\b[a-zA-Z_][a-zA-Z0-9_]*!"#)
-        }
-    }
-}
-
-private struct RustSyntaxPalette {
-    let foreground: NSColor
-    let keyword: NSColor
-    let type: NSColor
-    let string: NSColor
-    let number: NSColor
-    let comment: NSColor
-    let attribute: NSColor
-    let macro: NSColor
-
-    static let current = RustSyntaxPalette(
-        foreground: NSColor(calibratedRed: 0.95, green: 0.95, blue: 0.97, alpha: 1),
-        keyword: NSColor(calibratedRed: 1.0, green: 0.74, blue: 0.66, alpha: 1),
-        type: NSColor(calibratedRed: 0.56, green: 0.82, blue: 1.0, alpha: 1),
-        string: NSColor(calibratedRed: 1.0, green: 0.79, blue: 0.58, alpha: 1),
-        number: NSColor(calibratedRed: 0.47, green: 0.84, blue: 0.63, alpha: 1),
-        comment: NSColor(calibratedRed: 0.48, green: 0.54, blue: 0.63, alpha: 1),
-        attribute: NSColor(calibratedRed: 0.93, green: 0.57, blue: 0.73, alpha: 1),
-        macro: NSColor(calibratedRed: 0.90, green: 0.67, blue: 1.0, alpha: 1)
-    )
-
-    func color(for rule: RustSyntaxRule) -> NSColor {
-        switch rule {
-        case .keyword:
-            keyword
-        case .type:
-            type
-        case .string:
-            string
-        case .number:
-            number
-        case .comment:
-            comment
-        case .attribute:
-            attribute
-        case .macro:
-            macro
-        }
     }
 }
 

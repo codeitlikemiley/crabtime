@@ -74,6 +74,26 @@ struct ExercismCLI: Sendable {
         )
     }
 
+    func configure(token: String) async throws -> ProcessOutput {
+        let currentStatus = try status()
+
+        guard let executableURL = currentStatus.executableURL else {
+            throw CLIError.notInstalled
+        }
+
+        let result = try await processRunner(
+            executableURL,
+            ["configure", "--token=\(token)"],
+            nil
+        )
+
+        if result.terminationStatus != 0 || result.combinedText.contains("Error:") {
+            throw CLIError.invalidConfiguration(message: result.combinedText)
+        }
+
+        return result
+    }
+
     func download(track: String, exercise: String) async throws -> URL {
         let normalizedTrack = try normalizedArgument(track, fieldName: "track")
         let normalizedExercise = try normalizedArgument(exercise, fieldName: "exercise")
@@ -146,7 +166,10 @@ struct ExercismCLI: Sendable {
             exerciseDirectoryURL
         )
 
-        guard result.terminationStatus == 0 else {
+        if result.terminationStatus != 0 {
+            if result.combinedText.contains("No files you submitted have changed") {
+                return result
+            }
             throw CLIError.submitFailed(message: result.combinedText)
         }
 

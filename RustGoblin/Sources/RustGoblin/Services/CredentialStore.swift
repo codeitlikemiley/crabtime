@@ -1,80 +1,28 @@
 import Foundation
-import Security
 
 struct CredentialStore {
-    private let service = "RustGoblin.AIProviders"
+    private let prefix = "RustGoblin.Secrets."
 
     func readSecret(for key: String) -> String? {
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccount: key,
-            kSecReturnData: true,
-            kSecMatchLimit: kSecMatchLimitOne
-        ]
-
-        var result: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        guard status == errSecSuccess,
-              let data = result as? Data,
-              let secret = String(data: data, encoding: .utf8)
-        else {
-            return nil
-        }
-
-        return secret
+        return UserDefaults.standard.string(forKey: prefix + key)
     }
 
     func saveSecret(_ secret: String, for key: String) throws {
-        let data = Data(secret.utf8)
-        let baseQuery: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccount: key
-        ]
-
-        let attributes: [CFString: Any] = [
-            kSecValueData: data
-        ]
-
-        let updateStatus = SecItemUpdate(baseQuery as CFDictionary, attributes as CFDictionary)
-        if updateStatus == errSecSuccess {
-            return
-        }
-
-        guard updateStatus == errSecItemNotFound else {
-            throw CredentialStoreError.operationFailed(status: updateStatus)
-        }
-
-        var insertQuery = baseQuery
-        insertQuery[kSecValueData] = data
-        let insertStatus = SecItemAdd(insertQuery as CFDictionary, nil)
-        guard insertStatus == errSecSuccess else {
-            throw CredentialStoreError.operationFailed(status: insertStatus)
-        }
+        UserDefaults.standard.set(secret, forKey: prefix + key)
     }
 
     func deleteSecret(for key: String) throws {
-        let query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccount: key
-        ]
-
-        let status = SecItemDelete(query as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw CredentialStoreError.operationFailed(status: status)
-        }
+        UserDefaults.standard.removeObject(forKey: prefix + key)
     }
 }
 
 enum CredentialStoreError: LocalizedError {
-    case operationFailed(status: OSStatus)
+    case operationFailed(status: Int32)
 
     var errorDescription: String? {
         switch self {
         case .operationFailed(let status):
-            "Credential storage failed with status \(status)."
+            return "Credential storage failed with status \(status)."
         }
     }
 }

@@ -148,6 +148,10 @@ struct RustGoblinAppCommands: Commands {
                 .keyboardShortcut("r", modifiers: .command)
                 .disabled(!(workspaceStore?.hasSelection ?? false) || (workspaceStore?.isRunning ?? false))
 
+            Button("Override Cargo Runner…") { workspaceStore?.showCommandPalette(with: "> ") }
+                .keyboardShortcut("r", modifiers: [.command, .shift])
+                .disabled(workspaceStore == nil)
+
             Button("Submit to Exercism") { workspaceStore?.submitSelectedExerciseToExercism() }
                 .keyboardShortcut("u", modifiers: [.command, .shift])
                 .disabled(!(workspaceStore?.canSubmitSelectedExerciseToExercism ?? false))
@@ -181,8 +185,15 @@ struct RustGoblinAppCommands: Commands {
             .disabled(workspaceStore == nil)
         }
 
+        // Remove macOS Print (Cmd+P) so we can use it for Command Palette
+        CommandGroup(replacing: .printItem) { }
+
         CommandGroup(after: .toolbar) {
             Button("Open Workspace Palette") { workspaceStore?.showWorkspacePalette() }
+                .keyboardShortcut("p", modifiers: [.command, .shift])
+                .disabled(workspaceStore == nil)
+
+            Button("Command Palette") { workspaceStore?.showCommandPalette() }
                 .keyboardShortcut("p", modifiers: .command)
                 .disabled(workspaceStore == nil)
 
@@ -192,6 +203,10 @@ struct RustGoblinAppCommands: Commands {
 
             Button("Focus Exercise Search") { workspaceStore?.showExerciseLibraryAndFocusSearch() }
                 .keyboardShortcut("e", modifiers: .command)
+                .disabled(workspaceStore == nil)
+
+            Button("Focus Exercism Catalog") { workspaceStore?.showExercismCatalogAndFocusSearch() }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
                 .disabled(workspaceStore == nil)
 
             Button(workspaceStore?.showsTerminal ?? true ? "Hide Terminal" : "Show Terminal") {
@@ -222,11 +237,15 @@ struct RustGoblinAppCommands: Commands {
                 .keyboardShortcut("s", modifiers: [.command, .shift])
                 .disabled(workspaceStore == nil)
 
+            Button("Show TODO Explorer") { workspaceStore?.showTodoAndFocus() }
+                .keyboardShortcut("t", modifiers: [.command, .shift])
+                .disabled(workspaceStore == nil)
+
             Button("Focus Exercise Chat") { workspaceStore?.focusChatComposer() }
                 .keyboardShortcut("i", modifiers: .command)
                 .disabled(workspaceStore == nil)
 
-            Button("Show Inspector") { workspaceStore?.focusInspectorSidebar() }
+            Button("Focus Inspector List") { workspaceStore?.focusInspectorList() }
                 .keyboardShortcut("i", modifiers: [.command, .shift])
                 .disabled(workspaceStore == nil)
         }

@@ -6,4 +6,5 @@ struct ExerciseCheck: Identifiable, Equatable, Sendable {
     let detail: String
     let symbolName: String
     var status: CheckStatus = .idle
+    var line: Int? = nil
 }

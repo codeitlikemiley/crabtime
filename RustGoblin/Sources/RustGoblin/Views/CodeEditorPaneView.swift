@@ -38,10 +38,15 @@ struct CodeEditorPaneView: View {
                             helpText: "Restore file",
                             action: store.resetSelectedExercise
                         )
+                        .disabled(store.isCurrentExerciseEnriching)
+                        .opacity(store.isCurrentExerciseEnriching ? 0.4 : 1)
                     }
 
                     if store.hasSelection {
-                        RunCapsuleButton(action: store.runSelectedExercise, isEnabled: store.hasSelection && !store.isRunning)
+                        RunCapsuleButton(
+                            action: store.runSelectedExercise,
+                            isEnabled: store.hasSelection && !store.isRunning && !store.isCurrentExerciseEnriching
+                        )
                     }
 
                     IconGlassButton(
@@ -75,7 +80,6 @@ struct CodeEditorPaneView: View {
                         .font(.caption)
                         .foregroundStyle(RustGoblinTheme.Palette.textMuted)
 
-
                     if store.isEditorDirty && !store.isShowingReadonlyPreview {
                         Label("Unsaved", systemImage: "circle.fill")
                             .foregroundStyle(RustGoblinTheme.Palette.ember)
@@ -90,9 +94,24 @@ struct CodeEditorPaneView: View {
                     }
                 }
 
+                // ── AI Enrichment Banner ──────────────────────────────────────
+                if store.isCurrentExerciseEnriching {
+                    EnrichmentBanner()
+                }
+
                 Group {
-                    if store.isShowingDiffPreview {
-                        ReadonlyTextPreviewView(text: store.currentDiffText)
+                    if store.isCurrentExerciseEnriching {
+                        // Read-only while AI is rewriting the file — prevents race conditions
+                        ReadonlyTextPreviewView(
+                            text: store.editorText,
+                            fileExtension: currentFileExtension,
+                            showLineNumbers: store.showLineNumbers
+                        )
+                    } else if store.isShowingDiffPreview {
+                        ReadonlyTextPreviewView(
+                            text: store.currentDiffText,
+                            showLineNumbers: store.showLineNumbers
+                        )
                     } else if store.isShowingReadonlyPreview {
                         if store.isShowingMarkdownPreview {
                             MarkdownDocumentView(
@@ -101,7 +120,11 @@ struct CodeEditorPaneView: View {
                                 sizingMode: .fill
                             )
                         } else {
-                            ReadonlyTextPreviewView(text: store.explorerPreviewText)
+                            ReadonlyTextPreviewView(
+                                text: store.explorerPreviewText,
+                                fileExtension: currentFileExtension,
+                                showLineNumbers: store.showLineNumbers
+                            )
                         }
                     } else {
                         CodeTextEditorView(
@@ -109,10 +132,46 @@ struct CodeEditorPaneView: View {
                             onRun: store.runSelectedExercise,
                             onSave: store.saveSelectedExercise,
                             onTest: store.runSelectedExerciseTests,
-                            onCursorChange: { line in store.editorCursorLine = line }
+                            onCursorChange: { line in store.editorCursorLine = line },
+                            onCursorOffsetChange: { offset in store.editorCursorOffset = offset },
+                            onSaveCursorPosition: { offset, path in
+                                store.setCursorPosition(offset: offset, forPath: path)
+                            },
+                            showLineNumbers: store.showLineNumbers,
+                            goToLine: store.goToLineTarget
                         )
                             .onChange(of: store.editorText) { _, _ in
                                 store.handleEditorTextChange()
+                            }
+                            .onChange(of: store.goToLineToken) { _, _ in
+                                // Use a short delay to let the view settle after palette dismiss
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                    guard let line = store.goToLineTarget, line > 0 else { return }
+                                    store.goToLineTarget = nil
+                                    // Post a notification so the text view can handle it
+                                    NotificationCenter.default.post(
+                                        name: .goToLineRequested,
+                                        object: nil,
+                                        userInfo: ["line": line]
+                                    )
+                                }
+                            }
+                            .onChange(of: store.restoreCursorToken) { _, _ in
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    if let offset = store.restoreCursorOffset {
+                                        NotificationCenter.default.post(
+                                            name: .restoreCursorPositionRequested,
+                                            object: nil,
+                                            userInfo: ["offset": offset]
+                                        )
+                                    } else {
+                                        // New file, focus editor at current position
+                                        NotificationCenter.default.post(
+                                            name: .focusTextEditorRequested,
+                                            object: nil
+                                        )
+                                    }
+                                }
                             }
                     }
                 }
@@ -123,20 +182,87 @@ struct CodeEditorPaneView: View {
                 )
                 .overlay {
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(RustGoblinTheme.Palette.divider, lineWidth: 1)
+                        .stroke(
+                            store.isCurrentExerciseEnriching
+                                ? RustGoblinTheme.Palette.ember.opacity(0.5)
+                                : RustGoblinTheme.Palette.divider,
+                            lineWidth: store.isCurrentExerciseEnriching ? 1.5 : 1
+                        )
                 }
             } else {
                 WorkspaceEmptyStateView(
                     title: "Editor Ready",
                     systemImage: "curlybraces.square",
-                    description: "Import a folder or a single Rust file to turn this workspace into your active kata editor."
+                    description: "Import a folder or a Rust file to turn this workspace into your active kata editor."
                 )
             }
         }
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .paneCard()
+        .overlay {
+            if store.isCommandPalettePresented {
+                Color.black.opacity(0.3)
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .onTapGesture {
+                        store.hideCommandPalette()
+                    }
+                    .overlay(alignment: .top) {
+                        CommandPaletteView()
+                            .padding(.top, 40)
+                    }
+            }
+        }
+    }
+
+    private var currentFileExtension: String? {
+        store.selectedExplorerFileURL?.pathExtension
     }
 }
+
+// MARK: - Enrichment Banner
+
+private struct EnrichmentBanner: View {
+    @State private var isAnimating = false
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+                .controlSize(.mini)
+                .tint(RustGoblinTheme.Palette.ember)
+
+            Text("AI is enriching this file — editing is disabled until complete.")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(RustGoblinTheme.Palette.ember)
+
+            Spacer()
+
+            Text("Read-only")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(RustGoblinTheme.Palette.ember.opacity(0.8))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(RustGoblinTheme.Palette.ember.opacity(0.12)))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(RustGoblinTheme.Palette.ember.opacity(0.08))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(RustGoblinTheme.Palette.ember.opacity(0.25), lineWidth: 1)
+        }
+        .opacity(isAnimating ? 1 : 0.6)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                isAnimating = true
+            }
+        }
+    }
+}
+
+// MARK: - Open File Tabs
 
 private struct OpenFileTabsView: View {
     @Environment(WorkspaceStore.self) private var store
@@ -156,6 +282,13 @@ private struct OpenFileTabsView: View {
 
                                     Text(tab.title)
                                         .lineLimit(1)
+
+                                    // Spinner on tabs whose file is being enriched
+                                    if store.isEnriching(exerciseURL: tab.url) {
+                                        ProgressView()
+                                            .controlSize(.mini)
+                                            .tint(RustGoblinTheme.Palette.ember)
+                                    }
                                 }
                                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                             }
@@ -181,7 +314,12 @@ private struct OpenFileTabsView: View {
                         )
                         .overlay {
                             Capsule()
-                                .stroke(selectedFileURL == tab.url ? RustGoblinTheme.Palette.strongDivider : RustGoblinTheme.Palette.divider, lineWidth: 1)
+                                .stroke(
+                                    store.isEnriching(exerciseURL: tab.url)
+                                        ? RustGoblinTheme.Palette.ember.opacity(0.6)
+                                        : (selectedFileURL == tab.url ? RustGoblinTheme.Palette.strongDivider : RustGoblinTheme.Palette.divider),
+                                    lineWidth: 1
+                                )
                         }
                     }
                 }
@@ -206,6 +344,8 @@ private struct OpenFileTabsView: View {
         }
     }
 }
+
+// MARK: - Run Button
 
 private struct RunCapsuleButton: View {
     let action: () -> Void

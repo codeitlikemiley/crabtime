@@ -6,6 +6,9 @@ struct AppSettingsView: View {
 
     @State private var toolingStatus: [ToolHealthStatus] = []
     @State private var secretDrafts: [String: String] = [:]
+    @State private var isExercismConfiguring = false
+    @State private var exercismConfiguredSuccessfully: Bool? = nil
+    @State private var exercismConfigError: String? = nil
 
     private let credentialStore = CredentialStore()
     private let toolingHealthService = ToolingHealthService()
@@ -36,6 +39,16 @@ struct AppSettingsView: View {
             }
             .tabItem {
                 Label("Tooling", systemImage: "wrench.and.screwdriver")
+            }
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    exercismSettingsCard
+                }
+                .padding(20)
+            }
+            .tabItem {
+                Label("Exercism", systemImage: "graduationcap")
             }
         }
         .frame(width: 880, height: 720)
@@ -251,9 +264,116 @@ struct AppSettingsView: View {
         }
     }
 
+    private var exercismSettingsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Exercism API", systemImage: "graduationcap.fill")
+                    .font(.headline.weight(.bold))
+                Spacer()
+            }
+
+            Text("Browse and download exercises directly from Exercism. Find your API token at [exercism.org/settings/api_cli](https://exercism.org/settings/api_cli).")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            
+            HStack(alignment: .center, spacing: 12) {
+                Text("API Token")
+                    .font(.footnote.weight(.semibold))
+                    .frame(width: 90, alignment: .leading)
+
+                SecureField("Bearer token…", text: Binding(
+                    get: { secretDrafts["exercism_api_token"] ?? "" },
+                    set: {
+                        secretDrafts["exercism_api_token"] = $0
+                        exercismConfiguredSuccessfully = nil
+                    }
+                ))
+                .textFieldStyle(.roundedBorder)
+
+                Button(isExercismConfiguring ? "Saving…" : "Save") {
+                    Task {
+                        await saveExercismSecret()
+                    }
+                }
+                .disabled(isExercismConfiguring)
+                .interactivePointer()
+
+                Button("Clear") {
+                    clearExercismSecret()
+                }
+                .interactivePointer()
+            }
+
+            if let success = exercismConfiguredSuccessfully {
+                if success {
+                    HStack {
+                        Image(systemName: "checkmark.seal.fill")
+                            .foregroundStyle(RustGoblinTheme.Palette.moss)
+                        Text("API Token verified and configured locally.")
+                            .font(.footnote)
+                            .foregroundStyle(RustGoblinTheme.Palette.moss)
+                    }
+                    .padding(.top, 4)
+                } else if let error = exercismConfigError {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(RustGoblinTheme.Palette.ember)
+                        Text(error)
+                            .font(.footnote)
+                            .foregroundStyle(RustGoblinTheme.Palette.ember)
+                    }
+                    .padding(.top, 4)
+                }
+            }
+        }
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(RustGoblinTheme.Palette.panelFill)
+        )
+    }
+
     private func hydrateSecrets() {
         for kind in AIProviderKind.allCases where !kind.isCLI {
             secretDrafts[kind.credentialKey] = credentialStore.readSecret(for: kind.credentialKey) ?? ""
+        }
+        secretDrafts["exercism_api_token"] = credentialStore.readSecret(for: "exercism_api_token") ?? ""
+    }
+
+    private func saveExercismSecret() async {
+        let secret = secretDrafts["exercism_api_token"] ?? ""
+        guard !secret.isEmpty else {
+            exercismConfigError = "Please enter an API Token."
+            exercismConfiguredSuccessfully = false
+            return
+        }
+
+        isExercismConfiguring = true
+        exercismConfiguredSuccessfully = nil
+        exercismConfigError = nil
+
+        do {
+            let cli = ExercismCLI()
+            _ = try await cli.configure(token: secret)
+
+            try credentialStore.saveSecret(secret, for: "exercism_api_token")
+            exercismConfiguredSuccessfully = true
+        } catch {
+            exercismConfigError = error.localizedDescription
+            exercismConfiguredSuccessfully = false
+        }
+
+        isExercismConfiguring = false
+    }
+
+    private func clearExercismSecret() {
+        do {
+            try credentialStore.deleteSecret(for: "exercism_api_token")
+            secretDrafts["exercism_api_token"] = ""
+            exercismConfiguredSuccessfully = nil
+            exercismConfigError = nil
+        } catch {
+            secretDrafts["exercism_api_token"] = error.localizedDescription
         }
     }
 

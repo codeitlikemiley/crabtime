@@ -29,6 +29,20 @@ struct WorkspaceRailView: View {
                     isActive: store.sidebarMode == .explorer,
                     action: { store.selectSidebarMode(.explorer) }
                 )
+
+                dockButton(
+                    systemImage: "checklist",
+                    help: "Show TODOs",
+                    isActive: store.sidebarMode == .todos,
+                    action: { store.selectSidebarMode(.todos) }
+                )
+
+                dockButton(
+                    systemImage: "graduationcap",
+                    help: "Browse Exercism",
+                    isActive: store.sidebarMode == .exercism,
+                    action: { store.selectSidebarMode(.exercism) }
+                )
             }
             .frame(maxWidth: .infinity)
 

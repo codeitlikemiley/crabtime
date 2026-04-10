@@ -7,9 +7,14 @@ struct ProblemBrowserView: View {
         @Bindable var store = store
 
         Group {
-            if store.sidebarMode == .explorer {
+            switch store.sidebarMode {
+            case .explorer:
                 WorkspaceExplorerView()
-            } else {
+            case .todos:
+                TodoExplorerView()
+            case .exercism:
+                ExercismBrowserView()
+            case .exercises:
                 VStack(alignment: .leading, spacing: 16) {
                     VStack(alignment: .leading, spacing: 6) {
                         EyebrowLabel(text: "Exercise Library")
@@ -60,6 +65,9 @@ private struct ProblemSearchField: View {
                 .foregroundStyle(RustGoblinTheme.Palette.ink)
                 .tint(RustGoblinTheme.Palette.panelTint)
                 .focused($isFocused)
+                .onSubmit {
+                    store.openFirstVisibleExercise()
+                }
 
             Text("\(resultCount)")
                 .font(.caption.weight(.semibold))

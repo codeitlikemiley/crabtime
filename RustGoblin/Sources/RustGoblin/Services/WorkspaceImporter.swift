@@ -103,7 +103,8 @@ struct WorkspaceImporter {
                 continue
             }
 
-            if isExerciseCollectionDirectory(candidateURL, rootURL: rootURL) {
+            if isExerciseCollectionDirectory(candidateURL, rootURL: rootURL)
+                || isSolutionsDirectory(candidateURL, rootURL: rootURL) {
                 continue
             }
 
@@ -185,7 +186,22 @@ struct WorkspaceImporter {
         let derivedChecks = !presentation.hiddenChecks.isEmpty
             ? presentation.hiddenChecks
             : (solutionPresentation?.hiddenChecks ?? [])
-        let checks = derivedChecks.isEmpty
+
+        // Also scan tests/ directory for Exercism integration tests.
+        // These are #[test] fns in tests/*.rs files — not captured by SourcePresentationBuilder.
+        let integrationChecks = scanIntegrationTestChecks(in: rootURL)
+
+        // Merge: prefer inline checks, then integration checks, finally fall back to manual-run.
+        let allDiscoveredChecks: [ExerciseCheck] = {
+            var merged = derivedChecks
+            let existingIDs = Set(merged.map(\.id))
+            for check in integrationChecks where !existingIDs.contains(check.id) {
+                merged.append(check)
+            }
+            return merged
+        }()
+
+        let checks = allDiscoveredChecks.isEmpty
             ? [
                 ExerciseCheck(
                     id: "manual-run",
@@ -194,7 +210,7 @@ struct WorkspaceImporter {
                     symbolName: "play.rectangle"
                 )
             ]
-            : derivedChecks
+            : allDiscoveredChecks
 
         let exercise = ExerciseDocument(
             id: candidate.sourceURL.standardizedFileURL,
@@ -219,6 +235,72 @@ struct WorkspaceImporter {
 
         let relativePath = relativePath(from: candidate.sourceURL, rootURL: rootURL)
         return LoadedExercise(exercise: exercise, relativePath: relativePath)
+    }
+
+    /// Scans all `tests/*.rs` integration test files under `rootURL` for `#[test]` functions.
+    /// Also includes `#[ignore]`-annotated tests so they appear in the check list at load time.
+    /// Returns one `ExerciseCheck` per discovered test function, all with `.idle` status.
+    private func scanIntegrationTestChecks(in rootURL: URL) -> [ExerciseCheck] {
+        let testsDir = rootURL.appendingPathComponent("tests", isDirectory: true)
+        guard fileManager.fileExists(atPath: testsDir.path) else { return [] }
+
+        guard let testFiles = try? fileManager.contentsOfDirectory(
+            at: testsDir,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ).filter({ $0.pathExtension == "rs" }) else {
+            return []
+        }
+
+        var checks: [ExerciseCheck] = []
+        for fileURL in testFiles.sorted(by: { $0.path < $1.path }) {
+            guard let source = try? String(contentsOf: fileURL, encoding: .utf8) else { continue }
+            let discovered = extractIntegrationTests(from: source)
+            checks.append(contentsOf: discovered)
+        }
+        return checks
+    }
+
+    /// Line-by-line scanner that extracts `#[test]` function names from a source file.
+    /// Handles both non-ignored and `#[ignore]` tests — both are registered with `.idle` status.
+    private func extractIntegrationTests(from source: String) -> [ExerciseCheck] {
+        var checks: [ExerciseCheck] = []
+        var pendingAttributes: [String] = []
+
+        for rawLine in source.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline) {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+
+            if line.hasPrefix("#[") {
+                pendingAttributes.append(line)
+                continue
+            }
+
+            guard line.hasPrefix("fn ") else {
+                if !line.isEmpty { pendingAttributes.removeAll() }
+                continue
+            }
+
+            defer { pendingAttributes.removeAll() }
+
+            // Must have #[test] attribute
+            guard pendingAttributes.contains(where: { $0.contains("#[test") }) else { continue }
+
+            let isIgnored = pendingAttributes.contains(where: { $0.contains("#[ignore") })
+            guard
+                let signature = line.split(separator: " ", maxSplits: 1).last,
+                let name = signature.split(separator: "(", maxSplits: 1).first
+            else { continue }
+
+            let id = String(name)
+            checks.append(ExerciseCheck(
+                id: id,
+                title: id.replacingOccurrences(of: "_", with: " "),
+                detail: isIgnored ? "Integration Test (ignored)" : "Integration Test",
+                symbolName: "testtube.2",
+                status: .idle
+            ))
+        }
+        return checks
     }
 
     private func buildFileTree(at directoryURL: URL) throws -> [WorkspaceFileNode] {
@@ -387,6 +469,10 @@ struct WorkspaceImporter {
 
     private func isExerciseCollectionFile(_ url: URL, rootURL: URL) -> Bool {
         relativePathComponents(for: url, rootURL: rootURL).contains("exercises")
+    }
+
+    private func isSolutionsDirectory(_ url: URL, rootURL: URL) -> Bool {
+        relativePathComponents(for: url, rootURL: rootURL).contains("solutions")
     }
 
     private func fileRole(for sourceURL: URL, rootURL: URL) -> ExerciseFileRole {

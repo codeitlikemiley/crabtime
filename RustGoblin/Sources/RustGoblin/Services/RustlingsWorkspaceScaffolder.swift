@@ -10,12 +10,6 @@ struct RustlingsWorkspaceScaffolder {
         let devUpdateMessage: String?
     }
 
-    struct DrillResult: Sendable {
-        let topic: String
-        let count: Int
-        let created: [ChallengeResult]
-        let failed: Int
-    }
 
     private let fileManager: FileManager
 
@@ -27,11 +21,14 @@ struct RustlingsWorkspaceScaffolder {
         try ensureWorkspaceShell(named: rawName, at: rootURL, repairExisting: false)
     }
 
-    func createChallenge(
+    // MARK: - Phase 1: Instant Stub Creation (no AI, no waiting)
+
+    /// Creates stub files immediately — returns in < 1ms.
+    /// Call this first, reload workspace, then call `enrichChallengeInBackground`.
+    func createChallengeStub(
         named rawName: String,
-        in workspaceRootURL: URL,
-        providerManager: AIProviderManager? = nil
-    ) async throws -> ChallengeResult {
+        in workspaceRootURL: URL
+    ) throws -> ChallengeResult {
         let requestedSlug = slug(from: rawName)
         guard !requestedSlug.isEmpty else {
             throw WorkspaceChallengeError.invalidName
@@ -55,141 +52,75 @@ struct RustlingsWorkspaceScaffolder {
         let exerciseURL = exercisesURL.appendingPathComponent("\(normalizedSlug).rs", isDirectory: false)
         let solutionURL = solutionsURL.appendingPathComponent("\(normalizedSlug).rs", isDirectory: false)
 
-        // Step 1: Generate exercise file (AI or fallback stub)
-        let exerciseContent = await generateExerciseContent(
-            title: title,
-            providerManager: providerManager
-        )
-        try exerciseContent.write(to: exerciseURL, atomically: true, encoding: .utf8)
-
-        // Step 2: Generate solution file (AI or fallback stub) — uses exercise as context
-        let solutionContent = await generateSolutionContent(
-            title: title,
-            exerciseContent: exerciseContent,
-            providerManager: providerManager
-        )
-        try solutionContent.write(to: solutionURL, atomically: true, encoding: .utf8)
-
+        try fallbackExerciseStub(title: title).write(to: exerciseURL, atomically: true, encoding: .utf8)
+        try fallbackSolutionStub(title: title).write(to: solutionURL, atomically: true, encoding: .utf8)
         try appendInfoEntryIfNeeded(slug: normalizedSlug, title: title, to: infoTomlURL)
-
-        let devUpdateMessage = try await runRustlingsDevUpdateIfAvailable(in: workspaceRootURL)
 
         return ChallengeResult(
             title: title,
             slug: normalizedSlug,
             exerciseURL: exerciseURL,
             solutionURL: solutionURL,
-            devUpdateMessage: devUpdateMessage
+            devUpdateMessage: nil
         )
     }
 
-    func createDrill(
-        topic: String,
-        count: Int,
-        in workspaceRootURL: URL,
-        providerManager: AIProviderManager? = nil,
-        onProgress: @Sendable @MainActor (Int, Int, String) -> Void = { _, _, _ in }
-    ) async throws -> DrillResult {
-        let clampedCount = max(1, min(count, 100))
-        let baseSlug = slug(from: topic)
-        guard !baseSlug.isEmpty else {
-            throw WorkspaceChallengeError.invalidName
+
+    // MARK: - Phase 2: Background AI Enrichment (parallel, non-blocking)
+
+    /// Fires AI enrichment for a single challenge in a background Task.
+    func enrichChallengeInBackground(
+        result: ChallengeResult,
+        providerManager: AIProviderManager?,
+        onLog: @escaping @Sendable @MainActor (String) -> Void,
+        onComplete: @escaping @Sendable @MainActor (URL, URL, String) -> Void
+    ) {
+        guard let providerManager else {
+            onComplete(result.exerciseURL, result.solutionURL, "ℹ️ No AI provider — stub is ready for `\(result.slug)`.")
+            return
         }
 
-        try ensureWorkspaceShell(named: workspaceRootURL.lastPathComponent, at: workspaceRootURL, repairExisting: true)
+        Task { @MainActor in
+            let enrichStart = Date()
 
-        let exercisesURL = workspaceRootURL.appendingPathComponent("exercises", isDirectory: true)
-        let solutionsURL = workspaceRootURL.appendingPathComponent("solutions", isDirectory: true)
-        let infoTomlURL = workspaceRootURL.appendingPathComponent("info.toml", isDirectory: false)
-
-        try fileManager.createDirectory(at: exercisesURL, withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: solutionsURL, withIntermediateDirectories: true)
-        if !fileManager.fileExists(atPath: infoTomlURL.path) {
-            try canonicalInfoTomlHeader.write(to: infoTomlURL, atomically: true, encoding: .utf8)
-        }
-
-        var created: [ChallengeResult] = []
-        var failedCount = 0
-        var previousThemes: [String] = []
-
-        for i in 1...clampedCount {
-            let numberedSlug = "\(baseSlug)\(i)"
-            let title = prettifiedTitle(from: baseSlug.replacingOccurrences(of: "_", with: " "))
-            let numberedTitle = "\(title) (\(i)/\(clampedCount))"
-
-            let normalizedSlug = nextAvailableSlug(basedOn: numberedSlug, in: exercisesURL)
-            let exerciseURL = exercisesURL.appendingPathComponent("\(normalizedSlug).rs", isDirectory: false)
-            let solutionURL = solutionsURL.appendingPathComponent("\(normalizedSlug).rs", isDirectory: false)
-
-            await onProgress(i, clampedCount, normalizedSlug)
-
-            let variationContext = drillVariationContext(
-                topic: title,
-                index: i,
-                total: clampedCount,
-                previousThemes: previousThemes
-            )
-
-            let exerciseContent = await generateExerciseContent(
-                title: title,
+            // ── Exercise ──────────────────────────────────────────────
+            let (exerciseContent, exerciseGenerated) = await generateExerciseContent(
+                title: result.title,
                 providerManager: providerManager,
-                variationContext: variationContext
+                onLog: { msg in onLog(msg) }
             )
-
-            do {
-                try exerciseContent.write(to: exerciseURL, atomically: true, encoding: .utf8)
-
-                let solutionContent = await generateSolutionContent(
-                    title: title,
-                    exerciseContent: exerciseContent,
-                    providerManager: providerManager
-                )
-                try solutionContent.write(to: solutionURL, atomically: true, encoding: .utf8)
-                try appendInfoEntryIfNeeded(slug: normalizedSlug, title: numberedTitle, to: infoTomlURL)
-
-                created.append(ChallengeResult(
-                    title: numberedTitle,
-                    slug: normalizedSlug,
-                    exerciseURL: exerciseURL,
-                    solutionURL: solutionURL,
-                    devUpdateMessage: nil
-                ))
-
-                // Track theme for variation in next iteration
-                let firstLine = exerciseContent.components(separatedBy: .newlines)
-                    .first(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) ?? normalizedSlug
-                previousThemes.append(firstLine)
-            } catch {
-                failedCount += 1
+            if exerciseGenerated {
+                try? exerciseContent.write(to: result.exerciseURL, atomically: true, encoding: .utf8)
             }
-        }
 
-        // Run dev update once at the end instead of per-exercise
-        let devUpdateMessage = try await runRustlingsDevUpdateIfAvailable(in: workspaceRootURL)
-        var finalResults = created
-        if let last = finalResults.last {
-            finalResults[finalResults.count - 1] = ChallengeResult(
-                title: last.title,
-                slug: last.slug,
-                exerciseURL: last.exerciseURL,
-                solutionURL: last.solutionURL,
-                devUpdateMessage: devUpdateMessage
+            // ── Solution ──────────────────────────────────────────────
+            let (solutionContent, solutionGenerated) = await generateSolutionContent(
+                title: result.title,
+                exerciseContent: exerciseContent,
+                providerManager: providerManager,
+                onLog: { msg in onLog(msg) }
             )
-        }
+            if solutionGenerated {
+                try? solutionContent.write(to: result.solutionURL, atomically: true, encoding: .utf8)
+            }
 
-        return DrillResult(
-            topic: topic,
-            count: clampedCount,
-            created: finalResults,
-            failed: failedCount
-        )
+            let elapsed = Int(Date().timeIntervalSince(enrichStart))
+            let emoji = exerciseGenerated ? "✨" : (solutionGenerated ? "📝" : "ℹ️")
+            let exStatus = exerciseGenerated ? "✅" : "❌"
+            let solStatus = solutionGenerated ? "✅" : "❌"
+            let detail = "exercise \(exStatus) solution \(solStatus) (\(elapsed)s)"
+
+            onComplete(result.exerciseURL, result.solutionURL, "\(emoji) `\(result.slug)`: \(detail)")
+        }
     }
+
+
+
+    // MARK: - Core Workspace Setup
 
     private func appendInfoEntryIfNeeded(slug: String, title: String, to infoTomlURL: URL) throws {
         let existing = (try? String(contentsOf: infoTomlURL, encoding: .utf8)) ?? ""
-        guard !existing.contains("name = \"\(slug)\"") else {
-            return
-        }
+        guard !existing.contains("name = \"\(slug)\"") else { return }
 
         let hintBody = [
             "Implement \(title).",
@@ -215,16 +146,13 @@ struct RustlingsWorkspaceScaffolder {
     }
 
     private func runRustlingsDevUpdateIfAvailable(in workspaceRootURL: URL) async throws -> String? {
-        guard ToolingHealthService.resolveExecutable(named: "rustlings") != nil else {
-            return nil
-        }
+        guard ToolingHealthService.resolveExecutable(named: "rustlings") != nil else { return nil }
 
         let update = try await runProcess(
             currentDirectoryURL: workspaceRootURL,
             arguments: ["rustlings", "dev", "update"],
             commandDescription: "rustlings dev update"
         )
-
         let check = try await runProcess(
             currentDirectoryURL: workspaceRootURL,
             arguments: ["rustlings", "dev", "check"],
@@ -239,10 +167,7 @@ struct RustlingsWorkspaceScaffolder {
     }
 
     private func writeIfMissing(_ text: String, to url: URL) throws {
-        guard !fileManager.fileExists(atPath: url.path) else {
-            return
-        }
-
+        guard !fileManager.fileExists(atPath: url.path) else { return }
         try text.write(to: url, atomically: true, encoding: .utf8)
     }
 
@@ -275,12 +200,8 @@ struct RustlingsWorkspaceScaffolder {
             try canonicalInfoTomlHeader.write(to: url, atomically: true, encoding: .utf8)
             return
         }
-
         let existing = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
-        guard shouldRepairInfoToml(existing) else {
-            return
-        }
-
+        guard shouldRepairInfoToml(existing) else { return }
         let exerciseEntries = extractExerciseEntries(from: existing)
         let rebuilt = canonicalInfoTomlHeader + (exerciseEntries.isEmpty ? "" : "\n\n" + exerciseEntries)
         try rebuilt.write(to: url, atomically: true, encoding: .utf8)
@@ -291,12 +212,8 @@ struct RustlingsWorkspaceScaffolder {
             try canonicalCargoToml.write(to: url, atomically: true, encoding: .utf8)
             return
         }
-
         let existing = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
-        guard shouldRepairCargoToml(existing) else {
-            return
-        }
-
+        guard shouldRepairCargoToml(existing) else { return }
         try canonicalCargoToml.write(to: url, atomically: true, encoding: .utf8)
     }
 
@@ -305,12 +222,8 @@ struct RustlingsWorkspaceScaffolder {
             try canonicalRustAnalyzerToml.write(to: url, atomically: true, encoding: .utf8)
             return
         }
-
         let existing = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
-        guard shouldRepairRustAnalyzerToml(existing) else {
-            return
-        }
-
+        guard shouldRepairRustAnalyzerToml(existing) else { return }
         try canonicalRustAnalyzerToml.write(to: url, atomically: true, encoding: .utf8)
     }
 
@@ -330,23 +243,17 @@ struct RustlingsWorkspaceScaffolder {
     }
 
     private func extractExerciseEntries(from contents: String) -> String {
-        guard let range = contents.range(of: "[[exercises]]") else {
-            return ""
-        }
-
-        return contents[range.lowerBound...]
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let range = contents.range(of: "[[exercises]]") else { return "" }
+        return contents[range.lowerBound...].trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func nextAvailableSlug(basedOn baseSlug: String, in exercisesURL: URL) -> String {
         var candidate = baseSlug
         var suffix = 1
-
         while fileManager.fileExists(atPath: exercisesURL.appendingPathComponent("\(candidate).rs", isDirectory: false).path) {
             candidate = "\(baseSlug)\(suffix)"
             suffix += 1
         }
-
         return candidate
     }
 
@@ -357,7 +264,6 @@ struct RustlingsWorkspaceScaffolder {
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .filter { !$0.isEmpty }
             .joined(separator: "_")
-
         return normalized.isEmpty ? "challenge" : normalized
     }
 
@@ -369,44 +275,56 @@ struct RustlingsWorkspaceScaffolder {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    // MARK: - AI-Powered Exercise Generation
+    // MARK: - AI Content Generation
 
+    /// Returns (content, isAIGenerated).
+    /// On any failure (including 90s timeout), returns the fallback stub with `isAIGenerated = false`.
+    /// Always logs diagnostic info through `onLog` so failures are never silent.
     private func generateExerciseContent(
         title: String,
         providerManager: AIProviderManager?,
-        variationContext: String? = nil
-    ) async -> String {
+        onLog: @MainActor (String) -> Void
+    ) async -> (content: String, isAIGenerated: Bool) {
         guard let providerManager else {
-            return fallbackExerciseStub(title: title)
+            onLog("ℹ️ Exercise `\(title)`: no AI provider configured.")
+            return (fallbackExerciseStub(title: title), false)
         }
 
         do {
-            var userMessage = "Generate a Rustlings exercise for the topic: \"\(title)\""
-            if let variationContext, !variationContext.isEmpty {
-                userMessage += "\n\n\(variationContext)"
-            }
-
-            let raw = try await providerManager.generate(
+            let userMessage = "Generate a Rustlings exercise for the topic: \"\(title)\""
+            let raw = try await generateWithTimeout(
+                providerManager: providerManager,
                 systemPrompt: exerciseSystemPrompt,
                 userMessage: userMessage
             )
             let cleaned = Self.stripMarkdownFences(from: raw)
-            guard !cleaned.isEmpty else {
-                return fallbackExerciseStub(title: title)
+            let hasRust = Self.looksLikeRustCode(cleaned)
+
+            if cleaned.isEmpty || !hasRust {
+                let preview = String(raw.prefix(200)).replacingOccurrences(of: "\n", with: "\\n")
+                onLog("⚠️ Exercise `\(title)`: AI returned \(raw.count) chars but failed validation (hasRust=\(hasRust), cleanedEmpty=\(cleaned.isEmpty)). Preview: \(preview)")
+                return (fallbackExerciseStub(title: title), false)
             }
-            return cleaned
+            return (cleaned, true)
+        } catch is AITimeoutError {
+            onLog("⏱ Exercise `\(title)`: timed out after 90s.")
+            return (fallbackExerciseStub(title: title), false)
         } catch {
-            return fallbackExerciseStub(title: title)
+            onLog("⚠️ Exercise `\(title)`: AI error — \(error.localizedDescription)")
+            return (fallbackExerciseStub(title: title), false)
         }
     }
 
+    /// Returns (content, isAIGenerated).
     private func generateSolutionContent(
         title: String,
         exerciseContent: String,
-        providerManager: AIProviderManager?
-    ) async -> String {
+        providerManager: AIProviderManager?,
+        onLog: @MainActor (String) -> Void
+    ) async -> (content: String, isAIGenerated: Bool) {
         guard let providerManager else {
-            return fallbackSolutionStub(title: title)
+            onLog("ℹ️ Solution `\(title)`: no AI provider configured.")
+            return (fallbackSolutionStub(title: title), false)
         }
 
         do {
@@ -417,19 +335,67 @@ struct RustlingsWorkspaceScaffolder {
             \(exerciseContent)
             ```
             """
-            let raw = try await providerManager.generate(
+            let raw = try await generateWithTimeout(
+                providerManager: providerManager,
                 systemPrompt: solutionSystemPrompt,
                 userMessage: userMessage
             )
             let cleaned = Self.stripMarkdownFences(from: raw)
-            guard !cleaned.isEmpty else {
-                return fallbackSolutionStub(title: title)
+            let hasRust = Self.looksLikeRustCode(cleaned)
+
+            if cleaned.isEmpty || !hasRust {
+                let preview = String(raw.prefix(200)).replacingOccurrences(of: "\n", with: "\\n")
+                onLog("⚠️ Solution `\(title)`: AI returned \(raw.count) chars but failed validation (hasRust=\(hasRust), cleanedEmpty=\(cleaned.isEmpty)). Preview: \(preview)")
+                return (fallbackSolutionStub(title: title), false)
             }
-            return cleaned
+            return (cleaned, true)
+        } catch is AITimeoutError {
+            onLog("⏱ Solution `\(title)`: timed out after 90s.")
+            return (fallbackSolutionStub(title: title), false)
         } catch {
-            return fallbackSolutionStub(title: title)
+            onLog("⚠️ Solution `\(title)`: AI error — \(error.localizedDescription)")
+            return (fallbackSolutionStub(title: title), false)
         }
     }
+
+    // MARK: - Timeout-safe AI call
+
+    private struct AITimeoutError: Error {}
+
+    /// Calls `providerManager.generate` with a 90-second deadline.
+    /// Creates a MainActor task for the AI call and a background timer that cancels it on expiry.
+    private func generateWithTimeout(
+        providerManager: AIProviderManager,
+        systemPrompt: String,
+        userMessage: String,
+        timeoutSeconds: Double = 90
+    ) async throws -> String {
+        let aiTask = Task { @MainActor in
+            try await providerManager.generate(
+                systemPrompt: systemPrompt,
+                userMessage: userMessage
+            )
+        }
+
+        let timer = Task.detached {
+            try? await Task.sleep(for: .seconds(timeoutSeconds))
+            aiTask.cancel()
+        }
+
+        do {
+            let result = try await aiTask.value
+            timer.cancel()
+            return result
+        } catch is CancellationError {
+            timer.cancel()
+            throw AITimeoutError()
+        } catch {
+            timer.cancel()
+            throw error
+        }
+    }
+
+
 
     // MARK: - Prompts
 
@@ -450,7 +416,6 @@ struct RustlingsWorkspaceScaffolder {
           NO test module needed. The exercise is "fix this code so it compiles."
         - For algorithmic/data structure problems (e.g. LRU cache, linked list, binary search):
           Include a `#[cfg(test)] mod tests { ... }` block with test cases.
-        - The more complex the problem, the MORE test cases you should include.
         - Minimum 3 test cases for complex exercises, covering normal + edge cases.
 
         STRUCTURE:
@@ -467,49 +432,13 @@ struct RustlingsWorkspaceScaffolder {
 
         OUTPUT RULES:
         - Output ONLY valid Rust source code. No markdown fences, no prose, no explanations.
-        - Mirror the EXACT same structure as the exercise file:
-          same function signatures, same type definitions, same test module.
+        - Mirror the EXACT same structure as the exercise file.
         - Replace all `todo!()` with the correct working implementation.
         - Replace `// TODO:` comments with brief explanatory comments.
         - The code MUST contain `fn main() {}`.
         - If the exercise has `#[cfg(test)] mod tests`, include the SAME tests (they must all pass).
         - The code MUST pass `clippy -D warnings` on Rust edition 2024.
-        - Use idiomatic Rust patterns (entry API for HashMap, collapsed if-let chains, etc.).
         """
-    }
-
-    // MARK: - Drill Variation
-
-    private func drillVariationContext(
-        topic: String,
-        index: Int,
-        total: Int,
-        previousThemes: [String]
-    ) -> String {
-        var parts: [String] = []
-
-        parts.append("VARIATION REQUIREMENT: This is exercise \(index) of \(total) in a drill series on \"\(topic)\".")
-        parts.append("Each exercise MUST teach a DIFFERENT aspect or use a DIFFERENT approach.")
-
-        if index == 1 {
-            parts.append("Start with the fundamentals — the simplest form of the concept.")
-        } else if index <= total / 3 {
-            parts.append("Focus on basic/introductory difficulty. Build on fundamentals with slightly more complexity.")
-        } else if index <= (total * 2) / 3 {
-            parts.append("Focus on intermediate difficulty. Introduce edge cases, generics, or multiple data structures.")
-        } else {
-            parts.append("Focus on advanced difficulty. Use complex patterns, performance constraints, or real-world scenarios.")
-        }
-
-        if !previousThemes.isEmpty {
-            let summaries = previousThemes.enumerated()
-                .map { "  \($0.offset + 1). \($0.element)" }
-                .suffix(10) // Keep context window small — only last 10
-                .joined(separator: "\n")
-            parts.append("Previous exercises already covered these themes (DO NOT repeat them):\n\(summaries)")
-        }
-
-        return parts.joined(separator: "\n")
     }
 
     // MARK: - Fallback Stubs
@@ -536,31 +465,31 @@ struct RustlingsWorkspaceScaffolder {
         """
     }
 
-    // MARK: - Markdown Fence Stripping
+    // MARK: - Markdown & Rust Validation
 
     static func stripMarkdownFences(from text: String) -> String {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Strip ```rust ... ``` or ``` ... ``` wrapper
         let fencePattern = #"^```(?:rust|rs)?\s*\n([\s\S]*?)\n```\s*$"#
         if let regex = try? NSRegularExpression(pattern: fencePattern, options: []),
            let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
            let captureRange = Range(match.range(at: 1), in: trimmed) {
             return String(trimmed[captureRange]).trimmingCharacters(in: .whitespacesAndNewlines)
         }
-
-        // Also handle if there are multiple code blocks — take the first one
         let blockPattern = #"```(?:rust|rs)?\s*\n([\s\S]*?)\n```"#
         if let regex = try? NSRegularExpression(pattern: blockPattern, options: []),
            let match = regex.firstMatch(in: trimmed, range: NSRange(trimmed.startIndex..., in: trimmed)),
            let captureRange = Range(match.range(at: 1), in: trimmed) {
             return String(trimmed[captureRange]).trimmingCharacters(in: .whitespacesAndNewlines)
         }
-
         return trimmed
     }
 
-    // MARK: - Canonical Workspace Templates
+    static func looksLikeRustCode(_ text: String) -> Bool {
+        let rustSignals = ["fn ", "struct ", "impl ", "enum ", "use ", "let ", "pub ", "mod ", "trait ", "type "]
+        return rustSignals.contains(where: { text.contains($0) })
+    }
+
+    // MARK: - Canonical Templates
 
     private var canonicalCargoToml: String {
         """
@@ -618,12 +547,8 @@ struct RustlingsWorkspaceScaffolder {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
-        let stdoutTask = Task.detached {
-            try stdoutPipe.fileHandleForReading.readToEnd() ?? Data()
-        }
-        let stderrTask = Task.detached {
-            try stderrPipe.fileHandleForReading.readToEnd() ?? Data()
-        }
+        let stdoutTask = Task.detached { try stdoutPipe.fileHandleForReading.readToEnd() ?? Data() }
+        let stderrTask = Task.detached { try stderrPipe.fileHandleForReading.readToEnd() ?? Data() }
 
         return try await withCheckedThrowingContinuation { continuation in
             process.terminationHandler = { terminatedProcess in
@@ -631,20 +556,17 @@ struct RustlingsWorkspaceScaffolder {
                     do {
                         let stdoutData = try await stdoutTask.value
                         let stderrData = try await stderrTask.value
-                        continuation.resume(
-                            returning: ProcessOutput(
-                                commandDescription: commandDescription,
-                                stdout: String(decoding: stdoutData, as: UTF8.self),
-                                stderr: String(decoding: stderrData, as: UTF8.self),
-                                terminationStatus: terminatedProcess.terminationStatus
-                            )
-                        )
+                        continuation.resume(returning: ProcessOutput(
+                            commandDescription: commandDescription,
+                            stdout: String(decoding: stdoutData, as: UTF8.self),
+                            stderr: String(decoding: stderrData, as: UTF8.self),
+                            terminationStatus: terminatedProcess.terminationStatus
+                        ))
                     } catch {
                         continuation.resume(throwing: error)
                     }
                 }
             }
-
             do {
                 try process.run()
             } catch {
@@ -662,8 +584,7 @@ extension RustlingsWorkspaceScaffolder {
 
         var errorDescription: String? {
             switch self {
-            case .invalidName:
-                "Enter a valid challenge name."
+            case .invalidName: "Enter a valid challenge name."
             }
         }
     }

@@ -29,7 +29,7 @@ struct ExerciseCatalogView: View {
                                 index: index,
                                 exercise: exercise,
                                 isSelected: store.selectedExercise?.id == exercise.id,
-                                action: { store.selectExercise(id: exercise.id) }
+                                action: { store.selectAndOpenExercise(id: exercise.id) }
                             )
                         }
                     }

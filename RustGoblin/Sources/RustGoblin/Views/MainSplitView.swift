@@ -60,7 +60,15 @@ struct MainSplitView: View {
                             store.showWorkspacePalette()
                         }
                     },
-                    onDismissWorkspacePalette: store.hideWorkspacePalette
+                    onDismissWorkspacePalette: store.hideWorkspacePalette,
+                    onToggleCommandPalette: {
+                        if store.isCommandPalettePresented {
+                            // Move selection down (like VSCode)
+                            store.commandPaletteSelectionDelta += 1
+                        } else {
+                            store.showCommandPalette()
+                        }
+                    }
                 )
             )
             .overlay {
@@ -111,6 +119,7 @@ private struct WindowCommandBridge: NSViewRepresentable {
     let onDeleteWorkspace: () -> Void
     let onToggleWorkspacePalette: () -> Void
     let onDismissWorkspacePalette: () -> Void
+    let onToggleCommandPalette: () -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -121,7 +130,8 @@ private struct WindowCommandBridge: NSViewRepresentable {
             onResetWorkspace: onResetWorkspace,
             onDeleteWorkspace: onDeleteWorkspace,
             onToggleWorkspacePalette: onToggleWorkspacePalette,
-            onDismissWorkspacePalette: onDismissWorkspacePalette
+            onDismissWorkspacePalette: onDismissWorkspacePalette,
+            onToggleCommandPalette: onToggleCommandPalette
         )
     }
 
@@ -141,7 +151,8 @@ private struct WindowCommandBridge: NSViewRepresentable {
             onResetWorkspace: onResetWorkspace,
             onDeleteWorkspace: onDeleteWorkspace,
             onToggleWorkspacePalette: onToggleWorkspacePalette,
-            onDismissWorkspacePalette: onDismissWorkspacePalette
+            onDismissWorkspacePalette: onDismissWorkspacePalette,
+            onToggleCommandPalette: onToggleCommandPalette
         )
         return view
     }
@@ -161,7 +172,8 @@ private struct WindowCommandBridge: NSViewRepresentable {
             onResetWorkspace: onResetWorkspace,
             onDeleteWorkspace: onDeleteWorkspace,
             onToggleWorkspacePalette: onToggleWorkspacePalette,
-            onDismissWorkspacePalette: onDismissWorkspacePalette
+            onDismissWorkspacePalette: onDismissWorkspacePalette,
+            onToggleCommandPalette: onToggleCommandPalette
         )
     }
 
@@ -185,6 +197,7 @@ private struct WindowCommandBridge: NSViewRepresentable {
         private var onDeleteWorkspace: () -> Void
         private var onToggleWorkspacePalette: () -> Void
         private var onDismissWorkspacePalette: () -> Void
+        private var onToggleCommandPalette: () -> Void
 
         init(
             onCloseFile: @escaping () -> Void,
@@ -194,7 +207,8 @@ private struct WindowCommandBridge: NSViewRepresentable {
             onResetWorkspace: @escaping () -> Void,
             onDeleteWorkspace: @escaping () -> Void,
             onToggleWorkspacePalette: @escaping () -> Void,
-            onDismissWorkspacePalette: @escaping () -> Void
+            onDismissWorkspacePalette: @escaping () -> Void,
+            onToggleCommandPalette: @escaping () -> Void
         ) {
             self.onCloseFile = onCloseFile
             self.onSelectPreviousTab = onSelectPreviousTab
@@ -204,6 +218,7 @@ private struct WindowCommandBridge: NSViewRepresentable {
             self.onDeleteWorkspace = onDeleteWorkspace
             self.onToggleWorkspacePalette = onToggleWorkspacePalette
             self.onDismissWorkspacePalette = onDismissWorkspacePalette
+            self.onToggleCommandPalette = onToggleCommandPalette
         }
 
         func attach(to view: NSView) {
@@ -226,7 +241,8 @@ private struct WindowCommandBridge: NSViewRepresentable {
             onResetWorkspace: @escaping () -> Void,
             onDeleteWorkspace: @escaping () -> Void,
             onToggleWorkspacePalette: @escaping () -> Void,
-            onDismissWorkspacePalette: @escaping () -> Void
+            onDismissWorkspacePalette: @escaping () -> Void,
+            onToggleCommandPalette: @escaping () -> Void
         ) {
             self.shouldHandleCloseFile = shouldHandleCloseFile
             self.hasOpenTabs = hasOpenTabs
@@ -241,6 +257,7 @@ private struct WindowCommandBridge: NSViewRepresentable {
             self.onDeleteWorkspace = onDeleteWorkspace
             self.onToggleWorkspacePalette = onToggleWorkspacePalette
             self.onDismissWorkspacePalette = onDismissWorkspacePalette
+            self.onToggleCommandPalette = onToggleCommandPalette
         }
 
         func stopMonitoring() {
@@ -271,8 +288,15 @@ private struct WindowCommandBridge: NSViewRepresentable {
                 let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
                 let characters = event.charactersIgnoringModifiers?.lowercased()
 
-                if modifiers == .command, characters == "p" {
+                // Cmd+Shift+P → workspace palette
+                if modifiers == [.command, .shift], characters == "p" {
                     self.onToggleWorkspacePalette()
+                    return nil
+                }
+
+                // Cmd+P → command palette
+                if modifiers == .command, characters == "p" {
+                    self.onToggleCommandPalette()
                     return nil
                 }
 

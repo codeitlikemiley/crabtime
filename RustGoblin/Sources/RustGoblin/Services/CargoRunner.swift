@@ -17,27 +17,31 @@ struct CargoRunner: Sendable {
         }
     }
 
+    func runOverride(args: [String], in directoryURL: URL) async throws -> ProcessOutput {
+        try await processRunner(
+            directoryURL,
+            ["cargo", "runner", "override"] + args,
+            "cargo runner override \(args.joined(separator: " "))",
+            runnerEnvironment(projectRootURL: directoryURL)
+        )
+    }
+
     func run(exercise: ExerciseDocument, cursorLine: Int? = nil) async throws -> ProcessOutput {
         let runnerRootURL = projectRootURL(for: exercise.sourceURL, fallbackDirectoryURL: exercise.directoryURL)
         let environment = runnerEnvironment(projectRootURL: runnerRootURL)
 
+        // Always prefer cargo runner — it's the primary execution strategy.
+        // The CLI is intelligent and handles context-aware execution.
         if try await isCargoRunnerAvailable(in: runnerRootURL, environment: environment) {
-            let runnerResult = try await runCargoRunner(
+            return try await runCargoRunner(
                 sourceURL: exercise.sourceURL,
                 projectRootURL: runnerRootURL,
                 cursorLine: cursorLine,
                 environment: environment
             )
-
-            if !looksLikeRunnerInvocationError(runnerResult) {
-                return runnerResult
-            }
         }
 
-        if isCargoProjectRoot(runnerRootURL) {
-            return try await runCargoProject(in: runnerRootURL, environment: environment)
-        }
-
+        // Fallback: standalone script via rustc
         return try await runScriptFallback(at: exercise.sourceURL, projectRootURL: runnerRootURL, environment: environment)
     }
 
