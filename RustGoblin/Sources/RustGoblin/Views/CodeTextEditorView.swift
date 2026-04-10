@@ -220,7 +220,7 @@ extension CodeTextEditorView {
         }
 
         @objc func viewDidScroll(_ notification: Notification) {
-            textView?.needsDisplay = true
+            textView?.setGutterNeedsDisplay()
         }
 
         @MainActor
@@ -321,6 +321,12 @@ final class RunAwareTextView: NSTextView {
         // textContainerInset.width applies to BOTH sides equally.
         // We use it for the left gutter. The right waste is acceptable.
         textContainerInset = NSSize(width: gutterWidth, height: 18)
+    }
+
+    func setGutterNeedsDisplay() {
+        guard showLineNumbers, let visibleRect = enclosingScrollView?.contentView.documentVisibleRect else { return }
+        let gutterRect = NSRect(x: visibleRect.origin.x, y: visibleRect.origin.y, width: gutterWidth, height: visibleRect.height)
+        setNeedsDisplay(gutterRect)
     }
 
     override var textContainerOrigin: NSPoint {

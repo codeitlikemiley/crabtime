@@ -2,29 +2,6 @@ import AppKit
 import SwiftUI
 import WebKit
 
-private final class PassthroughScrollWKWebView: WKWebView {
-    var shouldPassScrollToParent = false
-
-    override func scrollWheel(with event: NSEvent) {
-        guard shouldPassScrollToParent else {
-            super.scrollWheel(with: event)
-            return
-        }
-
-        let internalScrollView = enclosingScrollView
-        var ancestor: NSView? = superview
-
-        while let current = ancestor {
-            if let outerScrollView = current.enclosingScrollView, outerScrollView !== internalScrollView {
-                outerScrollView.scrollWheel(with: event)
-                return
-            }
-            ancestor = current.superview
-        }
-
-        nextResponder?.scrollWheel(with: event)
-    }
-}
 
 struct MarkdownPreviewView: NSViewRepresentable {
     let markdown: String
@@ -43,7 +20,7 @@ struct MarkdownPreviewView: NSViewRepresentable {
         controller.add(context.coordinator, name: Coordinator.copyCodeMessageName)
         configuration.userContentController = controller
 
-        let webView = PassthroughScrollWKWebView(frame: .zero, configuration: configuration)
+        let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         webView.setValue(false, forKey: "drawsBackground")
         webView.allowsBackForwardNavigationGestures = false
@@ -101,8 +78,8 @@ extension MarkdownPreviewView {
             }
 
             DispatchQueue.main.async {
-                if let passthroughWebView = webView as? PassthroughScrollWKWebView {
-                    passthroughWebView.shouldPassScrollToParent = parent.sizingMode == .intrinsicHeight
+                if parent.sizingMode == .intrinsicHeight {
+                    webView.setValue(false, forKey: "drawsBackground")
                 }
 
                 guard let scrollView = webView.enclosingScrollView else {

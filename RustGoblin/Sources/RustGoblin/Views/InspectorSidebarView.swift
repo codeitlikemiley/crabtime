@@ -154,7 +154,7 @@ struct InspectorSidebarView: View {
                 if hasTestChecks {
                     InspectorSection(title: "Checks") {
                         ScrollViewReader { scrollProxy in
-                            VStack(alignment: .leading, spacing: 10) {
+                            LazyVStack(alignment: .leading, spacing: 10) {
                                 ForEach(testChecks) { check in
                                     VStack(alignment: .leading, spacing: 6) {
                                         HStack {
