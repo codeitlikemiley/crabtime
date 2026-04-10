@@ -3,6 +3,8 @@ import SwiftUI
 struct AppSettingsView: View {
     @Environment(AISettingsStore.self) private var settingsStore
     @Environment(AIModelCatalogStore.self) private var modelCatalogStore
+    @AppStorage("cachedToolingStatus") private var cachedToolingStatusData: Data = Data()
+
 
     @State private var toolingStatus: [ToolHealthStatus] = []
     @State private var secretDrafts: [String: String] = [:]
@@ -439,6 +441,38 @@ struct AppSettingsView: View {
     }
 
     private func refreshTooling() async {
-        toolingStatus = await toolingHealthService.collectStatus(exercismCLI: ExercismCLI())
+        if let decoded = try? JSONDecoder().decode([ToolHealthStatus].self, from: cachedToolingStatusData), !decoded.isEmpty {
+            toolingStatus = decoded
+        } else if toolingStatus.isEmpty {
+            toolingStatus = [
+                "codex", "gemini", "claude", "opencode", "cargo", "cargo-runner", "rustlings", "rustc", "codecrafters", "exercism"
+            ].map {
+                ToolHealthStatus(id: $0, title: "Checking...", subtitle: "", executablePath: nil, version: nil, isInstalled: false, isConfigured: false, guidance: nil, installCommand: nil)
+            }
+        }
+
+        for await toolStatus in toolingHealthService.collectStatusStream(exercismCLI: ExercismCLI()) {
+            if let index = toolingStatus.firstIndex(where: { $0.id == toolStatus.id }) {
+                toolingStatus[index] = toolStatus
+            } else {
+                toolingStatus.append(toolStatus)
+            }
+
+            if let encoded = try? JSONEncoder().encode(toolingStatus) {
+                cachedToolingStatusData = encoded
+            }
+        }
+        
+        // Ensure canonical sorting
+        let canonicalOrder = ["codex", "gemini", "claude", "opencode", "cargo", "cargo-runner", "rustlings", "rustc", "codecrafters", "exercism"]
+        toolingStatus.sort { a, b in
+            let idxA = canonicalOrder.firstIndex(of: a.id) ?? 999
+            let idxB = canonicalOrder.firstIndex(of: b.id) ?? 999
+            return idxA < idxB
+        }
+        
+        if let encoded = try? JSONEncoder().encode(toolingStatus) {
+            cachedToolingStatusData = encoded
+        }
     }
 }

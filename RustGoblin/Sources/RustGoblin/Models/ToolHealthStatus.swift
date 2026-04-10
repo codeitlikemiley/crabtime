@@ -1,6 +1,6 @@
 import Foundation
 
-struct ToolHealthStatus: Identifiable, Equatable, Sendable {
+struct ToolHealthStatus: Identifiable, Equatable, Sendable, Codable {
     let id: String
     let title: String
     let subtitle: String

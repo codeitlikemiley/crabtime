@@ -1,68 +1,91 @@
 import Foundation
 
 struct ToolingHealthService {
-    func collectStatus(exercismCLI: ExercismCLI) async -> [ToolHealthStatus] {
-        async let codex = codexStatus()
-        async let gemini = cliStatus(
-            title: "Gemini CLI",
-            subtitle: "Gemini subscription runtime",
-            executableName: "gemini",
-            versionArguments: ["--version"],
-            installHint: "Install Gemini CLI, then authenticate with OAuth or an API key.",
-            installCommand: "npm install -g @google/generative-ai-cli"
-        )
-        async let claude = cliStatus(
-            title: "Claude Code",
-            subtitle: "Anthropic CLI runtime",
-            executableName: "claude",
-            versionArguments: ["--version"],
-            installHint: "Install Claude Code and authenticate before using chat.",
-            installCommand: "npm install -g @anthropic-ai/claude-code"
-        )
-        async let openCode = openCodeStatus()
-        async let cargoRunner = cliStatus(
-            title: "Cargo Runner",
-            subtitle: "Rust exercise runner",
-            executableName: "cargo",
-            versionArguments: ["runner", "--help"],
-            installHint: "Install cargo-runner and make sure `cargo runner` resolves in PATH.",
-            installCommand: "cargo install cargo-runner"
-        )
-        async let rustlings = cliStatus(
-            title: "Rustlings CLI",
-            subtitle: "Rustlings exercise runner",
-            executableName: "rustlings",
-            versionArguments: ["--version"],
-            installHint: "Install with `cargo install rustlings`, then run `rustlings init` if you want the official managed workspace.",
-            installCommand: "cargo install rustlings"
-        )
-        async let cargo = cliStatus(
-            title: "Cargo",
-            subtitle: "Rust build tool",
-            executableName: "cargo",
-            versionArguments: ["--version"],
-            installHint: "Install Rust with rustup from the official Rust site.",
-            installCommand: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
-        )
-        async let rustc = cliStatus(
-            title: "rustc",
-            subtitle: "Rust compiler",
-            executableName: "rustc",
-            versionArguments: ["--version"],
-            installHint: "Install Rust with rustup from the official Rust site.",
-            installCommand: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
-        )
-        async let codecrafters = cliStatus(
-            title: "Codecrafters CLI",
-            subtitle: "Codecrafters workspace tooling",
-            executableName: "codecrafters",
-            versionArguments: ["--version"],
-            installHint: "Install the Codecrafters CLI if you want challenge support here.",
-            installCommand: "curl https://codecrafters.io/install.sh | sh"
-        )
-        async let exercism = exercismStatus(exercismCLI)
+    func collectStatusStream(exercismCLI: ExercismCLI) -> AsyncStream<ToolHealthStatus> {
+        return AsyncStream { continuation in
+            Task {
+                await withTaskGroup(of: ToolHealthStatus.self) { group in
+                    group.addTask { await self.codexStatus() }
+                    group.addTask {
+                        await self.cliStatus(
+                            title: "Gemini CLI",
+                            subtitle: "Gemini subscription runtime",
+                            executableName: "gemini",
+                            versionArguments: ["--version"],
+                            installHint: "Install Gemini CLI, then authenticate with OAuth or an API key.",
+                            installCommand: "npm install -g @google/generative-ai-cli"
+                        )
+                    }
+                    group.addTask {
+                        await self.cliStatus(
+                            title: "Claude Code",
+                            subtitle: "Anthropic CLI runtime",
+                            executableName: "claude",
+                            versionArguments: ["--version"],
+                            installHint: "Install Claude Code and authenticate before using chat.",
+                            installCommand: "npm install -g @anthropic-ai/claude-code"
+                        )
+                    }
+                    group.addTask { await self.openCodeStatus() }
+                    group.addTask {
+                        await self.cliStatus(
+                            title: "Cargo Runner",
+                            subtitle: "Rust exercise runner",
+                            executableName: "cargo",
+                            versionArguments: ["runner", "--help"],
+                            installHint: "Install cargo-runner and make sure `cargo runner` resolves in PATH.",
+                            installCommand: "cargo install cargo-runner"
+                        )
+                    }
+                    group.addTask {
+                        await self.cliStatus(
+                            title: "Rustlings CLI",
+                            subtitle: "Rustlings exercise runner",
+                            executableName: "rustlings",
+                            versionArguments: ["--version"],
+                            installHint: "Install with `cargo install rustlings`, then run `rustlings init` if you want the official managed workspace.",
+                            installCommand: "cargo install rustlings"
+                        )
+                    }
+                    group.addTask {
+                        await self.cliStatus(
+                            title: "Cargo",
+                            subtitle: "Rust build tool",
+                            executableName: "cargo",
+                            versionArguments: ["--version"],
+                            installHint: "Install Rust with rustup from the official Rust site.",
+                            installCommand: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+                        )
+                    }
+                    group.addTask {
+                        await self.cliStatus(
+                            title: "rustc",
+                            subtitle: "Rust compiler",
+                            executableName: "rustc",
+                            versionArguments: ["--version"],
+                            installHint: "Install Rust with rustup from the official Rust site.",
+                            installCommand: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+                        )
+                    }
+                    group.addTask {
+                        await self.cliStatus(
+                            title: "Codecrafters CLI",
+                            subtitle: "Codecrafters workspace tooling",
+                            executableName: "codecrafters",
+                            versionArguments: ["--version"],
+                            installHint: "Install the Codecrafters CLI if you want challenge support here.",
+                            installCommand: "curl https://codecrafters.io/install.sh | sh"
+                        )
+                    }
+                    group.addTask { await self.exercismStatus(exercismCLI) }
 
-        return await [codex, gemini, claude, openCode, cargoRunner, rustlings, cargo, rustc, codecrafters, exercism]
+                    for await status in group {
+                        continuation.yield(status)
+                    }
+                }
+                continuation.finish()
+            }
+        }
     }
 
     private func codexStatus() async -> ToolHealthStatus {
