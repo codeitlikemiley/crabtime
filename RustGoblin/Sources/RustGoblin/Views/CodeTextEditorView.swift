@@ -171,11 +171,12 @@ extension CodeTextEditorView {
             textView.allowsUndo = false
             textView.string = string
             textView.allowsUndo = true
-            // Clear any unbalanced undo groups left by the programmatic set.
-            // Without this, Cmd+Z can trigger undoNestedGroup on an open group
-            // whose target has been deallocated → bad pointer crash.
-            textView.undoManager?.removeAllActions()
-            textView.window?.undoManager?.removeAllActions()
+            if let undoManager = textView.undoManager {
+                while undoManager.groupingLevel > 0 {
+                    undoManager.endUndoGrouping()
+                }
+                undoManager.removeAllActions()
+            }
         }
 
         @MainActor
@@ -315,6 +316,12 @@ final class RunAwareTextView: NSTextView {
     var onSave: (() -> Void)?
     var onTest: (() -> Void)?
     var showLineNumbers: Bool = false
+    
+    private let customUndoManager = UndoManager()
+    
+    override var undoManager: UndoManager? {
+        return customUndoManager
+    }
     private var gutterWidth: CGFloat = 0
 
     /// Compute gutter width based on total line count, then shift the text container.
