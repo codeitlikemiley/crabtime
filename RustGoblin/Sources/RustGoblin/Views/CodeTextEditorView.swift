@@ -204,12 +204,17 @@ extension CodeTextEditorView {
             let nsString = textView.string as NSString
             let lineRange = nsString.lineRange(for: NSRange(location: min(location, nsString.length), length: 0))
             var lineNumber = 1
-            var index = 0
-            while index < lineRange.location && index < nsString.length {
-                if nsString.character(at: index) == 0x000A {
+            var searchRange = NSRange(location: 0, length: min(lineRange.location, nsString.length))
+            while searchRange.length > 0 {
+                let foundRange = nsString.range(of: "\n", options: .literal, range: searchRange)
+                if foundRange.location != NSNotFound {
                     lineNumber += 1
+                    let consumed = foundRange.location + 1 - searchRange.location
+                    searchRange.location += consumed
+                    searchRange.length -= consumed
+                } else {
+                    break
                 }
-                index += 1
             }
             onCursorChange?(lineNumber)
         }
@@ -219,6 +224,7 @@ extension CodeTextEditorView {
             SyntaxHighlighter.apply(to: textView, fileExtension: "rs")
         }
 
+        @MainActor
         @objc func viewDidScroll(_ notification: Notification) {
             textView?.setGutterNeedsDisplay()
         }
@@ -231,16 +237,23 @@ extension CodeTextEditorView {
 
             let nsString = textView.string as NSString
             var currentLine = 1
-            var charIndex = 0
-            // Find start of target line
-            while currentLine < line, charIndex < nsString.length {
-                if nsString.character(at: charIndex) == 0x000A {
+            var targetCharIndex = 0
+            var searchRange = NSRange(location: 0, length: nsString.length)
+            
+            while currentLine < line, searchRange.length > 0 {
+                let foundRange = nsString.range(of: "\n", options: .literal, range: searchRange)
+                if foundRange.location != NSNotFound {
                     currentLine += 1
+                    targetCharIndex = foundRange.location + 1
+                    let consumed = foundRange.location + 1 - searchRange.location
+                    searchRange.location += consumed
+                    searchRange.length -= consumed
+                } else {
+                    break
                 }
-                charIndex += 1
             }
             // Move to end of this line
-            var endOfLine = charIndex
+            var endOfLine = targetCharIndex
             while endOfLine < nsString.length {
                 if nsString.character(at: endOfLine) == 0x000A { break }
                 endOfLine += 1
@@ -387,11 +400,19 @@ final class RunAwareTextView: NSTextView {
 
         // Count lines before visible range
         var lineNumber = 1
-        var i = 0
-        while i < visibleCharRange.location {
-            if nsString.character(at: i) == 0x000A { lineNumber += 1 }
-            i += 1
+        var searchRange = NSRange(location: 0, length: visibleCharRange.location)
+        while searchRange.length > 0 {
+            let foundRange = nsString.range(of: "\n", options: .literal, range: searchRange)
+            if foundRange.location != NSNotFound {
+                lineNumber += 1
+                let consumed = foundRange.location + 1 - searchRange.location
+                searchRange.location += consumed
+                searchRange.length -= consumed
+            } else {
+                break
+            }
         }
+
 
         // Draw visible line numbers
         var charIndex = visibleCharRange.location
