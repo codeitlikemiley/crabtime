@@ -8,14 +8,16 @@ struct ToolingHealthService {
             subtitle: "Gemini subscription runtime",
             executableName: "gemini",
             versionArguments: ["--version"],
-            installHint: "Install Gemini CLI, then authenticate with OAuth or an API key."
+            installHint: "Install Gemini CLI, then authenticate with OAuth or an API key.",
+            installCommand: "npm install -g @google/generative-ai-cli"
         )
         async let claude = cliStatus(
             title: "Claude Code",
             subtitle: "Anthropic CLI runtime",
             executableName: "claude",
             versionArguments: ["--version"],
-            installHint: "Install Claude Code and authenticate before using chat."
+            installHint: "Install Claude Code and authenticate before using chat.",
+            installCommand: "npm install -g @anthropic-ai/claude-code"
         )
         async let openCode = openCodeStatus()
         async let cargoRunner = cliStatus(
@@ -23,35 +25,40 @@ struct ToolingHealthService {
             subtitle: "Rust exercise runner",
             executableName: "cargo",
             versionArguments: ["runner", "--help"],
-            installHint: "Install cargo-runner and make sure `cargo runner` resolves in PATH."
+            installHint: "Install cargo-runner and make sure `cargo runner` resolves in PATH.",
+            installCommand: "cargo install cargo-runner"
         )
         async let rustlings = cliStatus(
             title: "Rustlings CLI",
             subtitle: "Rustlings exercise runner",
             executableName: "rustlings",
             versionArguments: ["--version"],
-            installHint: "Install with `cargo install rustlings`, then run `rustlings init` if you want the official managed workspace."
+            installHint: "Install with `cargo install rustlings`, then run `rustlings init` if you want the official managed workspace.",
+            installCommand: "cargo install rustlings"
         )
         async let cargo = cliStatus(
             title: "Cargo",
             subtitle: "Rust build tool",
             executableName: "cargo",
             versionArguments: ["--version"],
-            installHint: "Install Rust with rustup from the official Rust site."
+            installHint: "Install Rust with rustup from the official Rust site.",
+            installCommand: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
         )
         async let rustc = cliStatus(
             title: "rustc",
             subtitle: "Rust compiler",
             executableName: "rustc",
             versionArguments: ["--version"],
-            installHint: "Install Rust with rustup from the official Rust site."
+            installHint: "Install Rust with rustup from the official Rust site.",
+            installCommand: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
         )
         async let codecrafters = cliStatus(
             title: "Codecrafters CLI",
             subtitle: "Codecrafters workspace tooling",
             executableName: "codecrafters",
             versionArguments: ["--version"],
-            installHint: "Install the Codecrafters CLI if you want challenge support here."
+            installHint: "Install the Codecrafters CLI if you want challenge support here.",
+            installCommand: "curl https://codecrafters.io/install.sh | sh"
         )
         async let exercism = exercismStatus(exercismCLI)
 
@@ -68,7 +75,8 @@ struct ToolingHealthService {
                 version: nil,
                 isInstalled: false,
                 isConfigured: false,
-                guidance: "Install Codex CLI and sign in with your ChatGPT subscription."
+                guidance: "Install Codex CLI and sign in with your ChatGPT subscription.",
+                installCommand: "npm install -g @openai/codex-cli"
             )
         }
 
@@ -92,7 +100,8 @@ struct ToolingHealthService {
             version: versionResult?.combinedText.trimmingCharacters(in: .whitespacesAndNewlines),
             isInstalled: true,
             isConfigured: isConfigured,
-            guidance: isConfigured ? nil : "Run `codex login` or `codex login status` to finish setup."
+            guidance: isConfigured ? nil : "Run `codex login` or `codex login status` to finish setup.",
+            installCommand: nil
         )
     }
 
@@ -106,7 +115,8 @@ struct ToolingHealthService {
                 version: nil,
                 isInstalled: false,
                 isConfigured: false,
-                guidance: "Install OpenCode and configure a provider."
+                guidance: "Install OpenCode and configure a provider.",
+                installCommand: "npm install -g @open-code/cli"
             )
         }
 
@@ -130,7 +140,8 @@ struct ToolingHealthService {
             version: versionResult?.combinedText.trimmingCharacters(in: .whitespacesAndNewlines),
             isInstalled: true,
             isConfigured: isConfigured,
-            guidance: isConfigured ? nil : "Run `opencode auth login` or configure a provider in OpenCode first."
+            guidance: isConfigured ? nil : "Run `opencode auth login` or configure a provider in OpenCode first.",
+            installCommand: nil
         )
     }
 
@@ -147,7 +158,8 @@ struct ToolingHealthService {
                 isConfigured: status.isConfigured,
                 guidance: status.isInstalled
                     ? (status.isConfigured ? nil : "Run `exercism configure --token=YOUR_TOKEN` to finish setup.")
-                    : "Install with `brew install exercism`."
+                    : "Install with `brew install exercism`.",
+                installCommand: status.isInstalled ? nil : "brew install exercism"
             )
         } catch {
             return ToolHealthStatus(
@@ -158,7 +170,8 @@ struct ToolingHealthService {
                 version: nil,
                 isInstalled: false,
                 isConfigured: false,
-                guidance: error.localizedDescription
+                guidance: error.localizedDescription,
+                installCommand: nil
             )
         }
     }
@@ -168,7 +181,8 @@ struct ToolingHealthService {
         subtitle: String,
         executableName: String,
         versionArguments: [String],
-        installHint: String
+        installHint: String,
+        installCommand: String?
     ) async -> ToolHealthStatus {
         guard let executableURL = Self.resolveExecutable(named: executableName) else {
             return ToolHealthStatus(
@@ -179,7 +193,8 @@ struct ToolingHealthService {
                 version: nil,
                 isInstalled: false,
                 isConfigured: false,
-                guidance: installHint
+                guidance: installHint,
+                installCommand: installCommand
             )
         }
 
@@ -199,7 +214,8 @@ struct ToolingHealthService {
             version: versionText?.isEmpty == false ? versionText : nil,
             isInstalled: true,
             isConfigured: commandSucceeded,
-            guidance: commandSucceeded ? nil : installHint
+            guidance: commandSucceeded ? nil : installHint,
+            installCommand: nil
         )
     }
 

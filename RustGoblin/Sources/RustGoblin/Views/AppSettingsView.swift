@@ -16,7 +16,7 @@ struct AppSettingsView: View {
     var body: some View {
         TabView {
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                LazyVStack(alignment: .leading, spacing: 18) {
                     providerDefaultsCard
 
                     ForEach(AIProviderKind.defaultChatProviders) { kind in
@@ -30,7 +30,7 @@ struct AppSettingsView: View {
             }
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                LazyVStack(alignment: .leading, spacing: 18) {
                     ForEach(toolingStatus) { tool in
                         toolingCard(tool)
                     }
@@ -42,7 +42,7 @@ struct AppSettingsView: View {
             }
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                LazyVStack(alignment: .leading, spacing: 18) {
                     exercismSettingsCard
                 }
                 .padding(20)
@@ -206,6 +206,11 @@ struct AppSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            if let command = status.installCommand, !status.isInstalled {
+                installCommandView(command)
+                    .padding(.top, 4)
+            }
         }
     }
 
@@ -241,11 +246,49 @@ struct AppSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            if let command = tool.installCommand, !tool.isInstalled {
+                installCommandView(command)
+                    .padding(.top, 4)
+            }
         }
         .padding(18)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(RustGoblinTheme.Palette.panelFill)
+        )
+    }
+
+    private func installCommandView(_ command: String) -> some View {
+        HStack {
+            Text(command)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            
+            Spacer(minLength: 8)
+            
+            Button {
+                let pb = NSPasteboard.general
+                pb.clearContents()
+                pb.setString(command, forType: .string)
+            } label: {
+                Image(systemName: "doc.on.doc")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
+            .interactivePointer()
+            .help("Copy to clipboard")
+        }
+        .padding(8)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Color(nsColor: .windowBackgroundColor).opacity(0.5))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1)
         )
     }
 

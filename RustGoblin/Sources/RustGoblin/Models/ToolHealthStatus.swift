@@ -9,4 +9,5 @@ struct ToolHealthStatus: Identifiable, Equatable, Sendable {
     let isInstalled: Bool
     let isConfigured: Bool
     let guidance: String?
+    let installCommand: String?
 }
