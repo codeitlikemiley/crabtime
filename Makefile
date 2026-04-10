@@ -20,28 +20,26 @@ release:
 	cp RustGoblin/.build/release/RustGoblin $(MACOS_DIR)/
 
 	@echo "📄 Generating Info.plist..."
-	cat <<EOF > $(APP_BUNDLE)/Contents/Info.plist
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleExecutable</key>
-    <string>RustGoblin</string>
-    <key>CFBundleIdentifier</key>
-    <string>$(BUNDLE_ID)</string>
-    <key>CFBundleName</key>
-    <string>$(APP_NAME)</string>
-    <key>CFBundleVersion</key>
-    <string>$(VERSION)</string>
-    <key>CFBundleShortVersionString</key>
-    <string>$(VERSION)</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>14.0.0</string>
-    <key>NSHighResolutionCapable</key>
-    <true/>
-</dict>
-</plist>
-EOF
+	@echo '<?xml version="1.0" encoding="UTF-8"?>' > $(APP_BUNDLE)/Contents/Info.plist
+	@echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '<plist version="1.0">' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '<dict>' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '    <key>CFBundleExecutable</key>' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '    <string>RustGoblin</string>' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '    <key>CFBundleIdentifier</key>' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '    <string>$(BUNDLE_ID)</string>' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '    <key>CFBundleName</key>' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '    <string>$(APP_NAME)</string>' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '    <key>CFBundleVersion</key>' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '    <string>$(VERSION)</string>' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '    <key>CFBundleShortVersionString</key>' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '    <string>$(VERSION)</string>' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '    <key>LSMinimumSystemVersion</key>' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '    <string>14.0.0</string>' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '    <key>NSHighResolutionCapable</key>' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '    <true/>' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '</dict>' >> $(APP_BUNDLE)/Contents/Info.plist
+	@echo '</plist>' >> $(APP_BUNDLE)/Contents/Info.plist
 
 	@echo "🎨 Generating placeholder icon..."
 	mkdir -p $(RESOURCES_DIR)/AppIcon.iconset
