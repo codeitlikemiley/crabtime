@@ -90,8 +90,17 @@ struct ConsolePanelView: View {
                 switch store.selectedConsoleTab {
                 case .output:
                     ScrollView {
-                        ANSITextView(text: store.consoleOutput.isEmpty ? "Output appears here." : store.consoleOutput)
+                        if store.consoleOutput.isEmpty {
+                            ANSITextView(text: "Output appears here.")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        } else {
+                            LazyVStack(alignment: .leading, spacing: 0) {
+                                ForEach(Array(store.consoleOutput.components(separatedBy: "\n").enumerated()), id: \.offset) { index, line in
+                                    ANSITextView(text: line)
+                                }
+                            }
                             .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                 case .diagnostics:
                     if store.diagnostics.isEmpty {
@@ -103,7 +112,7 @@ struct ConsolePanelView: View {
                     } else {
                         ScrollViewReader { scrollProxy in
                             ScrollView {
-                                VStack(alignment: .leading, spacing: 10) {
+                                LazyVStack(alignment: .leading, spacing: 10) {
                                     ForEach(Array(store.diagnostics.enumerated()), id: \.element.id) { index, diagnostic in
                                         DiagnosticCard(
                                             diagnostic: diagnostic,
@@ -143,11 +152,15 @@ struct ConsolePanelView: View {
                         )
                     } else {
                         ScrollView {
-                            Text(store.sessionLog.joined(separator: "\n"))
-                                .font(.system(.body, design: .monospaced))
-                                .foregroundStyle(RustGoblinTheme.Palette.ink)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .textSelection(.enabled)
+                            LazyVStack(alignment: .leading, spacing: 2) {
+                                ForEach(Array(store.sessionLog.enumerated()), id: \.offset) { index, log in
+                                    Text(log)
+                                        .font(.system(.body, design: .monospaced))
+                                        .foregroundStyle(RustGoblinTheme.Palette.ink)
+                                        .textSelection(.enabled)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                 }

@@ -72,11 +72,13 @@ enum DiagnosticParser {
                 fullMessage += "\n" + contextLines.joined(separator: "\n")
             }
 
-            diagnostics.append(Diagnostic(
-                message: fullMessage,
-                line: lineNumber,
-                severity: severity
-            ))
+            if let lineNumber {
+                diagnostics.append(Diagnostic(
+                    message: fullMessage,
+                    line: lineNumber,
+                    severity: severity
+                ))
+            }
         }
 
         // Deduplicate by message
