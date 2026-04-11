@@ -27,6 +27,18 @@ struct AppStoragePaths: Equatable, Sendable {
         baseURL.appendingPathComponent("baselines", isDirectory: true)
     }
 
+    var logsURL: URL {
+        baseURL.appendingPathComponent("logs", isDirectory: true)
+    }
+
+    var acpLogsURL: URL {
+        logsURL.appendingPathComponent("acp", isDirectory: true)
+    }
+
+    var acpRuntimeURL: URL {
+        baseURL.appendingPathComponent("acp-runtime", isDirectory: true)
+    }
+
     static func live(fileManager: FileManager = .default) -> AppStoragePaths {
         let baseURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("RustGoblin", isDirectory: true)
@@ -44,6 +56,9 @@ struct AppStoragePaths: Equatable, Sendable {
         try fileManager.createDirectory(at: exercismLibraryURL, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: createdWorkspaceLibraryURL, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: baselineLibraryURL, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: logsURL, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: acpLogsURL, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: acpRuntimeURL, withIntermediateDirectories: true)
     }
 
     func containsManagedWorkspace(_ url: URL) -> Bool {

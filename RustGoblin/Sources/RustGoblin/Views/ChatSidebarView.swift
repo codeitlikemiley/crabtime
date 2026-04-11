@@ -73,7 +73,40 @@ struct ChatSidebarView: View {
     }
 
     private var sessionToolbar: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let provider = chatStore.selectedProvider(using: settingsStore)
+        let transport = settingsStore.preference(for: provider).transport
+
+        return VStack(alignment: .leading, spacing: 10) {
+            if let banner = store.aiRuntimeBannerMessage(for: provider, transport: transport) {
+                Button {
+                    store.showAIRuntime()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: transport == .acp ? "bolt.horizontal.circle.fill" : "info.circle")
+                            .foregroundStyle(transport == .acp ? RustGoblinTheme.Palette.cyan : RustGoblinTheme.Palette.textMuted)
+                        Text(banner)
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(RustGoblinTheme.Palette.ink)
+                        Spacer()
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(RustGoblinTheme.Palette.textMuted)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius)
+                            .fill(RustGoblinTheme.Palette.buttonFill)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius)
+                            .stroke(RustGoblinTheme.Palette.divider, lineWidth: 1)
+                    }
+                }
+                .buttonStyle(.plain)
+                .interactivePointer()
+            }
+
             HStack(spacing: 8) {
                 Menu {
                     Picker("Provider", selection: Binding(
@@ -674,7 +707,7 @@ private struct ChatMessageBubble: View {
             }
 
             if message.role == .assistant {
-                MarkdownDocumentView(markdown: message.content, sizingMode: .intrinsicHeight)
+                AssistantMarkdownText(markdown: message.content)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 Text(message.content)
@@ -750,5 +783,34 @@ private struct ChatMessageBubble: View {
         case .error:
             Color.red.opacity(0.12)
         }
+    }
+}
+
+private struct AssistantMarkdownText: View {
+    let markdown: String
+
+    var body: some View {
+        Group {
+            if let rendered = renderedMarkdown {
+                Text(rendered)
+                    .font(.body)
+                    .foregroundStyle(RustGoblinTheme.Palette.ink)
+            } else {
+                Text(markdown)
+                    .font(.body)
+                    .foregroundStyle(RustGoblinTheme.Palette.ink)
+            }
+        }
+        .textSelection(.enabled)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var renderedMarkdown: AttributedString? {
+        try? AttributedString(
+            markdown: markdown,
+            options: AttributedString.MarkdownParsingOptions(
+                interpretedSyntax: .inlineOnlyPreservingWhitespace
+            )
+        )
     }
 }

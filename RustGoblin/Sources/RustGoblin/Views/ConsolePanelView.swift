@@ -43,6 +43,15 @@ struct ConsolePanelView: View {
                         store.selectConsoleTab(.session)
                     }
 
+                    ConsoleTabButton(
+                        title: "AI Runtime",
+                        isSelected: store.selectedConsoleTab == .aiRuntime,
+                        badgeText: store.aiRuntimeToolCalls.isEmpty ? nil : "\(store.aiRuntimeToolCalls.count)",
+                        accentColor: store.aiRuntimeTransport == .acp ? RustGoblinTheme.Palette.cyan : RustGoblinTheme.Palette.textMuted
+                    ) {
+                        store.selectConsoleTab(.aiRuntime)
+                    }
+
                     // Copy session log to clipboard when session tab is active
                     if store.selectedConsoleTab == .session && !store.sessionLog.isEmpty {
                         Button {
@@ -62,6 +71,26 @@ struct ConsolePanelView: View {
                         .buttonStyle(.plain)
                         .interactivePointer()
                         .help("Copy session log to clipboard")
+                    }
+
+                    if store.selectedConsoleTab == .aiRuntime && !store.aiRuntimeEvents.isEmpty {
+                        Button {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(
+                                store.aiRuntimeEvents.joined(separator: "\n"),
+                                forType: .string
+                            )
+                        } label: {
+                            Image(systemName: "doc.on.clipboard")
+                                .font(.system(size: 11, weight: .semibold))
+                                .frame(width: 30, height: 30)
+                                .background(Capsule().fill(RustGoblinTheme.Palette.buttonFill))
+                                .overlay { Capsule().stroke(RustGoblinTheme.Palette.divider, lineWidth: 1) }
+                                .foregroundStyle(RustGoblinTheme.Palette.ink)
+                        }
+                        .buttonStyle(.plain)
+                        .interactivePointer()
+                        .help("Copy AI runtime events to clipboard")
                     }
 
                     IconGlassButton(
@@ -163,6 +192,8 @@ struct ConsolePanelView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
+                case .aiRuntime:
+                    AIRuntimeConsoleView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -178,6 +209,210 @@ struct ConsolePanelView: View {
         }
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .paneCard()
+    }
+}
+
+private struct AIRuntimeConsoleView: View {
+    @Environment(WorkspaceStore.self) private var store
+
+    var body: some View {
+        if store.aiRuntimeEvents.isEmpty && store.aiRuntimeToolCalls.isEmpty && store.aiRuntimeTransport == nil {
+            WorkspaceEmptyStateView(
+                title: "No AI Runtime Activity",
+                systemImage: "bolt.horizontal.circle",
+                description: "ACP auth state, warm session details, and live tool calls will appear here when chat starts."
+            )
+        } else {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 14) {
+                    runtimeSummaryCard
+                    runtimeActions
+
+                    if !store.aiRuntimeToolCalls.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Tool Calls")
+                                .font(.headline.weight(.bold))
+                                .foregroundStyle(RustGoblinTheme.Palette.ink)
+
+                            ForEach(store.aiRuntimeToolCalls) { tool in
+                                toolCallCard(tool)
+                            }
+                        }
+                    }
+
+                    if !store.aiRuntimeEvents.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Runtime Events")
+                                .font(.headline.weight(.bold))
+                                .foregroundStyle(RustGoblinTheme.Palette.ink)
+
+                            ForEach(Array(store.aiRuntimeEvents.enumerated()), id: \.offset) { _, event in
+                                Text(event)
+                                    .font(.system(.body, design: .monospaced))
+                                    .foregroundStyle(RustGoblinTheme.Palette.ink)
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.vertical, 2)
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private var runtimeSummaryCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Current Runtime")
+                .font(.headline.weight(.bold))
+                .foregroundStyle(RustGoblinTheme.Palette.ink)
+
+            runtimeRow("Provider", store.aiRuntimeProviderTitle)
+            runtimeRow("Transport", store.aiRuntimeTransport?.title ?? "Unknown")
+            runtimeRow("Model", store.aiRuntimeModel.isEmpty ? "Unknown" : store.aiRuntimeModel)
+            runtimeRow("Process", store.aiRuntimeProcessStatus)
+            runtimeRow("Auth", store.aiRuntimeAuthStatus)
+            runtimeRow("Session", store.aiRuntimeSessionID ?? "None")
+
+            if let logPath = store.aiRuntimeLogPath {
+                runtimeRow("Logs", logPath)
+            }
+            if let lastError = store.aiRuntimeLastError, !lastError.isEmpty {
+                runtimeRow("Last Error", lastError)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius)
+                .fill(RustGoblinTheme.Palette.subtleFill)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius)
+                .stroke(RustGoblinTheme.Palette.divider, lineWidth: 1)
+        }
+    }
+
+    private var runtimeActions: some View {
+        HStack(spacing: 8) {
+            Button("Reconnect ACP") {
+                store.reconnectCurrentAITransport()
+            }
+            .disabled(store.aiRuntimeTransport != .acp)
+
+            Button("Reset Warm Session") {
+                store.resetCurrentWarmAISession()
+            }
+            .disabled(store.aiRuntimeTransport != .acp)
+
+            Button("Open ACP Logs") {
+                store.openAIRuntimeLogs()
+            }
+            .disabled(store.aiRuntimeLogPath == nil)
+
+            Button("Copy Runtime Report") {
+                copyToPasteboard(runtimeReportText)
+            }
+            .disabled(runtimeReportText.isEmpty)
+        }
+        .buttonStyle(.bordered)
+    }
+
+    private var runtimeReportText: String {
+        var lines: [String] = [
+            "Provider: \(store.aiRuntimeProviderTitle)",
+            "Transport: \(store.aiRuntimeTransport?.title ?? "Unknown")",
+            "Model: \(store.aiRuntimeModel.isEmpty ? "Unknown" : store.aiRuntimeModel)",
+            "Process: \(store.aiRuntimeProcessStatus)",
+            "Auth: \(store.aiRuntimeAuthStatus)",
+            "Session: \(store.aiRuntimeSessionID ?? "None")"
+        ]
+
+        if let logPath = store.aiRuntimeLogPath, !logPath.isEmpty {
+            lines.append("Logs: \(logPath)")
+        }
+        if let lastError = store.aiRuntimeLastError, !lastError.isEmpty {
+            lines.append("Last Error: \(lastError)")
+        }
+        if !store.aiRuntimeToolCalls.isEmpty {
+            lines.append("")
+            lines.append("Tool Calls:")
+            lines.append(contentsOf: store.aiRuntimeToolCalls.map { "\($0.title) [\($0.status)] \($0.id)" })
+        }
+        if !store.aiRuntimeEvents.isEmpty {
+            lines.append("")
+            lines.append("Runtime Events:")
+            lines.append(contentsOf: store.aiRuntimeEvents)
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    private func copyToPasteboard(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    private func runtimeRow(_ title: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(title)
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(RustGoblinTheme.Palette.textMuted)
+                .frame(width: 74, alignment: .leading)
+
+            Text(value)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundStyle(RustGoblinTheme.Palette.ink)
+                .textSelection(.enabled)
+        }
+    }
+
+    private func toolCallCard(_ tool: AIToolCallSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(tool.title)
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(RustGoblinTheme.Palette.ink)
+
+                Spacer()
+
+                Text(tool.status)
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(statusColor(tool.status))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(statusColor(tool.status).opacity(0.14)))
+            }
+
+            Text(tool.id)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(RustGoblinTheme.Palette.textMuted)
+                .textSelection(.enabled)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius)
+                .fill(RustGoblinTheme.Palette.subtleFill)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: RustGoblinTheme.Layout.subpanelRadius)
+                .stroke(RustGoblinTheme.Palette.divider, lineWidth: 1)
+        }
+    }
+
+    private func statusColor(_ status: String) -> Color {
+        switch status.lowercased() {
+        case "completed", "complete", "finished", "succeeded":
+            RustGoblinTheme.Palette.moss
+        case "failed", "error":
+            .red
+        case "started", "pending", "in_progress", "running", "updated":
+            RustGoblinTheme.Palette.cyan
+        default:
+            RustGoblinTheme.Palette.ember
+        }
     }
 }
 

@@ -5,13 +5,13 @@ struct AppSettingsView: View {
     @Environment(AIModelCatalogStore.self) private var modelCatalogStore
     @AppStorage("cachedToolingStatus") private var cachedToolingStatusData: Data = Data()
 
-
     @State private var toolingStatus: [ToolHealthStatus] = []
     @State private var secretDrafts: [String: String] = [:]
     @State private var isExercismConfiguring = false
     @State private var exercismConfiguredSuccessfully: Bool? = nil
     @State private var exercismConfigError: String? = nil
 
+    private let appPaths = AppStoragePaths.live()
     private let credentialStore = CredentialStore()
     private let toolingHealthService = ToolingHealthService()
 
@@ -146,6 +146,43 @@ struct AppSettingsView: View {
             }
 
             if kind.isCLI {
+                if kind.supportsACPTransport {
+                    HStack(alignment: .center, spacing: 12) {
+                        Text("Transport")
+                            .font(.footnote.weight(.semibold))
+                            .frame(width: 90, alignment: .leading)
+
+                        Picker("Transport", selection: Binding(
+                            get: { settingsStore.preference(for: kind).transport },
+                            set: { settingsStore.updateTransport($0, for: kind) }
+                        )) {
+                            Text(AITransportKind.legacyCLI.title).tag(AITransportKind.legacyCLI)
+                            Text(AITransportKind.acp.title).tag(AITransportKind.acp)
+                        }
+                        .pickerStyle(.segmented)
+                    }
+
+                    Text(settingsStore.preference(for: kind).transport.summary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    if let acpHint = kind.acpHint {
+                        Text(acpHint)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if settingsStore.preference(for: kind).transport == .acp {
+                        Text(acpExecutableStatusText(for: kind))
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+
+                        Text("ACP logs: \(appPaths.acpLogsURL.path)")
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 if let status {
                     providerStatusRow(status)
                 }
@@ -307,6 +344,18 @@ struct AppSettingsView: View {
         case .openAI, .anthropic, .geminiAPI, .openRouter:
             nil
         }
+    }
+
+    private func acpExecutableStatusText(for kind: AIProviderKind) -> String {
+        guard let executableName = kind.acpExecutableName else {
+            return "ACP is not available for \(kind.title)."
+        }
+
+        if let executableURL = ToolingHealthService.resolveExecutable(named: executableName) {
+            return "ACP executable: \(executableURL.path)"
+        }
+
+        return "ACP executable missing: \(executableName)"
     }
 
     private var exercismSettingsCard: some View {

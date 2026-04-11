@@ -109,14 +109,34 @@ final class ChatStore {
     }
 
     func updateSelectedProvider(_ provider: AIProviderKind, using store: WorkspaceStore, settingsStore: AISettingsStore) {
+        let previousProvider = selectedSession?.providerKind
         settingsStore.setDefaultProvider(provider)
 
         guard var session = selectedSession else {
             return
         }
 
+        // Shut down the old provider's ACP connections if switching away from it
+        if let previousProvider, previousProvider != provider {
+            let oldTransport = settingsStore.preference(for: previousProvider).transport
+            if oldTransport == .acp {
+                Task {
+                    await providerManager.shutdownProvider(
+                        previousProvider,
+                        reason: "provider switched to \(provider.title)",
+                        eventSink: { event in
+                            Task { @MainActor in
+                                store.handleAITransportEvent(event)
+                            }
+                        }
+                    )
+                }
+            }
+        }
+
         session.providerKind = provider
         session.model = settingsStore.preference(for: provider).model
+        session.backendSessionID = nil
         session.updatedAt = Date()
 
         do {
@@ -165,6 +185,44 @@ final class ChatStore {
             store.persistChatSelection()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    func resetSelectedWarmSession(using store: WorkspaceStore) {
+        guard var session = selectedSession else {
+            return
+        }
+
+        session.backendSessionID = nil
+        session.updatedAt = Date()
+
+        do {
+            try database.upsertChatSession(session)
+            replaceSession(session)
+            store.handleAITransportEvent(.note(provider: session.providerKind, message: "Warm ACP session reset. The next send will create a new session."))
+            store.persistChatSelection()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func reconnectSelectedACP(using store: WorkspaceStore) {
+        guard let session = selectedSession else {
+            return
+        }
+
+        Task {
+            await providerManager.restartACPConnection(
+                session: session,
+                eventSink: { event in
+                    Task { @MainActor in
+                        store.handleAITransportEvent(event)
+                    }
+                }
+            )
+            await MainActor.run {
+                store.handleAITransportEvent(.note(provider: session.providerKind, message: "ACP connection restarted."))
+            }
         }
     }
 
@@ -219,21 +277,44 @@ final class ChatStore {
                 updatedSession.updatedAt = Date()
                 try database.upsertChatSession(updatedSession)
 
+                let transport = await MainActor.run {
+                    providerManager.settingsStore.preference(for: updatedSession.providerKind).transport
+                }
+                await MainActor.run {
+                    store.handleAITransportEvent(
+                        .transportSelected(
+                            provider: updatedSession.providerKind,
+                            transport: transport,
+                            model: updatedSession.model
+                        )
+                    )
+                }
+
                 let context = contextBuilder.build(from: store)
                 let reply = try await providerManager.sendMessage(
                     session: updatedSession,
                     messages: messages + [outgoingMessage],
-                    context: context
+                    context: context,
+                    eventSink: { event in
+                        Task { @MainActor in
+                            store.handleAITransportEvent(event)
+                        }
+                    }
                 )
+                updatedSession.backendSessionID = reply.backendSessionID ?? updatedSession.backendSessionID
 
-                let assistantMessage = ExerciseChatMessage(sessionID: updatedSession.id, role: .assistant, content: reply)
+                let assistantMessage = ExerciseChatMessage(sessionID: updatedSession.id, role: .assistant, content: reply.content)
                 try database.insertChatMessage(assistantMessage)
+                try database.upsertChatSession(updatedSession)
 
                 await MainActor.run {
                     replaceSession(updatedSession)
                     messages.append(assistantMessage)
                     isSending = false
                     store.selectedChatSessionID = updatedSession.id
+                    if reply.didRecoverStaleSession {
+                        store.handleAITransportEvent(.note(provider: updatedSession.providerKind, message: "Recovered from stale ACP session without clearing chat history."))
+                    }
                     store.persistChatSelection()
                 }
             } catch {
@@ -253,7 +334,19 @@ final class ChatStore {
                     if let errorMessage {
                         self.messages.append(errorMessage)
                     }
-                    self.errorMessage = error.localizedDescription
+                    let failedProvider = selectedSession?.providerKind ?? providerManager.settingsStore.defaultProvider
+                    let isACP = providerManager.transport(for: failedProvider) == .acp
+                    if isACP {
+                        store.handleAITransportEvent(.transportError(
+                            provider: failedProvider,
+                            message: error.localizedDescription,
+                            logFilePath: store.aiRuntimeLogPath
+                        ))
+                        store.selectConsoleTab(.aiRuntime)
+                        self.errorMessage = "ACP chat failed. Open AI Runtime for status and logs. \(error.localizedDescription)"
+                    } else {
+                        self.errorMessage = error.localizedDescription
+                    }
                     self.isSending = false
                 }
             }

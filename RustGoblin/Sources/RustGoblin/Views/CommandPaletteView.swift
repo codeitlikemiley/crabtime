@@ -147,6 +147,13 @@ struct CommandPaletteView: View {
                 shortcut: "⇧⌘S",
                 keywords: ["session", "log", "history", "tab"]
             ),
+            PaletteCommand(
+                id: "show_ai_runtime_tab",
+                title: "Show AI Runtime Tab",
+                icon: "bolt.horizontal.circle",
+                shortcut: "⇧⌘A",
+                keywords: ["ai", "runtime", "acp", "tools", "auth", "tab"]
+            ),
 
             // Workspace Actions
             PaletteCommand(
@@ -563,6 +570,8 @@ struct CommandPaletteView: View {
             store.selectConsoleTab(.diagnostics)
         case "show_session_tab":
             store.selectConsoleTab(.session)
+        case "show_ai_runtime_tab":
+            store.selectConsoleTab(.aiRuntime)
 
         // Workspace actions
         case "run_exercise":

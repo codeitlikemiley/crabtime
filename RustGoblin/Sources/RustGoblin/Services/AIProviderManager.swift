@@ -3,12 +3,27 @@ import Foundation
 struct AIProviderManager {
     let settingsStore: AISettingsStore
     let credentialStore: CredentialStore
+    let acpService: ACPTransportService
+
+    init(
+        settingsStore: AISettingsStore,
+        credentialStore: CredentialStore,
+        appPaths: AppStoragePaths = .live()
+    ) {
+        self.settingsStore = settingsStore
+        self.credentialStore = credentialStore
+        self.acpService = ACPTransportService(appPaths: appPaths, credentialStore: credentialStore)
+    }
 
     func sendMessage(
         session: ExerciseChatSession,
         messages: [ExerciseChatMessage],
-        context: String
-    ) async throws -> String {
+        context: String,
+        eventSink: (@Sendable (AITransportEvent) -> Void)? = nil
+    ) async throws -> AIProviderReply {
+        let selectedTransport = await MainActor.run {
+            settingsStore.preference(for: session.providerKind).transport
+        }
         let transcript = renderTranscript(messages: messages)
         let prompt = """
         \(context)
@@ -21,19 +36,52 @@ struct AIProviderManager {
 
         switch session.providerKind {
         case .codexCLI:
-            return try await runCLI(
+            if selectedTransport == .acp {
+                return try await sendACPMessage(
+                    session: session,
+                    messages: messages,
+                    context: context,
+                    eventSink: eventSink
+                )
+            }
+            return AIProviderReply(
+                content: try await runCLI(
                 command: "codex",
                 arguments: ["exec", "-", "--skip-git-repo-check", "--json", "-m", session.model],
                 stdin: Data(prompt.utf8)
             )
+            )
         case .geminiCLI:
-            return try await runCLI(command: "gemini", arguments: ["-p", prompt, "-m", session.model])
+            if selectedTransport == .acp {
+                return try await sendACPMessage(
+                    session: session,
+                    messages: messages,
+                    context: context,
+                    eventSink: eventSink
+                )
+            }
+            return AIProviderReply(
+                content: try await runCLI(command: "gemini", arguments: ["-p", prompt, "-m", session.model])
+            )
         case .claudeCLI:
-            return try await runCLI(command: "claude", arguments: ["-p", prompt, "--output-format", "text", "--model", session.model])
+            return AIProviderReply(
+                content: try await runCLI(command: "claude", arguments: ["-p", prompt, "--output-format", "text", "--model", session.model])
+            )
         case .openCodeCLI:
-            return try await runCLI(command: "opencode", arguments: ["run", prompt, "-m", session.model])
+            if selectedTransport == .acp {
+                return try await sendACPMessage(
+                    session: session,
+                    messages: messages,
+                    context: context,
+                    eventSink: eventSink
+                )
+            }
+            return AIProviderReply(
+                content: try await runCLI(command: "opencode", arguments: ["run", prompt, "-m", session.model])
+            )
         case .openAI:
-            return try await sendOpenAICompatibleMessage(
+            return AIProviderReply(
+                content: try await sendOpenAICompatibleMessage(
                 endpoint: URL(string: "https://api.openai.com/v1/chat/completions")!,
                 apiKey: try apiKey(for: .openAI),
                 model: session.model,
@@ -41,8 +89,10 @@ struct AIProviderManager {
                 messages: messages,
                 isOpenRouter: false
             )
+            )
         case .openRouter:
-            return try await sendOpenAICompatibleMessage(
+            return AIProviderReply(
+                content: try await sendOpenAICompatibleMessage(
                 endpoint: URL(string: "https://openrouter.ai/api/v1/chat/completions")!,
                 apiKey: try apiKey(for: .openRouter),
                 model: session.model,
@@ -50,18 +100,23 @@ struct AIProviderManager {
                 messages: messages,
                 isOpenRouter: true
             )
+            )
         case .anthropic:
-            return try await sendAnthropicMessage(
+            return AIProviderReply(
+                content: try await sendAnthropicMessage(
                 apiKey: try apiKey(for: .anthropic),
                 model: session.model,
                 systemPrompt: context,
                 messages: messages
             )
+            )
         case .geminiAPI:
-            return try await sendGeminiAPIMessage(
+            return AIProviderReply(
+                content: try await sendGeminiAPIMessage(
                 apiKey: try apiKey(for: .geminiAPI),
                 model: session.model,
                 prompt: prompt
+            )
             )
         }
     }
@@ -89,12 +144,48 @@ struct AIProviderManager {
             session: session,
             messages: [message],
             context: systemPrompt
-        )
+        ).content
     }
 
     @MainActor
     func displayModel(for kind: AIProviderKind) -> String {
         settingsStore.preference(for: kind).model
+    }
+
+    @MainActor
+    func transport(for kind: AIProviderKind) -> AITransportKind {
+        settingsStore.preference(for: kind).transport
+    }
+
+    func restartACPConnection(
+        session: ExerciseChatSession,
+        eventSink: (@Sendable (AITransportEvent) -> Void)? = nil
+    ) async {
+        let isACP = await MainActor.run {
+            settingsStore.preference(for: session.providerKind).transport == .acp
+        }
+        guard isACP else {
+            return
+        }
+
+        await acpService.restartConnection(
+            provider: session.providerKind,
+            model: session.model,
+            workspaceRootPath: session.workspaceRootPath,
+            eventSink: eventSink
+        )
+    }
+
+    func shutdownProvider(
+        _ provider: AIProviderKind,
+        reason: String,
+        eventSink: (@Sendable (AITransportEvent) -> Void)? = nil
+    ) async {
+        await acpService.shutdownConnectionsForProvider(
+            provider,
+            reason: reason,
+            eventSink: eventSink
+        )
     }
 
     private func apiKey(for kind: AIProviderKind) throws -> String {
@@ -140,6 +231,28 @@ struct AIProviderManager {
             return fallback
         }
         return output
+    }
+
+    private func sendACPMessage(
+        session: ExerciseChatSession,
+        messages: [ExerciseChatMessage],
+        context: String,
+        eventSink: (@Sendable (AITransportEvent) -> Void)?
+    ) async throws -> AIProviderReply {
+        let prompt = renderACPPrompt(
+            session: session,
+            messages: messages,
+            context: context
+        )
+
+        return try await acpService.sendMessage(
+            provider: session.providerKind,
+            model: session.model,
+            workspaceRootPath: session.workspaceRootPath,
+            existingSessionID: session.backendSessionID,
+            prompt: prompt,
+            eventSink: eventSink
+        )
     }
 
     private func sendOpenAICompatibleMessage(
@@ -316,6 +429,34 @@ struct AIProviderManager {
             }
         }
         return output.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func renderACPPrompt(
+        session: ExerciseChatSession,
+        messages: [ExerciseChatMessage],
+        context: String
+    ) -> String {
+        let latestUserMessage = messages.last(where: { $0.role == .user })?.content ?? ""
+
+        if session.backendSessionID == nil {
+            return """
+            \(context)
+
+            Conversation so far:
+            \(renderTranscript(messages: messages))
+
+            Respond to the latest user message as a concise, technically correct tutor. Use markdown when helpful.
+            """
+        }
+
+        return """
+        \(context)
+
+        Latest user message:
+        \(latestUserMessage)
+
+        Use the session history you already have. Respond as a concise, technically correct tutor. Use markdown when helpful.
+        """
     }
 }
 

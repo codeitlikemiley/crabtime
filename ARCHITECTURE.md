@@ -27,3 +27,13 @@ The app implements a flexible `AIProviderManager` resolving context via strategy
 - Present diagnostic outputs or compiler failures.
 
 This deeply embeds prompt-engineering directly into the IDE workflow.
+
+### ACP Session Transport
+CLI-backed providers can now run through either the legacy one-shot command path or an ACP-backed persistent session path.
+
+- **Transport toggle**: Each eligible CLI provider exposes a settings toggle between the current cold-start implementation and ACP.
+- **Warm sessions**: ACP sessions persist the remote `sessionId` in `ExerciseChatSession.backendSessionID`, allowing later turns to reuse the same agent session instead of reinitializing the CLI every time.
+- **Cross-client adapter model**: Native ACP clients such as Gemini CLI and OpenCode launch directly through their ACP entrypoints, while providers like Codex can be supported through ACP adapters such as `codex-acp`.
+- **Debugging and logging**: Raw ACP traffic and agent stderr are written under `~/Library/Application Support/RustGoblin/logs/acp/`, and high-level session/tool-call events are surfaced in the existing Session console.
+- **In-app runtime panel**: The Console now includes an `AI Runtime` tab that exposes the active provider, transport, auth state, warm session ID, ACP log location, and live tool-call updates.
+- **Auth and permissions**: The ACP transport negotiates `initialize`, retries `authenticate` on auth-related failures, and handles `session/request_permission` by prompting the user through a native alert.

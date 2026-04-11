@@ -42,6 +42,11 @@ final class DependencyManager: @unchecked Sendable {
     var defaultEnvironment: [String: String] {
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = augmentedPath
+        env["HOME"] = env["HOME"] ?? FileManager.default.homeDirectoryForCurrentUser.path
+        env["USER"] = env["USER"] ?? NSUserName()
+        env["LOGNAME"] = env["LOGNAME"] ?? NSUserName()
+        env["SHELL"] = env["SHELL"] ?? "/bin/zsh"
+        env["TMPDIR"] = env["TMPDIR"] ?? NSTemporaryDirectory()
         return env
     }
     

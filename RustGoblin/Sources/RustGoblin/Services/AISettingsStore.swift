@@ -34,6 +34,12 @@ final class AISettingsStore {
         }
     }
 
+    func updateTransport(_ transport: AITransportKind, for kind: AIProviderKind) {
+        updatePreference(for: kind) { preference in
+            preference.transport = transport
+        }
+    }
+
     func setDefaultProvider(_ kind: AIProviderKind) {
         defaultProvider = kind
         defaults.set(kind.rawValue, forKey: defaultProviderKey)

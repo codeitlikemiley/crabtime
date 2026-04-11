@@ -32,6 +32,7 @@ The resulting `RustGoblin.app` bundle will exist in `.build/release/`.
 
 ## Features
 - **Integrated AI Chat**: Built-in support for Anthropic (Claude 3.5 Sonnet) and OpenAI, grounded exclusively against your active workspace, current diagnostics, and task domain context.
+- **ACP Session Reuse**: Gemini CLI and OpenCode can run through ACP-backed warm sessions so the first load is cold, then follow-up turns reuse the same agent session.
 - **Dependency Manager Wizard**: Installs Rust tooling seamlessly on startup for an out-of-the-box learning experience.
 - **Exercism integration**: One-click download of assignments, and integrated submission straight from the editor.
 - **Fast UI**: Built entirely in native Swift/AppKit overlaying a highly robust source editor framework.

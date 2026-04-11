@@ -34,7 +34,8 @@ final class AppServices {
         modelCatalogStore = AIModelCatalogStore()
         providerManager = AIProviderManager(
             settingsStore: aiSettingsStore,
-            credentialStore: CredentialStore()
+            credentialStore: CredentialStore(),
+            appPaths: appPaths
         )
     }
 }
@@ -251,6 +252,10 @@ struct RustGoblinAppCommands: Commands {
 
             Button("Show Session Tab") { workspaceStore?.selectConsoleTab(.session) }
                 .keyboardShortcut("s", modifiers: [.command, .shift])
+                .disabled(workspaceStore == nil)
+
+            Button("Show AI Runtime Tab") { workspaceStore?.selectConsoleTab(.aiRuntime) }
+                .keyboardShortcut("a", modifiers: [.command, .shift])
                 .disabled(workspaceStore == nil)
 
             Button("Show TODO Explorer") { workspaceStore?.showTodoAndFocus() }

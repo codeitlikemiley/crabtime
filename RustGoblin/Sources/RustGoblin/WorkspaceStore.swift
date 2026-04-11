@@ -58,6 +58,17 @@ final class WorkspaceStore {
         }
     }
     var sessionLog: [String] = []
+    var aiRuntimeProviderTitle: String = "No AI activity yet"
+    var aiRuntimeModel: String = ""
+    var aiRuntimeTransport: AITransportKind?
+    var aiRuntimeSessionID: String?
+    var aiRuntimeProcessStatus: String = "Idle"
+    var aiRuntimeAuthStatus: String = "Idle"
+    var aiRuntimeLogPath: String?
+    var aiRuntimeLastEvent: String?
+    var aiRuntimeLastError: String?
+    var aiRuntimeEvents: [String] = []
+    var aiRuntimeToolCalls: [AIToolCallSnapshot] = []
     var diagnostics: [Diagnostic] = []
     var selectedDiagnosticIndex: Int = 0
     var selectedConsoleTab: ConsoleTab = .output
@@ -928,6 +939,110 @@ final class WorkspaceStore {
         if selectedConsoleTab != .output {
             selectedConsoleTab = .output
         }
+    }
+
+    func appendAISessionMessage(_ message: String) {
+        appendSessionMessage("AI  \(message)")
+    }
+
+    func handleAITransportEvent(_ event: AITransportEvent) {
+        switch event {
+        case .transportSelected(let provider, let transport, let model):
+            aiRuntimeEvents = []
+            aiRuntimeToolCalls = []
+            aiRuntimeProviderTitle = provider.title
+            aiRuntimeTransport = transport
+            aiRuntimeModel = model
+            aiRuntimeSessionID = nil
+            aiRuntimeProcessStatus = transport == .acp ? "Launching" : "Not applicable"
+            aiRuntimeAuthStatus = transport == .acp ? "Waiting" : "Not applicable"
+            aiRuntimeLogPath = nil
+            aiRuntimeLastEvent = nil
+            aiRuntimeLastError = nil
+            appendAIRuntimeEvent("\(provider.shortTitle) using \(transport.title) with \(model)")
+        case .processState(let provider, let status, let logFilePath):
+            aiRuntimeProviderTitle = provider.title
+            aiRuntimeProcessStatus = status
+            aiRuntimeLogPath = logFilePath ?? aiRuntimeLogPath
+            appendAIRuntimeEvent(status)
+        case .sessionReady(let provider, _, let sessionID, let reused, let logFilePath):
+            aiRuntimeProviderTitle = provider.title
+            aiRuntimeSessionID = sessionID
+            aiRuntimeProcessStatus = "Connected"
+            aiRuntimeAuthStatus = "Ready"
+            aiRuntimeLogPath = logFilePath
+            appendAIRuntimeEvent(reused ? "Reused ACP session \(sessionID)" : "Created ACP session \(sessionID)")
+        case .authState(let provider, let status):
+            aiRuntimeProviderTitle = provider.title
+            aiRuntimeAuthStatus = status
+            appendAIRuntimeEvent(status)
+        case .transportError(let provider, let message, let logFilePath):
+            aiRuntimeProviderTitle = provider.title
+            aiRuntimeProcessStatus = "Failed"
+            aiRuntimeLastError = message
+            aiRuntimeLogPath = logFilePath ?? aiRuntimeLogPath
+            appendAIRuntimeEvent("Error: \(message)")
+        case .toolCall(let provider, let id, let title, let status):
+            aiRuntimeProviderTitle = provider.title
+            updateAIToolCall(id: id, title: title, status: status)
+            appendAIRuntimeEvent("Tool \(title) [\(status)]")
+        case .note(let provider, let message):
+            aiRuntimeProviderTitle = provider.title
+            appendAIRuntimeEvent(message)
+        }
+    }
+
+    func aiRuntimeBannerMessage(for provider: AIProviderKind, transport: AITransportKind) -> String? {
+        guard transport == .acp, aiRuntimeProviderTitle == provider.title else {
+            return nil
+        }
+
+        if let aiRuntimeLastError, !aiRuntimeLastError.isEmpty {
+            return "ACP unavailable. Open AI Runtime."
+        }
+        if aiRuntimeAuthStatus.localizedCaseInsensitiveContains("fail") {
+            return "ACP auth failed. Open AI Runtime."
+        }
+        if aiRuntimeAuthStatus.localizedCaseInsensitiveContains("authenticating") {
+            return "ACP authenticating…"
+        }
+        if let aiRuntimeLastEvent, aiRuntimeLastEvent.localizedCaseInsensitiveContains("invalid") {
+            return "Stale session recovered. Open AI Runtime."
+        }
+        if aiRuntimeSessionID != nil {
+            return "ACP healthy. Session warm."
+        }
+        return "ACP enabled. First send will cold start."
+    }
+
+    func showAIRuntime() {
+        selectConsoleTab(.aiRuntime)
+    }
+
+    func reconnectCurrentAITransport() {
+        guard aiRuntimeTransport == .acp else {
+            return
+        }
+        chatStore?.reconnectSelectedACP(using: self)
+    }
+
+    func resetCurrentWarmAISession() {
+        guard aiRuntimeTransport == .acp else {
+            return
+        }
+        aiRuntimeSessionID = nil
+        aiRuntimeToolCalls = []
+        aiRuntimeLastError = nil
+        aiRuntimeProcessStatus = "Idle"
+        chatStore?.resetSelectedWarmSession(using: self)
+    }
+
+    func openAIRuntimeLogs() {
+        guard let aiRuntimeLogPath else {
+            return
+        }
+        let url = URL(fileURLWithPath: aiRuntimeLogPath)
+        NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
     func selectConsoleTab(_ tab: ConsoleTab) {
@@ -3221,6 +3336,33 @@ final class WorkspaceStore {
         )
         if sessionLog.count > 4000 {
             sessionLog.removeLast(sessionLog.count - 4000)
+        }
+    }
+
+    private func appendAIRuntimeEvent(_ message: String) {
+        let stamped = "\(Date().formatted(date: .omitted, time: .shortened))  \(message)"
+        aiRuntimeLastEvent = stamped
+        aiRuntimeEvents.insert(stamped, at: 0)
+        if aiRuntimeEvents.count > 200 {
+            aiRuntimeEvents.removeLast(aiRuntimeEvents.count - 200)
+        }
+        appendAISessionMessage(message)
+    }
+
+    private func updateAIToolCall(id: String, title: String, status: String) {
+        if let index = aiRuntimeToolCalls.firstIndex(where: { $0.id == id }) {
+            aiRuntimeToolCalls[index].title = title
+            aiRuntimeToolCalls[index].status = status
+            aiRuntimeToolCalls[index].updatedAt = Date()
+            return
+        }
+
+        aiRuntimeToolCalls.insert(
+            AIToolCallSnapshot(id: id, title: title, status: status, updatedAt: Date()),
+            at: 0
+        )
+        if aiRuntimeToolCalls.count > 40 {
+            aiRuntimeToolCalls.removeLast(aiRuntimeToolCalls.count - 40)
         }
     }
 

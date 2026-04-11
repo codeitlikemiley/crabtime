@@ -127,6 +127,86 @@ final class WorkspaceStoreTests: XCTestCase {
         XCTAssertEqual(store.visibleExercises.map(\.title), ["Variables One", "Variables Two"])
     }
 
+    func testAIRuntimeEventsUpdateStructuredState() {
+        let store = WorkspaceStore(appPaths: .temporary(rootName: UUID().uuidString))
+
+        store.handleAITransportEvent(
+            .transportSelected(provider: .geminiCLI, transport: .acp, model: "gemini-2.5-pro")
+        )
+        store.handleAITransportEvent(
+            .sessionReady(
+                provider: .geminiCLI,
+                transport: .acp,
+                sessionID: "session-123",
+                reused: false,
+                logFilePath: "/tmp/acp.log"
+            )
+        )
+        store.handleAITransportEvent(
+            .toolCall(provider: .geminiCLI, id: "tool-1", title: "Read file", status: "completed")
+        )
+
+        XCTAssertEqual(store.aiRuntimeProviderTitle, AIProviderKind.geminiCLI.title)
+        XCTAssertEqual(store.aiRuntimeTransport, .acp)
+        XCTAssertEqual(store.aiRuntimeModel, "gemini-2.5-pro")
+        XCTAssertEqual(store.aiRuntimeSessionID, "session-123")
+        XCTAssertEqual(store.aiRuntimeAuthStatus, "Ready")
+        XCTAssertEqual(store.aiRuntimeLogPath, "/tmp/acp.log")
+        XCTAssertEqual(store.aiRuntimeToolCalls.first?.title, "Read file")
+        XCTAssertEqual(store.aiRuntimeToolCalls.first?.status, "completed")
+        XCTAssertFalse(store.aiRuntimeEvents.isEmpty)
+    }
+
+    func testAIRuntimeErrorUpdatesFailureState() {
+        let store = WorkspaceStore(appPaths: .temporary(rootName: UUID().uuidString))
+
+        store.handleAITransportEvent(
+            .transportError(provider: .openCodeCLI, message: "ACP process exited", logFilePath: "/tmp/opencode.log")
+        )
+
+        XCTAssertEqual(store.aiRuntimeProviderTitle, AIProviderKind.openCodeCLI.title)
+        XCTAssertEqual(store.aiRuntimeProcessStatus, "Failed")
+        XCTAssertEqual(store.aiRuntimeLastError, "ACP process exited")
+        XCTAssertEqual(store.aiRuntimeLogPath, "/tmp/opencode.log")
+    }
+
+    func testResetSelectedWarmSessionClearsBackendSessionID() throws {
+        let defaults = UserDefaults(suiteName: "WorkspaceStoreTests.reset.\(UUID().uuidString)")!
+        let appPaths = AppStoragePaths.temporary(rootName: UUID().uuidString)
+        let database = try WorkspaceLibraryDatabase(paths: appPaths)
+        let settingsStore = AISettingsStore(defaults: defaults)
+        let providerManager = AIProviderManager(
+            settingsStore: settingsStore,
+            credentialStore: CredentialStore(),
+            appPaths: appPaths
+        )
+        let store = WorkspaceStore(appPaths: appPaths, database: database, defaults: defaults)
+        let chatStore = ChatStore(database: database, providerManager: providerManager)
+        store.attachChatStore(chatStore)
+
+        let session = ExerciseChatSession(
+            workspaceRootPath: "/tmp/workspace",
+            exercisePath: "/tmp/workspace/exercise.rs",
+            title: "Reset Session",
+            providerKind: .geminiCLI,
+            model: "gemini-2.5-pro",
+            backendSessionID: "warm-123"
+        )
+
+        try database.upsertChatSession(session)
+        chatStore.sessions = [session]
+        chatStore.selectedSessionID = session.id
+
+        chatStore.resetSelectedWarmSession(using: store)
+
+        XCTAssertNil(chatStore.selectedSession?.backendSessionID)
+        let fetched = try database.fetchChatSessions(
+            workspaceRootPath: session.workspaceRootPath,
+            exercisePath: session.exercisePath
+        )
+        XCTAssertNil(fetched.first?.backendSessionID)
+    }
+
     func testNonRustlingsWorkspaceHidesRustlingsOnlyDifficultyFilters() throws {
         let fixtureURL = URL(fileURLWithPath: "/Volumes/goldcoders/rustgoblin/tests/fixtures/sample_challenge")
         let tempRootURL = try makeTemporaryWorkspaceRoot()

@@ -80,6 +80,50 @@ enum AIProviderKind: String, CaseIterable, Codable, Identifiable, Sendable {
         }
     }
 
+    var supportsACPTransport: Bool {
+        switch self {
+        case .codexCLI, .geminiCLI, .openCodeCLI:
+            true
+        case .claudeCLI, .openAI, .anthropic, .geminiAPI, .openRouter:
+            false
+        }
+    }
+
+    var defaultTransport: AITransportKind {
+        switch self {
+        case .geminiCLI, .openCodeCLI:
+            .acp
+        case .codexCLI, .claudeCLI, .openAI, .anthropic, .geminiAPI, .openRouter:
+            .legacyCLI
+        }
+    }
+
+    var acpExecutableName: String? {
+        switch self {
+        case .codexCLI:
+            "codex"
+        case .geminiCLI:
+            "gemini"
+        case .openCodeCLI:
+            "opencode"
+        case .claudeCLI, .openAI, .anthropic, .geminiAPI, .openRouter:
+            nil
+        }
+    }
+
+    var acpHint: String? {
+        switch self {
+        case .codexCLI:
+            "Uses RustGoblin's local ACP adapter on top of `codex exec` to keep a warm session inside the app."
+        case .geminiCLI:
+            "Uses `gemini --acp` so the first startup is cold and later turns reuse the same session."
+        case .openCodeCLI:
+            "Uses `opencode acp` so the first startup is cold and later turns reuse the same session."
+        case .claudeCLI, .openAI, .anthropic, .geminiAPI, .openRouter:
+            nil
+        }
+    }
+
     var executableName: String? {
         switch self {
         case .codexCLI:
