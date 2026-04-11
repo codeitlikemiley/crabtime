@@ -944,9 +944,6 @@ private actor ACPConnection {
             guard ToolingHealthService.resolveExecutable(named: "codex") != nil else {
                 throw AIProviderError.missingExecutable("codex")
             }
-            guard ToolingHealthService.resolveExecutable(named: "python3") != nil else {
-                throw AIProviderError.missingExecutable("python3")
-            }
             let adapterURL = try resolveCodexACPAdapterURL()
 
             var environment = baseEnvironment
@@ -954,10 +951,10 @@ private actor ACPConnection {
             environment["CODEX_LOG_DIR"] = logDirectory
 
             return LaunchConfiguration(
-                command: "python3",
-                arguments: [adapterURL.path, "--model", model],
+                command: "xcrun",
+                arguments: ["swift", adapterURL.path, "--model", model],
                 environment: environment,
-                displayCommand: "python3 \(adapterURL.path) --model \(model)",
+                displayCommand: "xcrun swift \(adapterURL.path) --model \(model)",
                 logPrefix: "codex-acp-adapter"
             )
         case .claudeCLI, .openAI, .anthropic, .geminiAPI, .openRouter:
@@ -1041,7 +1038,7 @@ private actor ACPConnection {
         var current = URL(fileURLWithPath: #filePath)
         for _ in 0..<6 {
             current.deleteLastPathComponent()
-            let candidate = current.appendingPathComponent("tools/codex_acp_adapter.py", isDirectory: false)
+            let candidate = current.appendingPathComponent("tools/codex_acp_adapter.swift", isDirectory: false)
             if FileManager.default.fileExists(atPath: candidate.path) {
                 return candidate
             }
