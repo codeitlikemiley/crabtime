@@ -15,6 +15,24 @@ private struct ACPError: Error {
     let message: String
 }
 
+private final class DataBox {
+    private let lock = NSLock()
+    private var storage = Data()
+
+    func set(_ data: Data) {
+        lock.lock()
+        storage = data
+        lock.unlock()
+    }
+
+    func data() -> Data {
+        lock.lock()
+        let value = storage
+        lock.unlock()
+        return value
+    }
+}
+
 private final class CodexACPAdapter {
     private let model: String
     private var sessions: [String: SessionState] = [:]
@@ -178,6 +196,9 @@ private final class CodexACPAdapter {
         let process = Process()
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
+        let stdoutBox = DataBox()
+        let stderrBox = DataBox()
+        let streamGroup = DispatchGroup()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         process.arguments = [
             "codex",
@@ -203,6 +224,18 @@ private final class CodexACPAdapter {
             throw ACPError(code: -32010, message: "Failed to create stdin pipe for Codex.")
         }
 
+        streamGroup.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            stdoutBox.set(stdoutPipe.fileHandleForReading.readDataToEndOfFile())
+            streamGroup.leave()
+        }
+
+        streamGroup.enter()
+        DispatchQueue.global(qos: .utility).async {
+            stderrBox.set(stderrPipe.fileHandleForReading.readDataToEndOfFile())
+            streamGroup.leave()
+        }
+
         try process.run()
 
         if let inputData = transcript.data(using: .utf8) {
@@ -211,9 +244,10 @@ private final class CodexACPAdapter {
         try stdinPipe.fileHandleForWriting.close()
 
         process.waitUntilExit()
+        streamGroup.wait()
 
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+        let stdoutData = stdoutBox.data()
+        let stderrData = stderrBox.data()
         let stdoutText = String(data: stdoutData, encoding: .utf8) ?? ""
         let stderrText = String(data: stderrData, encoding: .utf8) ?? ""
 
