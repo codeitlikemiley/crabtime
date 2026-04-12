@@ -22,8 +22,8 @@ xcuserdata/
 # Rust build output
 target/
 
-# Nested example repository
-example/codecrafters-claude-code-rust/
+# Nested example repositories
+example/
 
 # Generated test fixture binaries
 tests/fixtures/sample_challenge/challenge
