@@ -1,10 +1,10 @@
-# Enhanced Prompt For Future RustGoblin Iterations
+# Enhanced Prompt For Future Crab Time Iterations
 
-Use this prompt when you want another coding agent to extend RustGoblin without regressing the new layout.
+Use this prompt when you want another coding agent to extend Crab Time without regressing the new layout.
 
 ---
 
-You are rebuilding or extending **RustGoblin**, a native macOS Rust practice app.
+You are rebuilding or extending **Crab Time**, a native macOS Rust practice app.
 
 ## Non-Negotiables
 - Preserve the four-area layout:

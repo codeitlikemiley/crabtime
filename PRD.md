@@ -1,7 +1,7 @@
-# Product Requirements Document: RustGoblin 2.0
+# Product Requirements Document: Crab Time 2.0
 
 ## Product Vision
-RustGoblin is a native desktop Rust practice lab for people who want a tighter loop than a browser tab and less noise than a full IDE. The app should feel closer to HackerRank or LeetCode for local Rust exercises: import a folder, browse problems, edit code, run it locally, inspect output, and learn from hints without leaving the workspace.
+Crab Time is a native desktop Rust practice lab for people who want a tighter loop than a browser tab and less noise than a full IDE. The app should feel closer to HackerRank or LeetCode for local Rust exercises: import a folder, browse problems, edit code, run it locally, inspect output, and learn from hints without leaving the workspace.
 
 ## Core User
 - Rust learners who want an offline challenge runner.

@@ -16,6 +16,8 @@ xcuserdata/
 
 # Credentials
 .netrc
+.env
+.env.local
 
 # Rust build output
 target/
