@@ -155,7 +155,11 @@ final class WorkspaceStore {
                 do {
                     resolvedDatabase = try WorkspaceLibraryDatabase(paths: fallbackPaths)
                 } catch {
-                    resolvedDatabase = try! WorkspaceLibraryDatabase(paths: nil)
+                do {
+                        resolvedDatabase = try WorkspaceLibraryDatabase(paths: nil)
+                    } catch {
+                        fatalError("Critical: SQLite in-memory workspace database failed to open: \(error)")
+                    }
                 }
                 bootstrapMessages.append("Database fallback enabled: \(error.localizedDescription)")
             }

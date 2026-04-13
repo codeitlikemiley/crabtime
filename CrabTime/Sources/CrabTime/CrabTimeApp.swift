@@ -29,7 +29,11 @@ final class AppServices {
             do {
                 database = try WorkspaceLibraryDatabase(paths: .temporary(rootName: "\(AppBrand.fallbackStoragePrefix)-\(UUID().uuidString)"))
             } catch {
-                database = try! WorkspaceLibraryDatabase(paths: nil)
+                do {
+                    database = try WorkspaceLibraryDatabase(paths: nil)
+                } catch {
+                    fatalError("Critical: SQLite in-memory database failed to open: \(error)")
+                }
             }
         }
 
