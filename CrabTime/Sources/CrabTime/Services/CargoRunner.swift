@@ -537,21 +537,17 @@ struct CargoRunner: Sendable {
         return try await withCheckedThrowingContinuation { continuation in
             process.terminationHandler = { terminatedProcess in
                 Task {
-                    do {
-                        let stdoutData = try await stdoutTask.value
-                        let stderrData = try await stderrTask.value
+                    let stdoutData = await stdoutTask.value
+                    let stderrData = await stderrTask.value
 
-                        continuation.resume(
-                            returning: ProcessOutput(
-                                commandDescription: commandDescription,
-                                stdout: String(decoding: stdoutData, as: UTF8.self),
-                                stderr: String(decoding: stderrData, as: UTF8.self),
-                                terminationStatus: terminatedProcess.terminationStatus
-                            )
+                    continuation.resume(
+                        returning: ProcessOutput(
+                            commandDescription: commandDescription,
+                            stdout: String(decoding: stdoutData, as: UTF8.self),
+                            stderr: String(decoding: stderrData, as: UTF8.self),
+                            terminationStatus: terminatedProcess.terminationStatus
                         )
-                    } catch {
-                        continuation.resume(throwing: error)
-                    }
+                    )
                 }
             }
 

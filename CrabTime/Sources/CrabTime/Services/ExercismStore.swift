@@ -220,7 +220,6 @@ final class ExercismStore {
             var requestedExercise = expectedExercise
 
             if expectedTrack.isEmpty || expectedExercise.isEmpty {
-                let initialPrompt = expectedTrack.isEmpty ? "" : "exercism download --track=\(expectedTrack) --exercise="
                 do {
                     let parts = try resolveExercismDownloadInput(
                         command: PromptValue.shared.command,

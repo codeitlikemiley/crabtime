@@ -112,7 +112,7 @@ struct ExerciseContextBuilder {
 
     @MainActor
     private func appendRuntimeSections(from store: WorkspaceStore, processStore: ProcessStore?, to sections: inout [String]) {
-        if let processStore = processStore, !store.consoleOutput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if processStore != nil, !store.consoleOutput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             sections.append("Terminal Output:\n```text\n\(store.consoleOutput)\n```")
         }
 
