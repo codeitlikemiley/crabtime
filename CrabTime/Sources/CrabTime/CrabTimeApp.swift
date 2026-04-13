@@ -259,6 +259,11 @@ struct CrabTimeAppCommands: Commands {
             .keyboardShortcut("b", modifiers: .command)
             .disabled(workspaceStore == nil)
 
+            Button("Toggle Right Sidebar") {
+                navigationStore?.toggleRightSidebarVisibility()
+            }
+            .keyboardShortcut("b", modifiers: [.command, .shift])
+            .disabled(workspaceStore == nil)
         }
 
         // Remove macOS Print (Cmd+P) so we can use it for Command Palette
@@ -273,15 +278,33 @@ struct CrabTimeAppCommands: Commands {
                 .keyboardShortcut("p", modifiers: .command)
                 .disabled(workspaceStore == nil)
 
-            Button("Show File Explorer") { workspaceStore?.showExplorerAndFocusSearch() }
+            Button("Show File Explorer") { 
+                if navigationStore?.contentDisplayMode == .editorMaximized {
+                    navigationStore?.toggleLeftColumnVisibility()
+                }
+                navigationStore?.sidebarMode = .explorer
+                workspaceStore?.showExplorerAndFocusSearch() 
+            }
                 .keyboardShortcut("f", modifiers: .command)
                 .disabled(workspaceStore == nil)
 
-            Button("Focus Exercise Search") { workspaceStore?.showExerciseLibraryAndFocusSearch() }
+            Button("Focus Exercise Search") { 
+                if navigationStore?.contentDisplayMode == .editorMaximized {
+                    navigationStore?.toggleLeftColumnVisibility()
+                }
+                navigationStore?.sidebarMode = .exercises
+                workspaceStore?.showExerciseLibraryAndFocusSearch() 
+            }
                 .keyboardShortcut("e", modifiers: .command)
                 .disabled(workspaceStore == nil)
 
-            Button("Focus Exercism Catalog") { workspaceStore?.showExercismCatalogAndFocusSearch() }
+            Button("Focus Exercism Catalog") { 
+                if navigationStore?.contentDisplayMode == .editorMaximized {
+                    navigationStore?.toggleLeftColumnVisibility()
+                }
+                navigationStore?.sidebarMode = .exercism
+                workspaceStore?.showExercismCatalogAndFocusSearch() 
+            }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
                 .disabled(workspaceStore == nil)
 
@@ -291,12 +314,41 @@ struct CrabTimeAppCommands: Commands {
             .keyboardShortcut("j", modifiers: .command)
             .disabled(workspaceStore == nil)
 
+            Button("Maximize Terminal") {
+                navigationStore?.toggleTerminalMaximize()
+            }
+            .keyboardShortcut("m", modifiers: [.command, .shift])
+            .disabled(workspaceStore == nil)
 
             Button("Clear Output") { workspaceStore?.clearConsoleOutput() }
                 .keyboardShortcut("k", modifiers: .command)
                 .disabled(workspaceStore == nil)
 
-            Button("Show TODO Explorer") { workspaceStore?.showTodoAndFocus() }
+            Button("Show Output Tab") {
+                navigationStore?.selectedConsoleTab = .output
+            }
+            .keyboardShortcut("o", modifiers: [.command, .shift])
+            .disabled(workspaceStore == nil)
+
+            Button("Show Diagnostics Tab") {
+                navigationStore?.selectedConsoleTab = .diagnostics
+            }
+            .keyboardShortcut("d", modifiers: [.command, .shift])
+            .disabled(workspaceStore == nil)
+
+            Button("Show Session Tab") {
+                navigationStore?.selectedConsoleTab = .session
+            }
+            .keyboardShortcut("s", modifiers: [.command, .shift])
+            .disabled(workspaceStore == nil)
+
+            Button("Show TODO Explorer") { 
+                if navigationStore?.contentDisplayMode == .editorMaximized {
+                    navigationStore?.toggleLeftColumnVisibility()
+                }
+                navigationStore?.sidebarMode = .todos
+                workspaceStore?.showTodoAndFocus() 
+            }
                 .keyboardShortcut("t", modifiers: [.command, .shift])
                 .disabled(workspaceStore == nil)
 
