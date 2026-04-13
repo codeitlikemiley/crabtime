@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ExercismBrowserView: View {
     @Environment(WorkspaceStore.self) private var workspaceStore
+    @Environment(NavigationStore.self) private var navigationStore
     @Environment(ExercismStore.self) private var store
     @Environment(ProcessStore.self) private var processStore
     @FocusState private var isSearchFocused: Bool
@@ -23,6 +24,7 @@ struct ExercismBrowserView: View {
         @Bindable var store = store
         let workspaceStore = workspaceStore
         let processStore = processStore
+        let navigationStore = navigationStore
         
         let credentialStore = CredentialStore()
         let hasToken = !(credentialStore.readSecret(for: "exercism_api_token") ?? "").isEmpty
@@ -175,7 +177,7 @@ struct ExercismBrowserView: View {
         .paneCard()
         .background(
             ExercismKeyBridge(
-                isEnabled: workspaceStore.sidebarMode == .exercism,
+                isEnabled: navigationStore.sidebarMode == .exercism,
                 onMoveUp: store.moveExercismSelectionUp,
                 onMoveDown: store.moveExercismSelectionDown,
                 onActivate: { store.activateSelectedExercismExercise(using: workspaceStore, processStore: processStore) }

@@ -2,10 +2,11 @@ import SwiftUI
 
 struct EditorWorkbenchView: View {
     @Environment(WorkspaceStore.self) private var store
+    @Environment(NavigationStore.self) private var navigationStore
 
     var body: some View {
         GeometryReader { proxy in
-            switch store.terminalDisplayMode {
+            switch navigationStore.terminalDisplayMode {
             case .hidden:
                 CodeEditorPaneView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

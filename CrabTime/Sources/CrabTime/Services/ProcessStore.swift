@@ -139,8 +139,8 @@ final class ProcessStore {
         return "ACP enabled. First send will cold start."
     }
 
-    func showAIRuntime(using store: WorkspaceStore) {
-        store.selectConsoleTab(.aiRuntime)
+    func showAIRuntime(using navigationStore: NavigationStore) {
+        navigationStore.selectedConsoleTab = .aiRuntime
     }
 
     func reconnectCurrentAITransport(using store: WorkspaceStore) {
@@ -171,7 +171,7 @@ final class ProcessStore {
         }
 
         runState = .running
-        store.selectedConsoleTab = .output
+        
         lastCommandDescription = ""
         store.consoleOutput += "\n[\(Date().formatted(date: .omitted, time: .standard))] Running \(exercise.title)…\n"
         store.appendSessionMessage("Started \(exercise.title)")
@@ -235,7 +235,7 @@ final class ProcessStore {
                         store.appendSessionMessage("Check output:\n\(trimmedOutput)")
                     }
                 }
-                store.selectedConsoleTab = .diagnostics
+                
             } else {
                 store.appendSessionMessage("Check: clean ✓")
             }

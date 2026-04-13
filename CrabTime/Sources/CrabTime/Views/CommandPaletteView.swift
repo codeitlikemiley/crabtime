@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CommandPaletteView: View {
     @Environment(WorkspaceStore.self) private var store
+    @Environment(NavigationStore.self) private var navigationStore
     @Environment(ProcessStore.self) private var processStore
     @State private var query: String = ""
     @State private var selectedIndex: Int = 0
@@ -60,14 +61,14 @@ struct CommandPaletteView: View {
             // Sidebar & Layout
             PaletteCommand(
                 id: "toggle_left_sidebar",
-                title: store.showsProblemPane ? "Hide Left Sidebar" : "Show Left Sidebar",
+                title: navigationStore.showsProblemPane ? "Hide Left Sidebar" : "Show Left Sidebar",
                 icon: "sidebar.left",
                 shortcut: "⌘B",
                 keywords: ["sidebar", "left", "toggle", "explorer", "panel"]
             ),
             PaletteCommand(
                 id: "toggle_right_sidebar",
-                title: store.isInspectorVisible ? "Hide Right Sidebar" : "Show Right Sidebar",
+                title: navigationStore.isInspectorVisible ? "Hide Right Sidebar" : "Show Right Sidebar",
                 icon: "sidebar.right",
                 shortcut: "⇧⌘B",
                 keywords: ["sidebar", "right", "toggle", "inspector"]
@@ -106,15 +107,15 @@ struct CommandPaletteView: View {
             // Terminal
             PaletteCommand(
                 id: "toggle_terminal",
-                title: store.showsTerminal ? "Hide Terminal" : "Show Terminal",
+                title: navigationStore.showsTerminal ? "Hide Terminal" : "Show Terminal",
                 icon: "terminal",
                 shortcut: "⌘J",
                 keywords: ["terminal", "console", "output", "toggle"]
             ),
             PaletteCommand(
                 id: "maximize_terminal",
-                title: store.isTerminalMaximized ? "Restore Terminal" : "Maximize Terminal",
-                icon: store.isTerminalMaximized ? "arrow.down.right.and.arrow.up.left" : "rectangle.bottomthird.inset.filled",
+                title: navigationStore.isTerminalMaximized ? "Restore Terminal" : "Maximize Terminal",
+                icon: navigationStore.isTerminalMaximized ? "arrow.down.right.and.arrow.up.left" : "rectangle.bottomthird.inset.filled",
                 shortcut: "⇧⌘M",
                 keywords: ["terminal", "maximize", "restore", "fullscreen"]
             ),
@@ -544,7 +545,7 @@ struct CommandPaletteView: View {
         case "toggle_left_sidebar":
             store.toggleLeftColumnVisibility()
         case "toggle_right_sidebar":
-            store.toggleRightSidebarVisibility()
+            navigationStore.toggleInspector()
 
         // Focus
         case "focus_chat":
@@ -558,21 +559,21 @@ struct CommandPaletteView: View {
 
         // Terminal
         case "toggle_terminal":
-            store.toggleTerminalVisibility()
+            navigationStore.toggleTerminalVisibility()
         case "maximize_terminal":
-            store.toggleTerminalMaximize()
+            navigationStore.toggleTerminalMaximize()
         case "clear_output":
             store.clearConsoleOutput()
 
         // Console tabs
         case "show_output_tab":
-            store.selectConsoleTab(.output)
+            navigationStore.selectedConsoleTab = .output
         case "show_diagnostics_tab":
-            store.selectConsoleTab(.diagnostics)
+            navigationStore.selectedConsoleTab = .diagnostics
         case "show_session_tab":
-            store.selectConsoleTab(.session)
+            navigationStore.selectedConsoleTab = .session
         case "show_ai_runtime_tab":
-            store.selectConsoleTab(.aiRuntime)
+            navigationStore.selectedConsoleTab = .aiRuntime
 
         // Workspace actions
         case "run_exercise":

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct WorkspaceExplorerView: View {
     @Environment(WorkspaceStore.self) private var store
+    @Environment(NavigationStore.self) private var navigationStore
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -59,7 +60,7 @@ struct WorkspaceExplorerView: View {
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(
             ExplorerKeyEventBridge(
-                isEnabled: store.sidebarMode == .explorer && store.explorerKeyboardFocusActive,
+                isEnabled: navigationStore.sidebarMode == .explorer && store.explorerKeyboardFocusActive,
                 onKeyPress: { key in
                     store.handleExplorerKey(key)
                 },
@@ -74,6 +75,7 @@ struct WorkspaceExplorerView: View {
 
 private struct ExplorerSearchField: View {
     @Environment(WorkspaceStore.self) private var store
+    @Environment(NavigationStore.self) private var navigationStore
     @Binding var text: String
     let resultCount: Int
     @FocusState private var isFocused: Bool
@@ -246,6 +248,7 @@ private struct ExplorerSearchKeyBridge: NSViewRepresentable {
 
 private struct WorkspaceExplorerNodeView: View {
     @Environment(WorkspaceStore.self) private var store
+    @Environment(NavigationStore.self) private var navigationStore
 
     let node: WorkspaceFileNode
     let depth: Int

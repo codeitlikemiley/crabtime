@@ -382,7 +382,9 @@ struct AIProviderManager {
             let candidates: [Candidate]?
         }
 
-        let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent")!
+        guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent") else {
+            throw AIProviderError.runtimeFailure("Malformed Gemini API URL.")
+        }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")

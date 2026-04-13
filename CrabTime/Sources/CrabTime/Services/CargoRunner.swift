@@ -267,7 +267,7 @@ struct CargoRunner: Sendable {
         let compileArguments =
             ["rustc", "--test"]
             + cargoEditionArguments(in: projectRootURL)
-            + [harnessURL.path, "-o", binaryURL.path]
+            + ["-o", binaryURL.path, "--", harnessURL.path]
         let compileDescription = "rustc --test \(displayTargetPath)"
         let compileResult = try await processRunner(
             projectRootURL,
@@ -312,7 +312,7 @@ struct CargoRunner: Sendable {
         let compileArguments =
             ["rustc"]
             + cargoEditionArguments(in: projectRootURL)
-            + [sourceURL.path, "-o", binaryURL.path]
+            + ["-o", binaryURL.path, "--", sourceURL.path]
         let compileDescription = "rustc \(displayTargetPath)"
         let compileResult = try await processRunner(
             projectRootURL,
@@ -486,20 +486,49 @@ struct CargoRunner: Sendable {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
+        let limit = 1_048_576
+
         let stdoutTask = Task.detached {
             var data = Data()
-            for try await byte in stdoutPipe.fileHandleForReading.bytes {
-                if data.count < 1_048_576 {
-                    data.append(byte)
+            data.reserveCapacity(limit)
+            
+            let (stream, continuation) = AsyncStream.makeStream(of: Data.self)
+            stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
+                let chunk = handle.availableData
+                if chunk.isEmpty {
+                    handle.readabilityHandler = nil
+                    continuation.finish()
+                } else {
+                    continuation.yield(chunk)
+                }
+            }
+            
+            for await chunk in stream {
+                if data.count < limit {
+                    data.append(chunk.prefix(limit - data.count))
                 }
             }
             return data
         }
+        
         let stderrTask = Task.detached {
             var data = Data()
-            for try await byte in stderrPipe.fileHandleForReading.bytes {
-                if data.count < 1_048_576 {
-                    data.append(byte)
+            data.reserveCapacity(limit)
+            
+            let (stream, continuation) = AsyncStream.makeStream(of: Data.self)
+            stderrPipe.fileHandleForReading.readabilityHandler = { handle in
+                let chunk = handle.availableData
+                if chunk.isEmpty {
+                    handle.readabilityHandler = nil
+                    continuation.finish()
+                } else {
+                    continuation.yield(chunk)
+                }
+            }
+            
+            for await chunk in stream {
+                if data.count < limit {
+                    data.append(chunk.prefix(limit - data.count))
                 }
             }
             return data

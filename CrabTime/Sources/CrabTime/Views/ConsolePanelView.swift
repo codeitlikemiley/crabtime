@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ConsolePanelView: View {
     @Environment(WorkspaceStore.self) private var store
+    @Environment(NavigationStore.self) private var navigationStore
     @Environment(ProcessStore.self) private var processStore
 
     var body: some View {
@@ -21,40 +22,40 @@ struct ConsolePanelView: View {
                 HStack(spacing: 8) {
                     ConsoleTabButton(
                         title: "Output",
-                        isSelected: store.selectedConsoleTab == .output,
+                        isSelected: navigationStore.selectedConsoleTab == .output,
                         badgeText: nil
                     ) {
-                        store.selectConsoleTab(.output)
+                        navigationStore.selectedConsoleTab = .output
                     }
 
                     ConsoleTabButton(
                         title: "Diagnostics",
-                        isSelected: store.selectedConsoleTab == .diagnostics,
+                        isSelected: navigationStore.selectedConsoleTab == .diagnostics,
                         badgeText: processStore.diagnosticsCount == 0 ? nil : "\(processStore.diagnosticsCount)",
                         accentColor: processStore.errorCount > 0 ? Color.red : CrabTimeTheme.Palette.ember
                     ) {
-                        store.selectConsoleTab(.diagnostics)
+                        navigationStore.selectedConsoleTab = .diagnostics
                     }
 
                     ConsoleTabButton(
                         title: "Session",
-                        isSelected: store.selectedConsoleTab == .session,
+                        isSelected: navigationStore.selectedConsoleTab == .session,
                         badgeText: nil
                     ) {
-                        store.selectConsoleTab(.session)
+                        navigationStore.selectedConsoleTab = .session
                     }
 
                     ConsoleTabButton(
                         title: "AI Runtime",
-                        isSelected: store.selectedConsoleTab == .aiRuntime,
+                        isSelected: navigationStore.selectedConsoleTab == .aiRuntime,
                         badgeText: processStore.aiRuntimeToolCalls.isEmpty ? nil : "\(processStore.aiRuntimeToolCalls.count)",
                         accentColor: processStore.aiRuntimeTransport == .acp ? CrabTimeTheme.Palette.cyan : CrabTimeTheme.Palette.textMuted
                     ) {
-                        store.selectConsoleTab(.aiRuntime)
+                        navigationStore.selectedConsoleTab = .aiRuntime
                     }
 
                     // Copy session log to clipboard when session tab is active
-                    if store.selectedConsoleTab == .session && !store.sessionLog.isEmpty {
+                    if navigationStore.selectedConsoleTab == .session && !store.sessionLog.isEmpty {
                         Button {
                             NSPasteboard.general.clearContents()
                             NSPasteboard.general.setString(
@@ -74,7 +75,7 @@ struct ConsolePanelView: View {
                         .help("Copy session log to clipboard")
                     }
 
-                    if store.selectedConsoleTab == .aiRuntime && !processStore.aiRuntimeEvents.isEmpty {
+                    if navigationStore.selectedConsoleTab == .aiRuntime && !processStore.aiRuntimeEvents.isEmpty {
                         Button {
                             NSPasteboard.general.clearContents()
                             NSPasteboard.general.setString(
@@ -101,23 +102,23 @@ struct ConsolePanelView: View {
                     )
 
                     IconGlassButton(
-                        systemImage: store.isTerminalMaximized ? "arrow.down.right.and.arrow.up.left" : "rectangle.bottomthird.inset.filled",
-                        helpText: store.isTerminalMaximized ? "Return to split view" : "Maximize terminal",
-                        isActive: store.isTerminalMaximized,
-                        action: store.toggleTerminalMaximize
+                        systemImage: navigationStore.isTerminalMaximized ? "arrow.down.right.and.arrow.up.left" : "rectangle.bottomthird.inset.filled",
+                        helpText: navigationStore.isTerminalMaximized ? "Return to split view" : "Maximize terminal",
+                        isActive: navigationStore.isTerminalMaximized,
+                        action: navigationStore.toggleTerminalMaximize
                     )
 
                     IconGlassButton(
                         systemImage: "terminal",
                         helpText: "Hide terminal",
                         isActive: true,
-                        action: store.toggleTerminalVisibility
+                        action: navigationStore.toggleTerminalVisibility
                     )
                 }
             }
 
             Group {
-                switch store.selectedConsoleTab {
+                switch navigationStore.selectedConsoleTab {
                 case .output:
                     ScrollView {
                         if store.consoleOutput.isEmpty {
@@ -166,7 +167,7 @@ struct ConsolePanelView: View {
                         }
                         .background(
                             DiagnosticsKeyBridge(
-                                isEnabled: store.selectedConsoleTab == .diagnostics,
+                                isEnabled: navigationStore.selectedConsoleTab == .diagnostics,
                                 onMoveUp: { processStore.moveDiagnosticSelectionUp() },
                                 onMoveDown: { processStore.moveDiagnosticSelectionDown() },
                                 onActivate: { processStore.activateSelectedDiagnostic(using: store) }
@@ -215,6 +216,7 @@ struct ConsolePanelView: View {
 
 private struct AIRuntimeConsoleView: View {
     @Environment(WorkspaceStore.self) private var store
+    @Environment(NavigationStore.self) private var navigationStore
     @Environment(ProcessStore.self) private var processStore
 
     var body: some View {

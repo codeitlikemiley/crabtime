@@ -2,11 +2,13 @@ import SwiftUI
 
 struct TodoExplorerView: View {
     @Environment(WorkspaceStore.self) private var workspaceStore
+    @Environment(NavigationStore.self) private var navigationStore
     @Environment(TodoExplorerStore.self) private var store
 
     var body: some View {
         @Bindable var store = store
         let workspaceStore = workspaceStore
+        let navigationStore = navigationStore
 
         VStack(alignment: .leading, spacing: 12) {
             // Header
@@ -138,7 +140,7 @@ struct TodoExplorerView: View {
         }
         .background(
             TodoKeyBridge(
-                isEnabled: workspaceStore.sidebarMode == .todos,
+                isEnabled: navigationStore.sidebarMode == .todos,
                 onMoveUp: { store.moveTodoSelectionUp(using: workspaceStore) },
                 onMoveDown: { store.moveTodoSelectionDown(using: workspaceStore) },
                 onActivate: { store.activateSelectedTodo(using: workspaceStore) }

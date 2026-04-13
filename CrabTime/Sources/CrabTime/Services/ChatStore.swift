@@ -341,7 +341,6 @@ final class ChatStore {
                             message: error.localizedDescription,
                             logFilePath: processStore?.aiRuntimeLogPath
                         ))
-                        store.selectConsoleTab(.aiRuntime)
                         self.errorMessage = "ACP chat failed. Open AI Runtime for status and logs. \(error.localizedDescription)"
                     } else {
                         self.errorMessage = error.localizedDescription

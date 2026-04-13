@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WorkspaceRailView: View {
     @Environment(WorkspaceStore.self) private var store
+    @Environment(NavigationStore.self) private var navigationStore
     @Environment(ProcessStore.self) private var processStore
 
     var body: some View {
@@ -20,29 +21,29 @@ struct WorkspaceRailView: View {
                 dockButton(
                     systemImage: "list.bullet.rectangle.portrait",
                     help: "Show exercises",
-                    isActive: store.sidebarMode == .exercises,
-                    action: { store.selectSidebarMode(.exercises) }
+                    isActive: navigationStore.sidebarMode == .exercises,
+                    action: { navigationStore.sidebarMode = .exercises }
                 )
 
                 dockButton(
                     systemImage: "folder",
                     help: "Show explorer",
-                    isActive: store.sidebarMode == .explorer,
-                    action: { store.selectSidebarMode(.explorer) }
+                    isActive: navigationStore.sidebarMode == .explorer,
+                    action: { navigationStore.sidebarMode = .explorer }
                 )
 
                 dockButton(
                     systemImage: "checklist",
                     help: "Show TODOs",
-                    isActive: store.sidebarMode == .todos,
-                    action: { store.selectSidebarMode(.todos) }
+                    isActive: navigationStore.sidebarMode == .todos,
+                    action: { navigationStore.sidebarMode = .todos }
                 )
 
                 dockButton(
                     systemImage: "graduationcap",
                     help: "Browse Exercism",
-                    isActive: store.sidebarMode == .exercism,
-                    action: { store.selectSidebarMode(.exercism) }
+                    isActive: navigationStore.sidebarMode == .exercism,
+                    action: { navigationStore.sidebarMode = .exercism }
                 )
             }
             .frame(maxWidth: .infinity)

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CodeEditorPaneView: View {
     @Environment(WorkspaceStore.self) private var store
+    @Environment(NavigationStore.self) private var navigationStore
     @Environment(ProcessStore.self) private var processStore
 
     var body: some View {
@@ -24,11 +25,11 @@ struct CodeEditorPaneView: View {
                 Spacer()
 
                 HStack(spacing: 8) {
-                    if store.canToggleDiffMode {
+                    if navigationStore.canToggleDiffMode {
                         IconGlassButton(
-                            systemImage: store.isShowingDiffPreview ? "doc.text" : "arrow.left.arrow.right.square",
-                            helpText: store.isShowingDiffPreview ? "Return to editor" : "Show diff",
-                            isActive: store.isShowingDiffPreview,
+                            systemImage: navigationStore.isShowingDiffPreview ? "doc.text" : "arrow.left.arrow.right.square",
+                            helpText: navigationStore.isShowingDiffPreview ? "Return to editor" : "Show diff",
+                            isActive: navigationStore.isShowingDiffPreview,
                             action: store.toggleDiffMode
                         )
                     }
@@ -52,23 +53,23 @@ struct CodeEditorPaneView: View {
 
                     IconGlassButton(
                         systemImage: "terminal",
-                        helpText: store.showsTerminal ? "Hide terminal" : "Show terminal",
-                        isActive: store.showsTerminal,
-                        action: store.toggleTerminalVisibility
+                        helpText: navigationStore.showsTerminal ? "Hide terminal" : "Show terminal",
+                        isActive: navigationStore.showsTerminal,
+                        action: navigationStore.toggleTerminalVisibility
                     )
 
                     IconGlassButton(
-                        systemImage: store.contentDisplayMode == .editorMaximized ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
-                        helpText: store.contentDisplayMode == .editorMaximized ? "Return to split view" : "Maximize editor",
-                        isActive: store.contentDisplayMode == .editorMaximized,
+                        systemImage: navigationStore.contentDisplayMode == .editorMaximized ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
+                        helpText: navigationStore.contentDisplayMode == .editorMaximized ? "Return to split view" : "Maximize editor",
+                        isActive: navigationStore.contentDisplayMode == .editorMaximized,
                         action: store.toggleEditorMaximize
                     )
 
                     IconGlassButton(
                         systemImage: "sidebar.right",
-                        helpText: store.isInspectorVisible ? "Hide inspector" : "Show inspector",
-                        isActive: store.isInspectorVisible,
-                        action: store.toggleInspector
+                        helpText: navigationStore.isInspectorVisible ? "Hide inspector" : "Show inspector",
+                        isActive: navigationStore.isInspectorVisible,
+                        action: navigationStore.toggleInspector
                     )
                 }
             }
@@ -108,7 +109,7 @@ struct CodeEditorPaneView: View {
                             fileExtension: currentFileExtension,
                             showLineNumbers: store.showLineNumbers
                         )
-                    } else if store.isShowingDiffPreview {
+                    } else if navigationStore.isShowingDiffPreview {
                         ReadonlyTextPreviewView(
                             text: store.currentDiffText,
                             showLineNumbers: store.showLineNumbers
@@ -267,6 +268,7 @@ private struct EnrichmentBanner: View {
 
 private struct OpenFileTabsView: View {
     @Environment(WorkspaceStore.self) private var store
+    @Environment(NavigationStore.self) private var navigationStore
 
     var body: some View {
         if !store.currentOpenTabs.isEmpty {

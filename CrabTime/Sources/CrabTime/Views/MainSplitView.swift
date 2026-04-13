@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainSplitView: View {
     @Environment(WorkspaceStore.self) private var store
+    @Environment(NavigationStore.self) private var navigationStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -13,28 +14,28 @@ struct MainSplitView: View {
                     .frame(width: CrabTimeTheme.Layout.sidebarWidth)
 
                 ProblemBrowserView()
-                    .frame(width: store.showsProblemPane ? problemWidth(in: proxy.size.width) : 0)
-                    .opacity(store.showsProblemPane ? 1 : 0)
-                    .allowsHitTesting(store.showsProblemPane)
+                    .frame(width: navigationStore.showsProblemPane ? problemWidth(in: proxy.size.width) : 0)
+                    .opacity(navigationStore.showsProblemPane ? 1 : 0)
+                    .allowsHitTesting(navigationStore.showsProblemPane)
                     .clipped()
 
                 HStack(alignment: .top, spacing: CrabTimeTheme.Layout.columnSpacing) {
                     EditorWorkbenchView()
-                        .frame(maxWidth: store.showsEditorPane ? .infinity : 0, maxHeight: .infinity)
-                        .opacity(store.showsEditorPane ? 1 : 0)
-                        .allowsHitTesting(store.showsEditorPane)
+                        .frame(maxWidth: navigationStore.showsEditorPane ? .infinity : 0, maxHeight: .infinity)
+                        .opacity(navigationStore.showsEditorPane ? 1 : 0)
+                        .allowsHitTesting(navigationStore.showsEditorPane)
                         .clipped()
 
                     RightSidebarView()
-                        .frame(width: store.showsInspector ? inspectorWidth(in: proxy.size.width) : 0)
-                        .opacity(store.showsInspector ? 1 : 0)
-                        .allowsHitTesting(store.showsInspector)
+                        .frame(width: navigationStore.showsInspector ? inspectorWidth(in: proxy.size.width) : 0)
+                        .opacity(navigationStore.showsInspector ? 1 : 0)
+                        .allowsHitTesting(navigationStore.showsInspector)
                         .clipped()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .animation(layoutAnimation, value: store.contentDisplayMode)
-            .animation(layoutAnimation, value: store.isInspectorVisible)
+            .animation(layoutAnimation, value: navigationStore.contentDisplayMode)
+            .animation(layoutAnimation, value: navigationStore.isInspectorVisible)
             .padding(CrabTimeTheme.Layout.outerPadding)
             .background(WorkbenchBackgroundView())
             .background(

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ChatSidebarView: View {
     @Environment(WorkspaceStore.self) private var store
+    @Environment(NavigationStore.self) private var navigationStore
     @Environment(ProcessStore.self) private var processStore
     @Environment(ChatStore.self) private var chatStore
     @Environment(AISettingsStore.self) private var settingsStore
@@ -80,7 +81,7 @@ struct ChatSidebarView: View {
         return VStack(alignment: .leading, spacing: 10) {
             if let banner = processStore.aiRuntimeBannerMessage(for: provider, transport: transport) {
                 Button {
-                    processStore.showAIRuntime(using: store)
+                    processStore.showAIRuntime(using: navigationStore)
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: transport == .acp ? "bolt.horizontal.circle.fill" : "info.circle")

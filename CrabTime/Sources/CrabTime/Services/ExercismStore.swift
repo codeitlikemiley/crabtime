@@ -68,7 +68,6 @@ final class ExercismStore {
         }
 
         isSubmittingExercism = true
-        store.selectedConsoleTab = .output
         store.consoleOutput += "\n[\(Date().formatted(date: .omitted, time: .standard))] Submitting \(exercise.title) to Exercism…\n"
         store.appendSessionMessage("Submitting \(exercise.title) to Exercism")
 
@@ -211,7 +210,6 @@ final class ExercismStore {
 
     func downloadExercismExercise(track expectedTrack: String, exercise expectedExercise: String, using store: WorkspaceStore, processStore: ProcessStore) {
         Task {
-            store.sidebarMode = .explorer
 
             guard let status = try? exercismCLI.status(), status.isInstalled, status.hasToken, let _ = status.workspaceURL else {
                 showExercismStatus()

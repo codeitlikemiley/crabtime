@@ -59,21 +59,15 @@ final class WorkspaceStore {
     }
     var sessionLog: [String] = []
 
-    var selectedConsoleTab: ConsoleTab = .output
-    var terminalDisplayMode: TerminalDisplayMode = .split
     var runState: RunState = .idle
     var lastCommandDescription: String = ""
     var lastTerminationStatus: Int32?
-    var isInspectorVisible: Bool = true
     var rightSidebarTab: RightSidebarTab = .inspector
     var rightSidebarWidth: CGFloat = CrabTimeTheme.Layout.inspectorWidth
     var isSolutionVisible: Bool = false
     var isEditorDirty: Bool = false
-    var editorDisplayMode: EditorDisplayMode = .edit
     /// Paths of exercise files currently being AI-enriched in the background.
     var enrichingExercisePaths: Set<String> = []
-    var contentDisplayMode: ContentDisplayMode = .split
-    var sidebarMode: SidebarMode = .exercises
     var isCloneSheetPresented: Bool = false
     var cloneRepositoryURL: String = ""
     var cloneErrorMessage: String?
@@ -158,7 +152,11 @@ final class WorkspaceStore {
                 resolvedDatabase = try WorkspaceLibraryDatabase(paths: appPaths)
             } catch {
                 let fallbackPaths = AppStoragePaths.temporary(rootName: "\(AppBrand.fallbackStoragePrefix)-\(UUID().uuidString)")
-                resolvedDatabase = try! WorkspaceLibraryDatabase(paths: fallbackPaths)
+                do {
+                    resolvedDatabase = try WorkspaceLibraryDatabase(paths: fallbackPaths)
+                } catch {
+                    resolvedDatabase = try! WorkspaceLibraryDatabase(paths: nil)
+                }
                 bootstrapMessages.append("Database fallback enabled: \(error.localizedDescription)")
             }
         }
@@ -206,25 +204,10 @@ final class WorkspaceStore {
         enrichingExercisePaths.contains(exerciseURL.standardizedFileURL.path)
     }
 
-    var showsProblemPane: Bool {
-        contentDisplayMode != .editorMaximized
-    }
 
-    var showsEditorPane: Bool {
-        contentDisplayMode != .problemMaximized
-    }
 
-    var showsInspector: Bool {
-        showsEditorPane && isInspectorVisible
-    }
 
-    var showsTerminal: Bool {
-        terminalDisplayMode != .hidden
-    }
 
-    var isTerminalMaximized: Bool {
-        terminalDisplayMode == .maximized
-    }
 
     var currentFileTree: [WorkspaceFileNode] {
         filteredFileTree(workspace?.fileTree ?? [])
@@ -279,13 +262,7 @@ final class WorkspaceStore {
         return selectedExercise.sourceURL.standardizedFileURL
     }
 
-    var isShowingDiffPreview: Bool {
-        editorDisplayMode == .diff
-    }
 
-    var canToggleDiffMode: Bool {
-        activeDocumentURL != nil
-    }
 
     var canResetActiveDocument: Bool {
         activeDocumentURL != nil
@@ -763,32 +740,10 @@ final class WorkspaceStore {
 
     func clearConsoleOutput() {
         consoleOutput = ""
-        if selectedConsoleTab != .output {
-            selectedConsoleTab = .output
-        }
     }
 
     func appendAISessionMessage(_ message: String) {
         appendSessionMessage("AI  \(message)")
-    }
-
-
-    func selectConsoleTab(_ tab: ConsoleTab) {
-        if terminalDisplayMode == .hidden {
-            terminalDisplayMode = .split
-        }
-        selectedConsoleTab = tab
-
-        // When switching to diagnostics, resign text editor first responder
-        // so the diagnostic key bridge can capture j/k/enter
-        if tab == .diagnostics {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                if let window = NSApp.keyWindow,
-                   window.firstResponder is NSTextView {
-                    window.makeFirstResponder(nil)
-                }
-            }
-        }
     }
 
     func closeTab(_ tab: ActiveDocumentTab) {
@@ -900,7 +855,6 @@ final class WorkspaceStore {
             draftEditorTextByPath.removeValue(forKey: sourcePath)
             editorText = updatedPresentation.visibleSource
             isEditorDirty = false
-            editorDisplayMode = .edit
             currentDiffText = ""
             appendSessionMessage("Saved \(selectedExercise.sourceURL.lastPathComponent)")
             persistCurrentWorkspaceSnapshot()
@@ -1012,19 +966,11 @@ final class WorkspaceStore {
         return nil
     }
     func toggleProblemPaneVisibility() {
-        contentDisplayMode = contentDisplayMode == .editorMaximized ? .split : .editorMaximized
         persistCurrentWorkspaceSnapshot()
     }
 
-    func toggleInspector() {
-        isInspectorVisible.toggle()
-        persistCurrentWorkspaceSnapshot()
-    }
 
     func selectRightSidebarTab(_ tab: RightSidebarTab) {
-        if !isInspectorVisible {
-            isInspectorVisible = true
-        }
 
         guard rightSidebarTab != tab else {
             persistCurrentWorkspaceSnapshot()
@@ -1266,15 +1212,7 @@ final class WorkspaceStore {
 
 
 
-    func toggleTerminalMaximize() {
 
-        terminalDisplayMode = terminalDisplayMode == .maximized ? .split : .maximized
-        persistCurrentWorkspaceSnapshot()
-    }
-
-    func toggleRightSidebarVisibility() {
-        toggleInspector()
-    }
 
     func toggleLeftColumnVisibility() {
         toggleProblemPaneVisibility()
@@ -1287,9 +1225,7 @@ final class WorkspaceStore {
             NotificationCenter.default.post(name: .focusTextEditorRequested, object: nil)
         } else {
             lastFocusTarget = .explorerSearch
-            if !showsProblemPane { contentDisplayMode = .split }
-            sidebarMode = .explorer
-            explorerKeyboardFocusActive = false
+                explorerKeyboardFocusActive = false
             explorerSearchFocusToken += 1
         }
         persistCurrentWorkspaceSnapshot()
@@ -1301,8 +1237,6 @@ final class WorkspaceStore {
             NotificationCenter.default.post(name: .focusTextEditorRequested, object: nil)
         } else {
             lastFocusTarget = .exerciseSearch
-            if !showsProblemPane { contentDisplayMode = .split }
-            sidebarMode = .exercises
             explorerKeyboardFocusActive = false
             exerciseSearchFocusToken += 1
         }
@@ -1315,9 +1249,7 @@ final class WorkspaceStore {
             NotificationCenter.default.post(name: .focusTextEditorRequested, object: nil)
         } else {
             lastFocusTarget = .exercismSearch
-            if !showsProblemPane { contentDisplayMode = .split }
-            sidebarMode = .exercism
-            explorerKeyboardFocusActive = false
+                explorerKeyboardFocusActive = false
             exercismSearchFocusToken += 1
         }
         persistCurrentWorkspaceSnapshot()
@@ -1329,8 +1261,6 @@ final class WorkspaceStore {
             NotificationCenter.default.post(name: .focusTextEditorRequested, object: nil)
         } else {
             lastFocusTarget = .todo
-            if !showsProblemPane { contentDisplayMode = .split }
-            sidebarMode = .todos
             explorerKeyboardFocusActive = false
             refreshTodoItems()
             todoFocusToken += 1
@@ -1351,7 +1281,6 @@ final class WorkspaceStore {
             }
         } else {
             lastFocusTarget = .inspectorList
-            isInspectorVisible = true
             rightSidebarTab = .inspector
             inspectorListFocusToken += 1
             // Resign text editor so the InspectorKeyBridge global monitor
@@ -1415,7 +1344,6 @@ final class WorkspaceStore {
         guard let workspaceURL = workspace?.rootURL ?? selectedExercise?.directoryURL else { return }
         let splitArgs = args.components(separatedBy: " ").filter { !$0.isEmpty }
         
-        selectedConsoleTab = .output
         
         do {
             let output = try await cargoRunner.runOverride(args: splitArgs, in: workspaceURL)
@@ -1459,10 +1387,6 @@ final class WorkspaceStore {
     }
 
     func handleExplorerKey(_ key: String) {
-        guard sidebarMode == .explorer, showsProblemPane else {
-            return
-        }
-
         switch key.lowercased() {
         case "j":
             moveExplorerSelection(delta: 1)
@@ -1477,24 +1401,6 @@ final class WorkspaceStore {
         }
     }
 
-    func selectSidebarMode(_ mode: SidebarMode) {
-        guard sidebarMode != mode else {
-            return
-        }
-
-        sidebarMode = mode
-
-        // Auto-scan for TODOs when switching to the TODO panel
-        if mode == .todos {
-            refreshTodoItems()
-        } else if mode == .exercism {
-            Task {
-                await fetchExercismCatalog()
-            }
-        }
-
-        persistCurrentWorkspaceSnapshot()
-    }
 
     func selectDifficultyFilter(_ filter: ExerciseDifficulty?) {
         selectedDifficultyFilter = filter
@@ -1655,27 +1561,15 @@ final class WorkspaceStore {
     }
 
     func toggleDiffMode() {
-        guard canToggleDiffMode else {
-            return
-        }
-
-        if editorDisplayMode == .diff {
-            editorDisplayMode = .edit
-            currentDiffText = ""
-            return
-        }
-
         Task {
             await prepareDiffForActiveDocument()
         }
     }
 
     func toggleProblemMaximize() {
-        contentDisplayMode = contentDisplayMode == .problemMaximized ? .split : .problemMaximized
     }
 
     func toggleEditorMaximize() {
-        contentDisplayMode = contentDisplayMode == .editorMaximized ? .split : .editorMaximized
     }
 
     private func restorePersistedLibrary() {
@@ -1733,15 +1627,11 @@ final class WorkspaceStore {
             }
             draftEditorTextByPath = [:]
             selectedWorkspaceRootPath = rootPath
-            selectedConsoleTab = .output
             runState = .idle
             lastCommandDescription = ""
             lastTerminationStatus = nil
             isSolutionVisible = false
-            editorDisplayMode = .edit
             currentDiffText = ""
-            contentDisplayMode = .split
-            terminalDisplayMode = .split
             explorerSearchText = ""
             selectedExplorerNodePath = nil
             explorerKeyboardFocusActive = false
@@ -1797,11 +1687,8 @@ final class WorkspaceStore {
         selectedDifficultyFilter = state.difficultyFilter
         showsOnlyTestExercises = supportsTestExerciseFilter ? state.showsOnlyTestExercises : false
         completionFilter = state.completionFilter
-        sidebarMode = state.sidebarMode
         rightSidebarTab = state.rightSidebarTab
-        isInspectorVisible = state.isInspectorVisible
         rightSidebarWidth = CrabTimeTheme.Layout.inspectorWidth
-        terminalDisplayMode = state.terminalDisplayMode
         selectedChatSessionID = state.selectedChatSessionID
         if let savedDifficulty = state.difficultyFilter,
            !availableDifficultyFilters.contains(savedDifficulty) {
@@ -1837,7 +1724,6 @@ final class WorkspaceStore {
         editorText = sourcePath.flatMap { draftEditorTextByPath[$0] } ?? selectedExercise?.presentation.visibleSource ?? ""
         explorerPreviewText = ""
         isEditorDirty = sourcePath.map { draftEditorTextByPath[$0] != nil } ?? false
-        editorDisplayMode = .edit
         currentDiffText = ""
         isSolutionVisible = false
         selectedChatSessionID = nil
@@ -1863,7 +1749,6 @@ final class WorkspaceStore {
         selectedExplorerFileURL = url.standardizedFileURL
         selectedExplorerNodePath = url.standardizedFileURL.path
         registerOpenTab(url)
-        editorDisplayMode = .edit
         currentDiffText = ""
 
         if let matchingExercise = workspace.exercises.first(where: { $0.sourceURL.standardizedFileURL == url.standardizedFileURL }) {
@@ -1953,7 +1838,6 @@ final class WorkspaceStore {
         openTabs = []
         editorText = ""
         currentDiffText = ""
-        editorDisplayMode = .edit
         explorerKeyboardFocusActive = false
         selectedChatSessionID = nil
         chatStore?.syncSelection(using: self)
@@ -2020,10 +1904,8 @@ final class WorkspaceStore {
             )
 
             currentDiffText = diff.isEmpty ? "No changes in this file." : diff
-            editorDisplayMode = .diff
         } catch {
             currentDiffText = "Diff failed: \(error.localizedDescription)"
-            editorDisplayMode = .diff
         }
     }
 
@@ -2057,7 +1939,6 @@ final class WorkspaceStore {
         let standardizedURL = url.standardizedFileURL
         draftEditorTextByPath.removeValue(forKey: standardizedURL.path)
         currentDiffText = ""
-        editorDisplayMode = .edit
 
         if let selectedIndex = workspace.exercises.firstIndex(where: { $0.sourceURL.standardizedFileURL == standardizedURL }),
            let rebuiltSource = try? String(contentsOf: standardizedURL, encoding: .utf8) {
@@ -2128,11 +2009,11 @@ final class WorkspaceStore {
                 selectedExercisePath: selectedExercise?.sourceURL.standardizedFileURL.path,
                 activeTabPath: selectedExplorerFileURL?.standardizedFileURL.path,
                 openTabs: openTabs,
-                sidebarMode: sidebarMode,
-                isInspectorVisible: isInspectorVisible,
+                sidebarMode: .exercises,
+                isInspectorVisible: true,
                 rightSidebarTab: rightSidebarTab,
                 rightSidebarWidth: rightSidebarWidth,
-                terminalDisplayMode: terminalDisplayMode,
+                terminalDisplayMode: .split,
                 searchQuery: searchText,
                 difficultyFilter: selectedDifficultyFilter,
                 showsOnlyTestExercises: showsOnlyTestExercises,
@@ -2892,29 +2773,4 @@ private struct ExplorerVisibleEntry {
 
 // Restore toggleTerminalVisibility
 extension WorkspaceStore {
-    func toggleTerminalVisibility() {
-        if terminalDisplayMode == .hidden {
-            // ── SHOW terminal ────────────────────────────────────────────────
-            lastFocusTarget = .terminal
-            terminalDisplayMode = .split
-            persistCurrentWorkspaceSnapshot()
-            // Diagnostics tab with items: resign editor so the global key bridge
-            // (DiagnosticsKeyBridge) picks up j/k/enter for list navigation.
-            if selectedConsoleTab == .diagnostics {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    NSApp.keyWindow?.makeFirstResponder(nil)
-                }
-            }
-        } else {
-            // ── HIDE terminal ─────────────────────────────────────────────────
-            lastFocusTarget = .editor
-            terminalDisplayMode = .hidden
-            persistCurrentWorkspaceSnapshot()
-            
-            // Re-focus the split editor pane if possible
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                NSApp.keyWindow?.makeFirstResponder(nil)
-            }
-        }
-    }
 }

@@ -2,12 +2,13 @@ import SwiftUI
 
 struct ProblemBrowserView: View {
     @Environment(WorkspaceStore.self) private var store
+    @Environment(NavigationStore.self) private var navigationStore
 
     var body: some View {
         @Bindable var store = store
 
         Group {
-            switch store.sidebarMode {
+            switch navigationStore.sidebarMode {
             case .explorer:
                 WorkspaceExplorerView()
             case .todos:
@@ -41,7 +42,7 @@ struct ProblemBrowserView: View {
         }
         .simultaneousGesture(
             TapGesture().onEnded {
-                if store.sidebarMode != .explorer {
+                if navigationStore.sidebarMode != .explorer {
                     store.setExplorerKeyboardFocus(active: false)
                 }
             }
@@ -51,6 +52,7 @@ struct ProblemBrowserView: View {
 
 private struct ProblemSearchField: View {
     @Environment(WorkspaceStore.self) private var store
+    @Environment(NavigationStore.self) private var navigationStore
     @Binding var text: String
     let resultCount: Int
     @FocusState private var isFocused: Bool

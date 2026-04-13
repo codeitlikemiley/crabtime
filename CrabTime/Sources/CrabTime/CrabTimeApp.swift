@@ -48,7 +48,17 @@ private struct FocusedWorkspaceStoreKey: FocusedValueKey {
     typealias Value = WorkspaceStore
 }
 
+
+struct FocusedNavigationStoreKey: FocusedValueKey {
+    typealias Value = NavigationStore
+}
+
 extension FocusedValues {
+    var navigationStore: NavigationStore? {
+        get { self[FocusedNavigationStoreKey.self] }
+        set { self[FocusedNavigationStoreKey.self] = newValue }
+    }
+
     var workspaceStore: WorkspaceStore? {
         get { self[FocusedWorkspaceStoreKey.self] }
         set { self[FocusedWorkspaceStoreKey.self] = newValue }
@@ -75,6 +85,7 @@ struct WorkspaceSceneRoot: View {
     @State private var todoStore: TodoExplorerStore
     @State private var exercismStore: ExercismStore
     @State private var processStore: ProcessStore
+    @State private var navigationStore: NavigationStore
     @State private var didApplyInitialWorkspace = false
 
     init(services: AppServices, initialWorkspaceRootPath: String? = nil) {
@@ -100,6 +111,7 @@ struct WorkspaceSceneRoot: View {
         _todoStore = State(initialValue: todoStore)
         _exercismStore = State(initialValue: exercismStore)
         _processStore = State(initialValue: processStore)
+        _navigationStore = State(initialValue: NavigationStore())
     }
 
     @State private var dependencyManager = DependencyManager.shared
@@ -115,7 +127,9 @@ struct WorkspaceSceneRoot: View {
                     .environment(processStore)
                     .environment(services.aiSettingsStore)
                     .environment(services.modelCatalogStore)
+                    
                     .focusedSceneValue(\.workspaceStore, workspaceStore)
+                    .focusedSceneValue(\.navigationStore, navigationStore)
                     .focusedSceneValue(\.exercismStore, exercismStore)
                     .focusedSceneValue(\.processStore, processStore)
                     .task(id: initialWorkspaceRootPath) {
@@ -148,6 +162,7 @@ struct WorkspaceSceneRoot: View {
 
 struct CrabTimeAppCommands: Commands {
     @FocusedValue(\.workspaceStore) private var workspaceStore
+    @FocusedValue(\.navigationStore) private var navigationStore
     @FocusedValue(\.exercismStore) private var exercismStore
     @FocusedValue(\.processStore) private var processStore
 
@@ -233,21 +248,12 @@ struct CrabTimeAppCommands: Commands {
         }
 
         CommandGroup(replacing: .sidebar) {
-            Button(
-                workspaceStore?.showsProblemPane ?? true ? "Hide Left Column" : "Show Left Column"
-            ) {
-                workspaceStore?.toggleLeftColumnVisibility()
+            Button("Toggle Left Column") {
+                navigationStore?.toggleLeftColumnVisibility()
             }
             .keyboardShortcut("b", modifiers: .command)
             .disabled(workspaceStore == nil)
 
-            Button(
-                workspaceStore?.isInspectorVisible ?? true ? "Hide Right Sidebar" : "Show Right Sidebar"
-            ) {
-                workspaceStore?.toggleRightSidebarVisibility()
-            }
-            .keyboardShortcut("b", modifiers: [.command, .shift])
-            .disabled(workspaceStore == nil)
         }
 
         // Remove macOS Print (Cmd+P) so we can use it for Command Palette
@@ -274,35 +280,20 @@ struct CrabTimeAppCommands: Commands {
                 .keyboardShortcut("e", modifiers: [.command, .shift])
                 .disabled(workspaceStore == nil)
 
-            Button(workspaceStore?.showsTerminal ?? true ? "Hide Terminal" : "Show Terminal") {
-                workspaceStore?.toggleTerminalVisibility()
+            Button("Toggle Terminal") {
+                navigationStore?.toggleTerminalVisibility()
             }
             .keyboardShortcut("j", modifiers: .command)
             .disabled(workspaceStore == nil)
 
-            Button(workspaceStore?.isTerminalMaximized ?? false ? "Restore Terminal Layout" : "Maximize Terminal") {
-                workspaceStore?.toggleTerminalMaximize()
-            }
-            .keyboardShortcut("m", modifiers: [.command, .shift])
-            .disabled(workspaceStore == nil)
 
             Button("Clear Output") { workspaceStore?.clearConsoleOutput() }
                 .keyboardShortcut("k", modifiers: .command)
                 .disabled(workspaceStore == nil)
 
-            Button("Show Output Tab") { workspaceStore?.selectConsoleTab(.output) }
-                .keyboardShortcut("o", modifiers: [.command, .shift])
-                .disabled(workspaceStore == nil)
 
-            Button("Show Diagnostics Tab") { workspaceStore?.selectConsoleTab(.diagnostics) }
-                .keyboardShortcut("d", modifiers: [.command, .shift])
-                .disabled(workspaceStore == nil)
 
-            Button("Show Session Tab") { workspaceStore?.selectConsoleTab(.session) }
-                .keyboardShortcut("s", modifiers: [.command, .shift])
-                .disabled(workspaceStore == nil)
 
-            Button("Show AI Runtime Tab") { workspaceStore?.selectConsoleTab(.aiRuntime) }
                 .keyboardShortcut("a", modifiers: [.command, .shift])
                 .disabled(workspaceStore == nil)
 
@@ -344,6 +335,7 @@ struct CrabTimeApp: App {
             AppSettingsView()
                 .environment(services.aiSettingsStore)
                 .environment(services.modelCatalogStore)
+                    
                 .preferredColorScheme(.dark)
         }
     }
