@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct ExercismBrowserView: View {
-    @Environment(WorkspaceStore.self) private var store
+    @Environment(WorkspaceStore.self) private var workspaceStore
+    @Environment(ExercismStore.self) private var store
+    @Environment(ProcessStore.self) private var processStore
     @FocusState private var isSearchFocused: Bool
 
     private func toggleFilter(_ filter: String?) {
@@ -19,6 +21,8 @@ struct ExercismBrowserView: View {
 
     var body: some View {
         @Bindable var store = store
+        let workspaceStore = workspaceStore
+        let processStore = processStore
         
         let credentialStore = CredentialStore()
         let hasToken = !(credentialStore.readSecret(for: "exercism_api_token") ?? "").isEmpty
@@ -92,8 +96,8 @@ struct ExercismBrowserView: View {
                     RoundedRectangle(cornerRadius: CrabTimeTheme.Layout.subpanelRadius, style: .continuous)
                         .stroke(CrabTimeTheme.Palette.divider, lineWidth: 1)
                 }
-                .task(id: store.exercismSearchFocusToken) {
-                    guard store.exercismSearchFocusToken > 0 else { return }
+                .task(id: workspaceStore.exercismSearchFocusToken) {
+                    guard workspaceStore.exercismSearchFocusToken > 0 else { return }
                     isSearchFocused = true
                 }
 
@@ -145,7 +149,7 @@ struct ExercismBrowserView: View {
                                     isCompleted: store.exercismCompletedExercises.contains(exercise.slug),
                                     onDownload: {
                                         store.selectedExercismIndex = index
-                                        store.activateSelectedExercismExercise()
+                                        store.activateSelectedExercismExercise(using: workspaceStore, processStore: processStore)
                                     }
                                 )
                                 .id(exercise.id)
@@ -171,10 +175,10 @@ struct ExercismBrowserView: View {
         .paneCard()
         .background(
             ExercismKeyBridge(
-                isEnabled: store.sidebarMode == .exercism,
+                isEnabled: workspaceStore.sidebarMode == .exercism,
                 onMoveUp: store.moveExercismSelectionUp,
                 onMoveDown: store.moveExercismSelectionDown,
-                onActivate: store.activateSelectedExercismExercise
+                onActivate: { store.activateSelectedExercismExercise(using: workspaceStore, processStore: processStore) }
             )
         )
     }

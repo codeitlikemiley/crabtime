@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WorkspaceRailView: View {
     @Environment(WorkspaceStore.self) private var store
+    @Environment(ProcessStore.self) private var processStore
 
     var body: some View {
         VStack(spacing: 18) {
@@ -49,9 +50,9 @@ struct WorkspaceRailView: View {
             Spacer()
 
             VStack(spacing: 8) {
-                StatusDot(isActive: store.runState == .running, tint: CrabTimeTheme.Palette.cyan)
-                StatusDot(isActive: store.runState == .failed, tint: CrabTimeTheme.Palette.ember)
-                StatusDot(isActive: store.runState == .succeeded, tint: CrabTimeTheme.Palette.moss)
+                StatusDot(isActive: processStore.runState == .running, tint: CrabTimeTheme.Palette.cyan)
+                StatusDot(isActive: processStore.runState == .failed, tint: CrabTimeTheme.Palette.ember)
+                StatusDot(isActive: processStore.runState == .succeeded, tint: CrabTimeTheme.Palette.moss)
             }
             .frame(maxWidth: .infinity)
         }

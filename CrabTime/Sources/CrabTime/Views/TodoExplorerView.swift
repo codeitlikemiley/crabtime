@@ -1,10 +1,12 @@
 import SwiftUI
 
 struct TodoExplorerView: View {
-    @Environment(WorkspaceStore.self) private var store
+    @Environment(WorkspaceStore.self) private var workspaceStore
+    @Environment(TodoExplorerStore.self) private var store
 
     var body: some View {
         @Bindable var store = store
+        let workspaceStore = workspaceStore
 
         VStack(alignment: .leading, spacing: 12) {
             // Header
@@ -44,7 +46,7 @@ struct TodoExplorerView: View {
                         .stroke(Color.white.opacity(0.08), lineWidth: 1)
                 )
 
-                Text("\(store.visibleTodoItems.count)")
+                Text("\(store.visibleTodoItems(using: workspaceStore).count)")
                     .font(.system(size: 10, weight: .semibold, design: .monospaced))
                     .foregroundStyle(CrabTimeTheme.Palette.textMuted)
                     .padding(.horizontal, 6)
@@ -68,7 +70,7 @@ struct TodoExplorerView: View {
                 Spacer()
 
                 Button {
-                    store.refreshTodoItems()
+                    store.refreshTodoItems(using: workspaceStore)
                 } label: {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 11, weight: .semibold))
@@ -80,7 +82,7 @@ struct TodoExplorerView: View {
             }
 
             // List
-            let items = store.visibleTodoItems
+            let items = store.visibleTodoItems(using: workspaceStore)
             if items.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "checkmark.circle")
@@ -112,14 +114,14 @@ struct TodoExplorerView: View {
                                 .contentShape(Rectangle())
                                 .onTapGesture {
                                     store.selectedTodoIndex = index
-                                    store.activateTodoItem(item)
+                                    store.activateTodoItem(item, using: workspaceStore)
                                 }
                             }
                         }
                         .padding(.vertical, 2)
                     }
                     .onChange(of: store.selectedTodoIndex) { _, newValue in
-                        let visible = store.visibleTodoItems
+                        let visible = store.visibleTodoItems(using: workspaceStore)
                         if visible.indices.contains(newValue) {
                             withAnimation(.easeInOut(duration: 0.15)) {
                                 proxy.scrollTo(visible[newValue].id, anchor: .center)
@@ -132,14 +134,14 @@ struct TodoExplorerView: View {
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .paneCard()
         .onAppear {
-            store.refreshTodoItems()
+            store.refreshTodoItems(using: workspaceStore)
         }
         .background(
             TodoKeyBridge(
-                isEnabled: store.sidebarMode == .todos,
-                onMoveUp: store.moveTodoSelectionUp,
-                onMoveDown: store.moveTodoSelectionDown,
-                onActivate: store.activateSelectedTodo
+                isEnabled: workspaceStore.sidebarMode == .todos,
+                onMoveUp: { store.moveTodoSelectionUp(using: workspaceStore) },
+                onMoveDown: { store.moveTodoSelectionDown(using: workspaceStore) },
+                onActivate: { store.activateSelectedTodo(using: workspaceStore) }
             )
         )
     }

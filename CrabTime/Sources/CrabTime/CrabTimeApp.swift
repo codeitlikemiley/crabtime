@@ -26,7 +26,11 @@ final class AppServices {
         do {
             database = try WorkspaceLibraryDatabase(paths: appPaths)
         } catch {
-            database = try! WorkspaceLibraryDatabase(paths: .temporary(rootName: "\(AppBrand.fallbackStoragePrefix)-\(UUID().uuidString)"))
+            do {
+                database = try WorkspaceLibraryDatabase(paths: .temporary(rootName: "\(AppBrand.fallbackStoragePrefix)-\(UUID().uuidString)"))
+            } catch {
+                database = try! WorkspaceLibraryDatabase(paths: nil)
+            }
         }
 
         let aiSettingsStore = AISettingsStore()
@@ -49,7 +53,18 @@ extension FocusedValues {
         get { self[FocusedWorkspaceStoreKey.self] }
         set { self[FocusedWorkspaceStoreKey.self] = newValue }
     }
+    var exercismStore: ExercismStore? {
+        get { self[FocusedExercismStoreKey.self] }
+        set { self[FocusedExercismStoreKey.self] = newValue }
+    }
+    var processStore: ProcessStore? {
+        get { self[FocusedProcessStoreKey.self] }
+        set { self[FocusedProcessStoreKey.self] = newValue }
+    }
 }
+
+private struct FocusedExercismStoreKey: FocusedValueKey { typealias Value = ExercismStore }
+private struct FocusedProcessStoreKey: FocusedValueKey { typealias Value = ProcessStore }
 
 struct WorkspaceSceneRoot: View {
     let services: AppServices
@@ -57,6 +72,9 @@ struct WorkspaceSceneRoot: View {
 
     @State private var workspaceStore: WorkspaceStore
     @State private var chatStore: ChatStore
+    @State private var todoStore: TodoExplorerStore
+    @State private var exercismStore: ExercismStore
+    @State private var processStore: ProcessStore
     @State private var didApplyInitialWorkspace = false
 
     init(services: AppServices, initialWorkspaceRootPath: String? = nil) {
@@ -71,10 +89,17 @@ struct WorkspaceSceneRoot: View {
             database: services.database,
             providerManager: services.providerManager
         )
+        let todoStore = TodoExplorerStore()
+        let exercismStore = ExercismStore()
+        let processStore = ProcessStore()
         workspaceStore.attachChatStore(chatStore)
+        chatStore.attachProcessStore(processStore)
 
         _workspaceStore = State(initialValue: workspaceStore)
         _chatStore = State(initialValue: chatStore)
+        _todoStore = State(initialValue: todoStore)
+        _exercismStore = State(initialValue: exercismStore)
+        _processStore = State(initialValue: processStore)
     }
 
     @State private var dependencyManager = DependencyManager.shared
@@ -85,9 +110,14 @@ struct WorkspaceSceneRoot: View {
                 MainSplitView()
                     .environment(workspaceStore)
                     .environment(chatStore)
+                    .environment(todoStore)
+                    .environment(exercismStore)
+                    .environment(processStore)
                     .environment(services.aiSettingsStore)
                     .environment(services.modelCatalogStore)
                     .focusedSceneValue(\.workspaceStore, workspaceStore)
+                    .focusedSceneValue(\.exercismStore, exercismStore)
+                    .focusedSceneValue(\.processStore, processStore)
                     .task(id: initialWorkspaceRootPath) {
                         guard !didApplyInitialWorkspace else {
                             return
@@ -118,6 +148,8 @@ struct WorkspaceSceneRoot: View {
 
 struct CrabTimeAppCommands: Commands {
     @FocusedValue(\.workspaceStore) private var workspaceStore
+    @FocusedValue(\.exercismStore) private var exercismStore
+    @FocusedValue(\.processStore) private var processStore
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
@@ -137,12 +169,16 @@ struct CrabTimeAppCommands: Commands {
 
             Divider()
 
-            Button("Download Exercism Exercise…") { workspaceStore?.showExercismDownloadPrompt() }
-                .disabled(workspaceStore == nil)
+            Button("Download Exercism Exercise…") {
+                if let store = workspaceStore, let processStore = processStore {
+                    exercismStore?.showExercismDownloadPrompt(using: store, processStore: processStore)
+                }
+            }
+                .disabled(exercismStore == nil || workspaceStore == nil)
 
-            Button("Check Exercism Setup") { workspaceStore?.showExercismStatus() }
+            Button("Check Exercism Setup") { exercismStore?.showExercismStatus() }
                 .keyboardShortcut("e", modifiers: [.command, .option])
-                .disabled(workspaceStore == nil)
+                .disabled(exercismStore == nil)
 
             Divider()
 
@@ -150,6 +186,22 @@ struct CrabTimeAppCommands: Commands {
                 Text("Settings…")
             }
                 .keyboardShortcut(",", modifiers: .command)
+        }
+
+        CommandMenu("Run") {
+            Button("Run Exercise") {
+                if let processStore = processStore {
+                    workspaceStore?.runSelectedExercise(processStore: processStore)
+                }
+            }
+            .keyboardShortcut("R", modifiers: [.command])
+
+            Button("Run Tests") {
+                if let processStore = processStore {
+                    workspaceStore?.runSelectedExerciseTests(processStore: processStore)
+                }
+            }
+            .keyboardShortcut("U", modifiers: [.command])
         }
 
         CommandMenu("Workspace") {
@@ -161,21 +213,13 @@ struct CrabTimeAppCommands: Commands {
                 .keyboardShortcut("w", modifiers: .command)
                 .disabled(workspaceStore?.currentOpenTabs.isEmpty ?? true)
 
-            Button("Run Exercise") { workspaceStore?.runSelectedExercise() }
-                .keyboardShortcut("r", modifiers: .command)
-                .disabled(!(workspaceStore?.hasSelection ?? false) || (workspaceStore?.isRunning ?? false))
-
-            Button("Run Tests") { workspaceStore?.runSelectedExerciseTests() }
-                .keyboardShortcut("t", modifiers: .command)
-                .disabled(!(workspaceStore?.hasSelection ?? false) || (workspaceStore?.isRunning ?? false))
-
             Button("Override Cargo Runner…") { workspaceStore?.showCommandPalette(with: "> ") }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
                 .disabled(workspaceStore == nil)
 
-            Button("Submit to Exercism") { workspaceStore?.submitSelectedExerciseToExercism() }
+            Button("Submit to Exercism") { if let store = workspaceStore, let ps = processStore { exercismStore?.submitSelectedExerciseToExercism(using: store, processStore: ps) } }
                 .keyboardShortcut("u", modifiers: [.command, .shift])
-                .disabled(!(workspaceStore?.canSubmitSelectedExerciseToExercism ?? false))
+                .disabled(!(workspaceStore.map { exercismStore?.canSubmitSelectedExerciseToExercism(using: $0) ?? false } ?? false))
 
             Divider()
 

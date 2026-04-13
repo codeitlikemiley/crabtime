@@ -2,6 +2,8 @@ import SwiftUI
 
 struct InspectorSidebarView: View {
     @Environment(WorkspaceStore.self) private var store
+    @Environment(ProcessStore.self) private var processStore
+    @Environment(ExercismStore.self) private var exercismStore
     @State private var focusedCheckID: String?
 
     private var testChecks: [ExerciseCheck] {
@@ -54,8 +56,8 @@ struct InspectorSidebarView: View {
                     completionRatio: completionRatio,
                     hasTestChecks: hasTestChecks,
                     testChecksHaveResults: testChecksHaveResults,
-                    errorCount: store.errorCount,
-                    warningCount: store.warningCount
+                    errorCount: processStore.errorCount,
+                    warningCount: processStore.warningCount
                 )
 
                 if store.hasSolutionPreview {
@@ -82,7 +84,7 @@ struct InspectorSidebarView: View {
                 }
 
                 if store.isExercismWorkspace, let slug = store.workspace?.rootURL.lastPathComponent {
-                    if store.exercismCompletedExercises.contains(slug) {
+                    if exercismStore.exercismCompletedExercises.contains(slug) {
                         HStack(spacing: 8) {
                             Button(action: {
                                 if let url = URL(string: "https://exercism.org/tracks/rust/exercises/\(slug)") {
@@ -103,8 +105,8 @@ struct InspectorSidebarView: View {
                             .foregroundStyle(CrabTimeTheme.Palette.ink)
                             .interactivePointer()
 
-                            Button(action: store.submitSelectedExerciseToExercism) {
-                                if store.isSubmittingExercism {
+                            Button(action: { exercismStore.submitSelectedExerciseToExercism(using: store, processStore: processStore) }) {
+                                if exercismStore.isSubmittingExercism {
                                     ProgressView().controlSize(.small)
                                 } else {
                                     Image(systemName: "arrow.triangle.2.circlepath")
@@ -120,19 +122,21 @@ struct InspectorSidebarView: View {
                                 Capsule().stroke(CrabTimeTheme.Palette.divider, lineWidth: 1)
                             }
                             .foregroundStyle(CrabTimeTheme.Palette.textMuted)
-                            .disabled(!store.canSubmitSelectedExerciseToExercism)
+                            .disabled(!exercismStore.canSubmitSelectedExerciseToExercism(using: store))
                             .help("Submit Update")
                             .interactivePointer()
                         }
                     } else {
-                        Button(action: store.submitSelectedExerciseToExercism) {
+                        Button(action: {
+                            exercismStore.submitSelectedExerciseToExercism(using: store, processStore: processStore)
+                        }) {
                             HStack(spacing: 6) {
-                                if store.isSubmittingExercism {
+                                if exercismStore.isSubmittingExercism {
                                     ProgressView().controlSize(.small)
                                 } else {
                                     Image(systemName: "paperplane.fill")
                                 }
-                                Text(store.isSubmittingExercism ? "Submitting…" : "Submit to Exercism")
+                                Text(exercismStore.isSubmittingExercism ? "Submitting…" : "Submit to Exercism")
                             }
                         }
                         .buttonStyle(.plain)
@@ -145,7 +149,7 @@ struct InspectorSidebarView: View {
                             Capsule().stroke(CrabTimeTheme.Palette.divider, lineWidth: 1)
                         }
                         .foregroundStyle(CrabTimeTheme.Palette.ink)
-                        .disabled(!store.canSubmitSelectedExerciseToExercism)
+                        .disabled(!exercismStore.canSubmitSelectedExerciseToExercism(using: store))
                         .interactivePointer()
                     }
                 }
@@ -229,7 +233,7 @@ struct InspectorSidebarView: View {
     }
 
     private var statusTitle: String {
-        switch store.runState {
+        switch processStore.runState {
         case .idle:
             "Workspace ready"
         case .running:
@@ -242,7 +246,7 @@ struct InspectorSidebarView: View {
     }
 
     private var statusSymbol: String {
-        switch store.runState {
+        switch processStore.runState {
         case .idle:
             "sparkles"
         case .running:
@@ -255,7 +259,7 @@ struct InspectorSidebarView: View {
     }
 
     private var statusTint: Color {
-        switch store.runState {
+        switch processStore.runState {
         case .idle:
             CrabTimeTheme.Palette.ink
         case .running:

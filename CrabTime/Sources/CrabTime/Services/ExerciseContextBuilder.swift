@@ -2,7 +2,7 @@ import Foundation
 
 struct ExerciseContextBuilder {
     @MainActor
-    func build(from store: WorkspaceStore) -> String {
+    func build(from store: WorkspaceStore, processStore: ProcessStore?) -> String {
         var sections: [String] = []
 
         if let workspace = store.workspace {
@@ -72,7 +72,7 @@ struct ExerciseContextBuilder {
             """)
         }
 
-        appendRuntimeSections(from: store, to: &sections)
+        appendRuntimeSections(from: store, processStore: processStore, to: &sections)
         return sections.joined(separator: "\n\n")
     }
 
@@ -111,17 +111,17 @@ struct ExerciseContextBuilder {
     }
 
     @MainActor
-    private func appendRuntimeSections(from store: WorkspaceStore, to sections: inout [String]) {
-        if !store.consoleOutput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            sections.append("Latest run output:\n```text\n\(store.consoleOutput)\n```")
+    private func appendRuntimeSections(from store: WorkspaceStore, processStore: ProcessStore?, to sections: inout [String]) {
+        if let processStore = processStore, !store.consoleOutput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            sections.append("Terminal Output:\n```text\n\(store.consoleOutput)\n```")
         }
 
-        if !store.diagnostics.isEmpty {
-            let diagnosticText = store.diagnostics.map { diagnostic in
+        if let processStore = processStore, !processStore.diagnostics.isEmpty {
+            let diagnosticsText = processStore.diagnostics.map { diagnostic in
                 let lineSuffix = diagnostic.line.map { " @ line \($0)" } ?? ""
                 return "[\(diagnostic.severity.rawValue.uppercased())] \(diagnostic.message)\(lineSuffix)"
             }.joined(separator: "\n")
-            sections.append("Diagnostics:\n```text\n\(diagnosticText)\n```")
+            sections.append("Diagnostics:\n```text\n\(diagnosticsText)\n```")
         }
     }
 

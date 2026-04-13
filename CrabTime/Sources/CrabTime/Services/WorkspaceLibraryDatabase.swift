@@ -6,11 +6,17 @@ final class WorkspaceLibraryDatabase {
     private var database: OpaquePointer?
     private let sqliteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
-    init(paths: AppStoragePaths, fileManager: FileManager = .default) throws {
+    init(paths: AppStoragePaths? = nil, fileManager: FileManager = .default) throws {
         self.fileManager = fileManager
-        try paths.ensureDirectories(fileManager: fileManager)
+        let dbPath: String
+        if let paths = paths {
+            try paths.ensureDirectories(fileManager: fileManager)
+            dbPath = paths.databaseURL.path
+        } else {
+            dbPath = ":memory:"
+        }
 
-        guard sqlite3_open(paths.databaseURL.path, &database) == SQLITE_OK else {
+        guard sqlite3_open(dbPath, &database) == SQLITE_OK else {
             throw DatabaseError.openFailed(message: String(cString: sqlite3_errmsg(database)))
         }
 

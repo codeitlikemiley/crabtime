@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ConsolePanelView: View {
     @Environment(WorkspaceStore.self) private var store
+    @Environment(ProcessStore.self) private var processStore
 
     var body: some View {
         @Bindable var store = store
@@ -29,8 +30,8 @@ struct ConsolePanelView: View {
                     ConsoleTabButton(
                         title: "Diagnostics",
                         isSelected: store.selectedConsoleTab == .diagnostics,
-                        badgeText: store.diagnosticsCount == 0 ? nil : "\(store.diagnosticsCount)",
-                        accentColor: store.errorCount > 0 ? .red : CrabTimeTheme.Palette.ember
+                        badgeText: processStore.diagnosticsCount == 0 ? nil : "\(processStore.diagnosticsCount)",
+                        accentColor: processStore.errorCount > 0 ? Color.red : CrabTimeTheme.Palette.ember
                     ) {
                         store.selectConsoleTab(.diagnostics)
                     }
@@ -46,8 +47,8 @@ struct ConsolePanelView: View {
                     ConsoleTabButton(
                         title: "AI Runtime",
                         isSelected: store.selectedConsoleTab == .aiRuntime,
-                        badgeText: store.aiRuntimeToolCalls.isEmpty ? nil : "\(store.aiRuntimeToolCalls.count)",
-                        accentColor: store.aiRuntimeTransport == .acp ? CrabTimeTheme.Palette.cyan : CrabTimeTheme.Palette.textMuted
+                        badgeText: processStore.aiRuntimeToolCalls.isEmpty ? nil : "\(processStore.aiRuntimeToolCalls.count)",
+                        accentColor: processStore.aiRuntimeTransport == .acp ? CrabTimeTheme.Palette.cyan : CrabTimeTheme.Palette.textMuted
                     ) {
                         store.selectConsoleTab(.aiRuntime)
                     }
@@ -73,11 +74,11 @@ struct ConsolePanelView: View {
                         .help("Copy session log to clipboard")
                     }
 
-                    if store.selectedConsoleTab == .aiRuntime && !store.aiRuntimeEvents.isEmpty {
+                    if store.selectedConsoleTab == .aiRuntime && !processStore.aiRuntimeEvents.isEmpty {
                         Button {
                             NSPasteboard.general.clearContents()
                             NSPasteboard.general.setString(
-                                store.aiRuntimeEvents.joined(separator: "\n"),
+                                processStore.aiRuntimeEvents.joined(separator: "\n"),
                                 forType: .string
                             )
                         } label: {
@@ -96,7 +97,7 @@ struct ConsolePanelView: View {
                     IconGlassButton(
                         systemImage: "trash",
                         helpText: "Clear output",
-                        action: store.clearConsoleOutput
+                        action: { store.clearConsoleOutput() }
                     )
 
                     IconGlassButton(
@@ -132,7 +133,7 @@ struct ConsolePanelView: View {
                         }
                     }
                 case .diagnostics:
-                    if store.diagnostics.isEmpty {
+                    if processStore.diagnostics.isEmpty {
                         WorkspaceEmptyStateView(
                             title: "No Diagnostics",
                             systemImage: "checkmark.circle",
@@ -142,10 +143,10 @@ struct ConsolePanelView: View {
                         ScrollViewReader { scrollProxy in
                             ScrollView {
                                 LazyVStack(alignment: .leading, spacing: 10) {
-                                    ForEach(Array(store.diagnostics.enumerated()), id: \.element.id) { index, diagnostic in
+                                    ForEach(Array(processStore.diagnostics.enumerated()), id: \.element.id) { index, diagnostic in
                                         DiagnosticCard(
                                             diagnostic: diagnostic,
-                                            isSelected: index == store.selectedDiagnosticIndex
+                                            isSelected: index == processStore.selectedDiagnosticIndex
                                         ) {
                                             if let line = diagnostic.line {
                                                 store.goToLine(line)
@@ -155,10 +156,10 @@ struct ConsolePanelView: View {
                                     }
                                 }
                             }
-                            .onChange(of: store.selectedDiagnosticIndex) { _, newValue in
-                                if store.diagnostics.indices.contains(newValue) {
+                            .onChange(of: processStore.selectedDiagnosticIndex) { _, newValue in
+                                if processStore.diagnostics.indices.contains(newValue) {
                                     withAnimation(.easeOut(duration: 0.1)) {
-                                        scrollProxy.scrollTo(store.diagnostics[newValue].id, anchor: .center)
+                                        scrollProxy.scrollTo(processStore.diagnostics[newValue].id, anchor: .center)
                                     }
                                 }
                             }
@@ -166,9 +167,9 @@ struct ConsolePanelView: View {
                         .background(
                             DiagnosticsKeyBridge(
                                 isEnabled: store.selectedConsoleTab == .diagnostics,
-                                onMoveUp: store.moveDiagnosticSelectionUp,
-                                onMoveDown: store.moveDiagnosticSelectionDown,
-                                onActivate: store.activateSelectedDiagnostic
+                                onMoveUp: { processStore.moveDiagnosticSelectionUp() },
+                                onMoveDown: { processStore.moveDiagnosticSelectionDown() },
+                                onActivate: { processStore.activateSelectedDiagnostic(using: store) }
                             )
                         )
                     }
@@ -214,9 +215,10 @@ struct ConsolePanelView: View {
 
 private struct AIRuntimeConsoleView: View {
     @Environment(WorkspaceStore.self) private var store
+    @Environment(ProcessStore.self) private var processStore
 
     var body: some View {
-        if store.aiRuntimeEvents.isEmpty && store.aiRuntimeToolCalls.isEmpty && store.aiRuntimeTransport == nil {
+        if processStore.aiRuntimeEvents.isEmpty && processStore.aiRuntimeToolCalls.isEmpty && processStore.aiRuntimeTransport == nil {
             WorkspaceEmptyStateView(
                 title: "No AI Runtime Activity",
                 systemImage: "bolt.horizontal.circle",
@@ -228,25 +230,25 @@ private struct AIRuntimeConsoleView: View {
                     runtimeSummaryCard
                     runtimeActions
 
-                    if !store.aiRuntimeToolCalls.isEmpty {
+                    if !processStore.aiRuntimeToolCalls.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("Tool Calls")
                                 .font(.headline.weight(.bold))
                                 .foregroundStyle(CrabTimeTheme.Palette.ink)
 
-                            ForEach(store.aiRuntimeToolCalls) { tool in
+                            ForEach(processStore.aiRuntimeToolCalls) { tool in
                                 toolCallCard(tool)
                             }
                         }
                     }
 
-                    if !store.aiRuntimeEvents.isEmpty {
+                    if !processStore.aiRuntimeEvents.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("Runtime Events")
                                 .font(.headline.weight(.bold))
                                 .foregroundStyle(CrabTimeTheme.Palette.ink)
 
-                            ForEach(Array(store.aiRuntimeEvents.enumerated()), id: \.offset) { _, event in
+                            ForEach(Array(processStore.aiRuntimeEvents.enumerated()), id: \.offset) { _, event in
                                 Text(event)
                                     .font(.system(.body, design: .monospaced))
                                     .foregroundStyle(CrabTimeTheme.Palette.ink)
@@ -268,17 +270,17 @@ private struct AIRuntimeConsoleView: View {
                 .font(.headline.weight(.bold))
                 .foregroundStyle(CrabTimeTheme.Palette.ink)
 
-            runtimeRow("Provider", store.aiRuntimeProviderTitle)
-            runtimeRow("Transport", store.aiRuntimeTransport?.title ?? "Unknown")
-            runtimeRow("Model", store.aiRuntimeModel.isEmpty ? "Unknown" : store.aiRuntimeModel)
-            runtimeRow("Process", store.aiRuntimeProcessStatus)
-            runtimeRow("Auth", store.aiRuntimeAuthStatus)
-            runtimeRow("Session", store.aiRuntimeSessionID ?? "None")
+            runtimeRow("Provider", processStore.aiRuntimeProviderTitle)
+            runtimeRow("Transport", processStore.aiRuntimeTransport?.title ?? "Unknown")
+            runtimeRow("Model", processStore.aiRuntimeModel.isEmpty ? "Unknown" : processStore.aiRuntimeModel)
+            runtimeRow("Process", processStore.aiRuntimeProcessStatus)
+            runtimeRow("Auth", processStore.aiRuntimeAuthStatus)
+            runtimeRow("Session", processStore.aiRuntimeSessionID ?? "None")
 
-            if let logPath = store.aiRuntimeLogPath {
+            if let logPath = processStore.aiRuntimeLogPath {
                 runtimeRow("Logs", logPath)
             }
-            if let lastError = store.aiRuntimeLastError, !lastError.isEmpty {
+            if let lastError = processStore.aiRuntimeLastError, !lastError.isEmpty {
                 runtimeRow("Last Error", lastError)
             }
         }
@@ -297,19 +299,19 @@ private struct AIRuntimeConsoleView: View {
     private var runtimeActions: some View {
         HStack(spacing: 8) {
             Button("Reconnect ACP") {
-                store.reconnectCurrentAITransport()
+                processStore.reconnectCurrentAITransport(using: store)
             }
-            .disabled(store.aiRuntimeTransport != .acp)
+            .disabled(processStore.aiRuntimeTransport != .acp)
 
             Button("Reset Warm Session") {
-                store.resetCurrentWarmAISession()
+                processStore.resetCurrentWarmAISession(using: store)
             }
-            .disabled(store.aiRuntimeTransport != .acp)
+            .disabled(processStore.aiRuntimeTransport != .acp)
 
             Button("Open ACP Logs") {
-                store.openAIRuntimeLogs()
+                processStore.openAIRuntimeLogs()
             }
-            .disabled(store.aiRuntimeLogPath == nil)
+            .disabled(processStore.aiRuntimeLogPath == nil)
 
             Button("Copy Runtime Report") {
                 copyToPasteboard(runtimeReportText)
@@ -321,29 +323,29 @@ private struct AIRuntimeConsoleView: View {
 
     private var runtimeReportText: String {
         var lines: [String] = [
-            "Provider: \(store.aiRuntimeProviderTitle)",
-            "Transport: \(store.aiRuntimeTransport?.title ?? "Unknown")",
-            "Model: \(store.aiRuntimeModel.isEmpty ? "Unknown" : store.aiRuntimeModel)",
-            "Process: \(store.aiRuntimeProcessStatus)",
-            "Auth: \(store.aiRuntimeAuthStatus)",
-            "Session: \(store.aiRuntimeSessionID ?? "None")"
+            "Provider: \(processStore.aiRuntimeProviderTitle)",
+            "Transport: \(processStore.aiRuntimeTransport?.title ?? "Unknown")",
+            "Model: \(processStore.aiRuntimeModel.isEmpty ? "Unknown" : processStore.aiRuntimeModel)",
+            "Process: \(processStore.aiRuntimeProcessStatus)",
+            "Auth: \(processStore.aiRuntimeAuthStatus)",
+            "Session: \(processStore.aiRuntimeSessionID ?? "None")"
         ]
 
-        if let logPath = store.aiRuntimeLogPath, !logPath.isEmpty {
+        if let logPath = processStore.aiRuntimeLogPath, !logPath.isEmpty {
             lines.append("Logs: \(logPath)")
         }
-        if let lastError = store.aiRuntimeLastError, !lastError.isEmpty {
+        if let lastError = processStore.aiRuntimeLastError, !lastError.isEmpty {
             lines.append("Last Error: \(lastError)")
         }
-        if !store.aiRuntimeToolCalls.isEmpty {
+        if !processStore.aiRuntimeToolCalls.isEmpty {
             lines.append("")
             lines.append("Tool Calls:")
-            lines.append(contentsOf: store.aiRuntimeToolCalls.map { "\($0.title) [\($0.status)] \($0.id)" })
+            lines.append(contentsOf: processStore.aiRuntimeToolCalls.map { "\($0.title) [\($0.status)] \($0.id)" })
         }
-        if !store.aiRuntimeEvents.isEmpty {
+        if !processStore.aiRuntimeEvents.isEmpty {
             lines.append("")
             lines.append("Runtime Events:")
-            lines.append(contentsOf: store.aiRuntimeEvents)
+            lines.append(contentsOf: processStore.aiRuntimeEvents)
         }
 
         return lines.joined(separator: "\n")

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CommandPaletteView: View {
     @Environment(WorkspaceStore.self) private var store
+    @Environment(ProcessStore.self) private var processStore
     @State private var query: String = ""
     @State private var selectedIndex: Int = 0
     @FocusState private var isFocused: Bool
@@ -575,9 +576,9 @@ struct CommandPaletteView: View {
 
         // Workspace actions
         case "run_exercise":
-            store.runSelectedExercise()
+            store.runSelectedExercise(processStore: processStore)
         case "run_tests":
-            store.runSelectedExerciseTests()
+            store.runSelectedExerciseTests(processStore: processStore)
         case "save_exercise":
             store.saveSelectedExercise()
         case "close_file":

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CodeEditorPaneView: View {
     @Environment(WorkspaceStore.self) private var store
+    @Environment(ProcessStore.self) private var processStore
 
     var body: some View {
         @Bindable var store = store
@@ -44,7 +45,7 @@ struct CodeEditorPaneView: View {
 
                     if store.hasSelection {
                         RunCapsuleButton(
-                            action: store.runSelectedExercise,
+                            action: { store.runSelectedExercise(processStore: processStore) },
                             isEnabled: store.hasSelection && !store.isRunning && !store.isCurrentExerciseEnriching
                         )
                     }
@@ -87,8 +88,8 @@ struct CodeEditorPaneView: View {
 
                     Spacer()
 
-                    if !store.lastCommandDescription.isEmpty {
-                        Text(store.lastCommandDescription)
+                    if !processStore.lastCommandDescription.isEmpty {
+                        Text(processStore.lastCommandDescription)
                             .font(.caption.monospaced())
                             .foregroundStyle(CrabTimeTheme.Palette.textMuted)
                     }
@@ -129,9 +130,9 @@ struct CodeEditorPaneView: View {
                     } else {
                         CodeTextEditorView(
                             text: $store.editorText,
-                            onRun: store.runSelectedExercise,
+                            onRun: { store.runSelectedExercise(processStore: processStore) },
                             onSave: store.saveSelectedExercise,
-                            onTest: store.runSelectedExerciseTests,
+                            onTest: { store.runSelectedExerciseTests(processStore: processStore) },
                             onCursorChange: { line in store.editorCursorLine = line },
                             onCursorOffsetChange: { offset in store.editorCursorOffset = offset },
                             onSaveCursorPosition: { offset, path in

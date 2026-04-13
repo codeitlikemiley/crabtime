@@ -58,19 +58,7 @@ final class WorkspaceStore {
         }
     }
     var sessionLog: [String] = []
-    var aiRuntimeProviderTitle: String = "No AI activity yet"
-    var aiRuntimeModel: String = ""
-    var aiRuntimeTransport: AITransportKind?
-    var aiRuntimeSessionID: String?
-    var aiRuntimeProcessStatus: String = "Idle"
-    var aiRuntimeAuthStatus: String = "Idle"
-    var aiRuntimeLogPath: String?
-    var aiRuntimeLastEvent: String?
-    var aiRuntimeLastError: String?
-    var aiRuntimeEvents: [String] = []
-    var aiRuntimeToolCalls: [AIToolCallSnapshot] = []
-    var diagnostics: [Diagnostic] = []
-    var selectedDiagnosticIndex: Int = 0
+
     var selectedConsoleTab: ConsoleTab = .output
     var terminalDisplayMode: TerminalDisplayMode = .split
     var runState: RunState = .idle
@@ -132,7 +120,7 @@ final class WorkspaceStore {
     @ObservationIgnored private let appPaths: AppStoragePaths
     @ObservationIgnored private let database: WorkspaceLibraryDatabase
     @ObservationIgnored private let repositoryCloner: RepositoryCloner
-    @ObservationIgnored private let exercismCLI: ExercismCLI
+    @ObservationIgnored let exercismCLI: ExercismCLI
     @ObservationIgnored private let fileChangeService: WorkspaceFileChangeService
     @ObservationIgnored private let baselineStore: WorkspaceBaselineStore
     @ObservationIgnored private let rustlingsWorkspaceScaffolder: RustlingsWorkspaceScaffolder
@@ -141,7 +129,7 @@ final class WorkspaceStore {
     @ObservationIgnored private var isRestoringState = false
     @ObservationIgnored private var workspaceFileBaseline: [String: Data] = [:]
     @ObservationIgnored private var draftEditorTextByPath: [String: String] = [:]
-    @ObservationIgnored private weak var chatStore: ChatStore?
+    @ObservationIgnored var chatStore: ChatStore?
 
     init(
         appPaths: AppStoragePaths = .live(),
@@ -381,17 +369,7 @@ final class WorkspaceStore {
         return source.isEmpty ? 0 : source.split(whereSeparator: \.isNewline).count
     }
 
-    var diagnosticsCount: Int {
-        diagnostics.count
-    }
 
-    var errorCount: Int {
-        diagnostics.filter { $0.severity == .error }.count
-    }
-
-    var warningCount: Int {
-        diagnostics.filter { $0.severity == .warning }.count
-    }
 
     var visibleExercises: [ExerciseDocument] {
         guard let workspace else {
@@ -620,95 +598,6 @@ final class WorkspaceStore {
         }
     }
 
-    func showExercismDownloadPrompt() {
-        activateApplication()
-
-        let alert = NSAlert()
-        alert.messageText = "Download Exercism Exercise"
-        alert.informativeText = "Paste an Exercism download command or fill in the track and exercise below. \(AppBrand.shortName) will use your existing Exercism CLI setup and import the downloaded exercise."
-        alert.addButton(withTitle: "Download")
-        alert.addButton(withTitle: "Cancel")
-
-        let commandField = PromptTextField(frame: NSRect(x: 0, y: 0, width: 440, height: 30))
-        commandField.placeholderString = "exercism download --track=rust --exercise=hello-world"
-        commandField.font = .systemFont(ofSize: 13)
-        commandField.bezelStyle = .roundedBezel
-        commandField.isEditable = true
-        commandField.isSelectable = true
-
-        let trackField = PromptTextField(frame: NSRect(x: 0, y: 0, width: 440, height: 30))
-        trackField.placeholderString = "rust"
-        trackField.stringValue = "rust"
-        trackField.font = .systemFont(ofSize: 13)
-        trackField.bezelStyle = .roundedBezel
-        trackField.isEditable = true
-        trackField.isSelectable = true
-
-        let exerciseField = PromptTextField(frame: NSRect(x: 0, y: 0, width: 440, height: 30))
-        exerciseField.placeholderString = "hello-world"
-        exerciseField.font = .systemFont(ofSize: 13)
-        exerciseField.bezelStyle = .roundedBezel
-        exerciseField.isEditable = true
-        exerciseField.isSelectable = true
-
-        let accessoryView = NSView(frame: NSRect(x: 0, y: 0, width: 440, height: 182))
-        let commandLabel = promptLabel(title: "Command")
-        commandLabel.frame = NSRect(x: 0, y: 158, width: 440, height: 16)
-        commandField.frame = NSRect(x: 0, y: 126, width: 440, height: 30)
-
-        let helperLabel = NSTextField(wrappingLabelWithString: "Paste `exercism download --track=rust --exercise=hello-world` or use the fields below.")
-        helperLabel.font = .systemFont(ofSize: 11)
-        helperLabel.textColor = .secondaryLabelColor
-        helperLabel.frame = NSRect(x: 0, y: 94, width: 440, height: 28)
-
-        let trackLabel = promptLabel(title: "Track")
-        trackLabel.frame = NSRect(x: 0, y: 72, width: 440, height: 16)
-        trackField.frame = NSRect(x: 0, y: 42, width: 440, height: 30)
-
-        let exerciseLabel = promptLabel(title: "Exercise")
-        exerciseLabel.frame = NSRect(x: 0, y: 20, width: 440, height: 16)
-        exerciseField.frame = NSRect(x: 0, y: 0, width: 440, height: 30)
-
-        accessoryView.addSubview(commandLabel)
-        accessoryView.addSubview(commandField)
-        accessoryView.addSubview(helperLabel)
-        accessoryView.addSubview(trackLabel)
-        accessoryView.addSubview(trackField)
-        accessoryView.addSubview(exerciseLabel)
-        accessoryView.addSubview(exerciseField)
-        alert.accessoryView = accessoryView
-
-        let alertWindow = alert.window
-        alertWindow.initialFirstResponder = commandField
-        DispatchQueue.main.async {
-            alertWindow.makeFirstResponder(commandField)
-            commandField.selectText(nil)
-        }
-        alertWindow.makeKeyAndOrderFront(nil)
-
-        guard alert.runModal() == .alertFirstButtonReturn else {
-            return
-        }
-
-        do {
-            let input = try resolveExercismDownloadInput(
-                command: commandField.stringValue,
-                track: trackField.stringValue,
-                exercise: exerciseField.stringValue
-            )
-
-            downloadExercismExercise(
-                track: input.track,
-                exercise: input.exercise
-            )
-        } catch {
-            showBlockingAlert(
-                title: "Download Exercism Exercise",
-                message: error.localizedDescription,
-                style: .warning
-            )
-        }
-    }
 
     func cloneRepository() {
         guard !cloneRepositoryURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -738,68 +627,6 @@ final class WorkspaceStore {
         }
     }
 
-    func downloadExercismExercise(track: String, exercise: String) {
-        let requestedTrack = track.trimmingCharacters(in: .whitespacesAndNewlines)
-        let requestedExercise = exercise.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !requestedTrack.isEmpty, !requestedExercise.isEmpty else {
-            showBlockingAlert(
-                title: "Download Exercism Exercise",
-                message: "Enter both a track and an exercise slug.",
-                style: .warning
-            )
-            return
-        }
-
-        appendSessionMessage("Downloading Exercism exercise \(requestedTrack)/\(requestedExercise)")
-
-        Task {
-            do {
-                let destinationURL = try await exercismCLI.download(track: requestedTrack, exercise: requestedExercise)
-                appendSessionMessage("Downloaded Exercism exercise into \(destinationURL.path)")
-                
-                let runnerConfigURL = destinationURL.appendingPathComponent(".cargo-runner.json", isDirectory: false)
-                if !FileManager.default.fileExists(atPath: runnerConfigURL.path) {
-                    let configJSON = """
-                    {
-                      "cargo": {
-                        "extra_args": [],
-                        "extra_env": {},
-                        "extra_test_binary_args": []
-                      },
-                      "overrides": [
-                        {
-                          "cargo": {
-                            "extra_test_binary_args": [
-                              "--include-ignored"
-                            ]
-                          },
-                          "match": {
-                            "file_path": "."
-                          }
-                        }
-                      ]
-                    }
-                    """
-                    try? configJSON.write(to: runnerConfigURL, atomically: true, encoding: .utf8)
-                }
-
-                importWorkspace(from: destinationURL, sourceKind: .exercism, cloneURL: nil)
-                
-                await MainActor.run {
-                    markExercismDownloaded(requestedExercise)
-                }
-            } catch {
-                consoleOutput += "Exercism download failed: \(error.localizedDescription)\n"
-                appendSessionMessage("Exercism download failed for \(requestedTrack)/\(requestedExercise)")
-                showBlockingAlert(
-                    title: "Download Exercism Exercise",
-                    message: error.localizedDescription,
-                    style: .warning
-                )
-            }
-        }
-    }
 
     func markExercismDownloaded(_ slug: String) {
         exercismDownloadedExercises.insert(slug)
@@ -945,105 +772,6 @@ final class WorkspaceStore {
         appendSessionMessage("AI  \(message)")
     }
 
-    func handleAITransportEvent(_ event: AITransportEvent) {
-        switch event {
-        case .transportSelected(let provider, let transport, let model):
-            aiRuntimeEvents = []
-            aiRuntimeToolCalls = []
-            aiRuntimeProviderTitle = provider.title
-            aiRuntimeTransport = transport
-            aiRuntimeModel = model
-            aiRuntimeSessionID = nil
-            aiRuntimeProcessStatus = transport == .acp ? "Launching" : "Not applicable"
-            aiRuntimeAuthStatus = transport == .acp ? "Waiting" : "Not applicable"
-            aiRuntimeLogPath = nil
-            aiRuntimeLastEvent = nil
-            aiRuntimeLastError = nil
-            appendAIRuntimeEvent("\(provider.shortTitle) using \(transport.title) with \(model)")
-        case .processState(let provider, let status, let logFilePath):
-            aiRuntimeProviderTitle = provider.title
-            aiRuntimeProcessStatus = status
-            aiRuntimeLogPath = logFilePath ?? aiRuntimeLogPath
-            appendAIRuntimeEvent(status)
-        case .sessionReady(let provider, _, let sessionID, let reused, let logFilePath):
-            aiRuntimeProviderTitle = provider.title
-            aiRuntimeSessionID = sessionID
-            aiRuntimeProcessStatus = "Connected"
-            aiRuntimeAuthStatus = "Ready"
-            aiRuntimeLogPath = logFilePath
-            appendAIRuntimeEvent(reused ? "Reused ACP session \(sessionID)" : "Created ACP session \(sessionID)")
-        case .authState(let provider, let status):
-            aiRuntimeProviderTitle = provider.title
-            aiRuntimeAuthStatus = status
-            appendAIRuntimeEvent(status)
-        case .transportError(let provider, let message, let logFilePath):
-            aiRuntimeProviderTitle = provider.title
-            aiRuntimeProcessStatus = "Failed"
-            aiRuntimeLastError = message
-            aiRuntimeLogPath = logFilePath ?? aiRuntimeLogPath
-            appendAIRuntimeEvent("Error: \(message)")
-        case .toolCall(let provider, let id, let title, let status):
-            aiRuntimeProviderTitle = provider.title
-            updateAIToolCall(id: id, title: title, status: status)
-            appendAIRuntimeEvent("Tool \(title) [\(status)]")
-        case .note(let provider, let message):
-            aiRuntimeProviderTitle = provider.title
-            appendAIRuntimeEvent(message)
-        }
-    }
-
-    func aiRuntimeBannerMessage(for provider: AIProviderKind, transport: AITransportKind) -> String? {
-        guard transport == .acp, aiRuntimeProviderTitle == provider.title else {
-            return nil
-        }
-
-        if let aiRuntimeLastError, !aiRuntimeLastError.isEmpty {
-            return "ACP unavailable. Open AI Runtime."
-        }
-        if aiRuntimeAuthStatus.localizedCaseInsensitiveContains("fail") {
-            return "ACP auth failed. Open AI Runtime."
-        }
-        if aiRuntimeAuthStatus.localizedCaseInsensitiveContains("authenticating") {
-            return "ACP authenticating…"
-        }
-        if let aiRuntimeLastEvent, aiRuntimeLastEvent.localizedCaseInsensitiveContains("invalid") {
-            return "Stale session recovered. Open AI Runtime."
-        }
-        if aiRuntimeSessionID != nil {
-            return "ACP healthy. Session warm."
-        }
-        return "ACP enabled. First send will cold start."
-    }
-
-    func showAIRuntime() {
-        selectConsoleTab(.aiRuntime)
-    }
-
-    func reconnectCurrentAITransport() {
-        guard aiRuntimeTransport == .acp else {
-            return
-        }
-        chatStore?.reconnectSelectedACP(using: self)
-    }
-
-    func resetCurrentWarmAISession() {
-        guard aiRuntimeTransport == .acp else {
-            return
-        }
-        aiRuntimeSessionID = nil
-        aiRuntimeToolCalls = []
-        aiRuntimeLastError = nil
-        aiRuntimeProcessStatus = "Idle"
-        chatStore?.resetSelectedWarmSession(using: self)
-    }
-
-    func openAIRuntimeLogs() {
-        guard let aiRuntimeLogPath else {
-            return
-        }
-        let url = URL(fileURLWithPath: aiRuntimeLogPath)
-        NSWorkspace.shared.activateFileViewerSelecting([url])
-    }
 
     func selectConsoleTab(_ tab: ConsoleTab) {
         if terminalDisplayMode == .hidden {
@@ -1182,20 +910,20 @@ final class WorkspaceStore {
         }
     }
 
-    func runSelectedExercise() {
-        guard selectedExercise != nil else {
+    func runSelectedExercise(processStore: ProcessStore) {
+        guard let selectedExercise else {
             return
         }
 
         saveSelectedExercise()
 
         Task {
-            await performRun()
+            await processStore.performRun(exercise: selectedExercise, overrideCursorLine: nil, using: self)
         }
     }
 
-    func runSelectedExerciseTests() {
-        guard selectedExercise != nil else {
+    func runSelectedExerciseTests(processStore: ProcessStore) {
+        guard let selectedExercise else {
             return
         }
 
@@ -1203,12 +931,12 @@ final class WorkspaceStore {
 
         Task { @MainActor in
             guard let target = resolveSelectedExerciseTestTarget() else {
-                appendSessionMessage("No test target found for \(selectedExercise?.title ?? "current file")")
+                appendSessionMessage("No test target found for \(selectedExercise.title)")
                 consoleOutput += "No test target found for the current selection.\n"
                 return
             }
 
-            await performRun(exercise: target.exercise, overrideCursorLine: target.cursorLine)
+            await processStore.performRun(exercise: target.exercise, overrideCursorLine: target.cursorLine, using: self)
         }
     }
 
@@ -1283,26 +1011,6 @@ final class WorkspaceStore {
         }
         return nil
     }
-
-    func submitSelectedExerciseToExercism() {
-        guard let selectedExercise, canSubmitSelectedExerciseToExercism else {
-            return
-        }
-
-        saveSelectedExercise()
-        let modifiedFiles = modifiedWorkspaceRelativePaths
-
-        guard !modifiedFiles.isEmpty else {
-            consoleOutput += "Exercism submit skipped: no modified files to submit.\n"
-            appendSessionMessage("Skipped Exercism submit for \(selectedExercise.title)")
-            return
-        }
-
-        Task {
-            await performExercismSubmit(for: selectedExercise, files: modifiedFiles)
-        }
-    }
-
     func toggleProblemPaneVisibility() {
         contentDisplayMode = contentDisplayMode == .editorMaximized ? .split : .editorMaximized
         persistCurrentWorkspaceSnapshot()
@@ -1356,55 +1064,9 @@ final class WorkspaceStore {
         selectRightSidebarTab(.inspector)
     }
 
-    func toggleTerminalVisibility() {
-        if terminalDisplayMode == .hidden {
-            // ── SHOW terminal ────────────────────────────────────────────────
-            lastFocusTarget = .terminal
-            terminalDisplayMode = .split
-            persistCurrentWorkspaceSnapshot()
-            // Diagnostics tab with items: resign editor so the global key bridge
-            // (DiagnosticsKeyBridge) picks up j/k/enter for list navigation.
-            if selectedConsoleTab == .diagnostics && !diagnostics.isEmpty {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    NSApp.keyWindow?.makeFirstResponder(nil)
-                }
-            }
-        } else {
-            // ── HIDE terminal ─────────────────────────────────────────────────
-            lastFocusTarget = .editor
-            terminalDisplayMode = .hidden
-            persistCurrentWorkspaceSnapshot()
-            // Restore cursor to the continuously-tracked editor offset.
-            // This is always up-to-date from textViewDidChangeSelection, so it
-            // reflects exactly where the cursor was before terminal opened,
-            // regardless of whether the diagnostics tab resigned first responder.
-            let savedOffset = editorCursorOffset
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                NotificationCenter.default.post(
-                    name: .restoreCursorPositionRequested,
-                    object: nil,
-                    userInfo: ["offset": savedOffset]
-                )
-            }
-        }
-    }
 
-    func moveDiagnosticSelectionUp() {
-        guard !diagnostics.isEmpty else { return }
-        selectedDiagnosticIndex = max(selectedDiagnosticIndex - 1, 0)
-    }
 
-    func moveDiagnosticSelectionDown() {
-        guard !diagnostics.isEmpty else { return }
-        selectedDiagnosticIndex = min(selectedDiagnosticIndex + 1, diagnostics.count - 1)
-    }
 
-    func activateSelectedDiagnostic() {
-        guard diagnostics.indices.contains(selectedDiagnosticIndex) else { return }
-        if let line = diagnostics[selectedDiagnosticIndex].line {
-            goToLine(line)
-        }
-    }
 
     // MARK: - TODO Explorer
 
@@ -1600,25 +1262,9 @@ final class WorkspaceStore {
         }
     }
 
-    func moveExercismSelectionUp() {
-        guard !visibleExercismExercises.isEmpty else { return }
-        selectedExercismIndex = max(selectedExercismIndex - 1, 0)
-    }
 
-    func moveExercismSelectionDown() {
-        guard !visibleExercismExercises.isEmpty else { return }
-        selectedExercismIndex = min(selectedExercismIndex + 1, visibleExercismExercises.count - 1)
-    }
 
-    func activateSelectedExercismExercise() {
-        let items = visibleExercismExercises
-        guard items.indices.contains(selectedExercismIndex) else { return }
-        downloadExercismExercise(slug: items[selectedExercismIndex].slug)
-    }
 
-    func downloadExercismExercise(slug: String) {
-        downloadExercismExercise(track: "rust", exercise: slug)
-    }
 
     func toggleTerminalMaximize() {
 
@@ -2087,7 +1733,6 @@ final class WorkspaceStore {
             }
             draftEditorTextByPath = [:]
             selectedWorkspaceRootPath = rootPath
-            diagnostics = []
             selectedConsoleTab = .output
             runState = .idle
             lastCommandDescription = ""
@@ -2130,12 +1775,6 @@ final class WorkspaceStore {
             chatStore?.syncSelection(using: self)
 
             persistCurrentWorkspaceSnapshot()
-
-            // Run background diagnostic check
-            let rootURL = loadedWorkspace.rootURL
-            Task { [weak self] in
-                await self?.performBackgroundCheck(projectRootURL: rootURL)
-            }
         } catch {
             workspace = nil
             workspaceFileBaseline = [:]
@@ -2212,7 +1851,7 @@ final class WorkspaceStore {
         chatStore?.syncSelection(using: self)
     }
 
-    private func activateDocument(at url: URL, persistState: Bool) {
+    func activateDocument(at url: URL, persistState: Bool) {
         guard let workspace else {
             return
         }
@@ -2470,7 +2109,7 @@ final class WorkspaceStore {
         }
     }
 
-    private func persistCurrentWorkspaceSnapshot() {
+    func persistCurrentWorkspaceSnapshot() {
         guard let workspace, let selectedWorkspaceRootPath else {
             return
         }
@@ -2540,177 +2179,7 @@ final class WorkspaceStore {
         !exercise.checks.isEmpty && exercise.checks.allSatisfy { $0.status == .passed }
     }
 
-    private func performRun(exercise targetExercise: ExerciseDocument? = nil, overrideCursorLine: Int? = nil) async {
-        guard let exercise = targetExercise ?? selectedExercise else {
-            return
-        }
-
-        runState = .running
-        selectedConsoleTab = .output
-        lastCommandDescription = ""
-        consoleOutput += "\n[\(Date().formatted(date: .omitted, time: .standard))] Running \(exercise.title)…\n"
-        appendSessionMessage("Started \(exercise.title)")
-
-        do {
-            let cursorLine = targetExercise == nil ? (overrideCursorLine ?? editorCursorLine) : overrideCursorLine
-            let result = try await cargoRunner.run(exercise: exercise, cursorLine: cursorLine)
-            lastCommandDescription = result.commandDescription
-            lastTerminationStatus = result.terminationStatus
-            diagnostics = DiagnosticParser.parse(result.stderr)
-            applyCheckResults(from: result)
-
-            appendSessionMessage("$ \(result.commandDescription)")
-
-            if !result.stdout.isEmpty {
-                consoleOutput += result.stdout
-            }
-
-            if !result.stderr.isEmpty {
-                consoleOutput += result.stderr
-            }
-
-            runState = result.terminationStatus == 0 ? .succeeded : .failed
-
-            appendSessionMessage(
-                "Finished \(exercise.title) with status \(result.terminationStatus)"
-            )
-            persistCurrentWorkspaceSnapshot()
-        } catch {
-            runState = .failed
-            consoleOutput += "Run failed: \(error.localizedDescription)\n"
-            appendSessionMessage("Run failed for \(exercise.title)")
-            persistCurrentWorkspaceSnapshot()
-        }
-    }
-
-    private func performBackgroundCheck(projectRootURL: URL) async {
-        appendSessionMessage("Running background check…")
-
-        do {
-            let result = try await cargoRunner.check(projectRootURL: projectRootURL)
-
-            guard result.commandDescription != "no check available" else {
-                return
-            }
-
-            appendSessionMessage("$ \(result.commandDescription)")
-
-            // Parse diagnostics from both stdout and stderr (rustlings outputs to stdout)
-            let combinedOutput = [result.stdout, result.stderr].joined(separator: "\n")
-            diagnostics = DiagnosticParser.parse(combinedOutput)
-
-            let errorCount = diagnostics.filter { $0.severity == .error }.count
-            let warningCount = diagnostics.filter { $0.severity == .warning }.count
-
-            if result.terminationStatus != 0 || errorCount > 0 || warningCount > 0 {
-                // Show the full output in diagnostics console, not the main output
-                if errorCount > 0 || warningCount > 0 {
-                    appendSessionMessage("Check: \(errorCount) error(s), \(warningCount) warning(s)")
-                } else {
-                    // Non-zero exit but no parseable diagnostics — show the raw output in session
-                    let trimmedOutput = combinedOutput.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !trimmedOutput.isEmpty {
-                        appendSessionMessage("Check output:\n\(trimmedOutput)")
-                    }
-                }
-                selectedConsoleTab = .diagnostics
-            } else {
-                appendSessionMessage("Check: clean ✓")
-            }
-        } catch {
-            appendSessionMessage("Background check failed: \(error.localizedDescription)")
-        }
-    }
-
-    private func performExercismSubmit(for exercise: ExerciseDocument, files: [String]) async {
-        guard isExercismWorkspace, let workspace else {
-            return
-        }
-
-        isSubmittingExercism = true
-        selectedConsoleTab = .output
-        consoleOutput += "\n[\(Date().formatted(date: .omitted, time: .standard))] Submitting \(exercise.title) to Exercism…\n"
-        appendSessionMessage("Submitting \(exercise.title) to Exercism")
-
-        defer {
-            isSubmittingExercism = false
-        }
-
-        do {
-            // Resolve the correct Exercism exercise directory.
-            // `workspace.rootURL` may point to an App Support sandbox copy; we need
-            // the path inside the Exercism CLI workspace (~/Exercism/rust/<slug>).
-            let exerciseDirectoryURL: URL = {
-                // 1. If originPath is set on the record, it IS the Exercism path.
-                if let originURL = currentWorkspaceRecord?.originURL {
-                    return originURL
-                }
-
-                // 2. Try to construct path from CLI status workspaceURL + track + slug.
-                // Strip any appended hash suffix (e.g. "sublist-bc8c3d8f" → "sublist").
-                if let cliStatus = try? exercismCLI.status(), let cliWorkspaceURL = cliStatus.workspaceURL {
-                    var rawSlug = workspace.rootURL.lastPathComponent
-                    // Strip "-xxxxxxxx" 8-hex hash suffix added by Crab Time sandboxing
-                    if let range = rawSlug.range(of: #"-[0-9a-f]{8}$"#, options: .regularExpression) {
-                        rawSlug = String(rawSlug[rawSlug.startIndex..<range.lowerBound])
-                    }
-                    let candidateURL = cliWorkspaceURL
-                        .appendingPathComponent("rust", isDirectory: true)
-                        .appendingPathComponent(rawSlug, isDirectory: true)
-                    if FileManager.default.fileExists(atPath: candidateURL.path) {
-                        return candidateURL
-                    }
-                }
-
-                // 3. Fall back to the stored rootURL (works when it's already the correct path).
-                return workspace.rootURL
-            }()
-
-            let result = try await exercismCLI.submit(
-                exerciseDirectoryURL: exerciseDirectoryURL,
-                files: files
-            )
-            lastCommandDescription = result.commandDescription
-            lastTerminationStatus = result.terminationStatus
-
-            if !result.stdout.isEmpty {
-                consoleOutput += result.stdout
-                if !result.stdout.hasSuffix("\n") {
-                    consoleOutput += "\n"
-                }
-            }
-
-            if !result.stderr.isEmpty {
-                consoleOutput += result.stderr
-                if !result.stderr.hasSuffix("\n") {
-                    consoleOutput += "\n"
-                }
-            }
-
-            await MainActor.run {
-                self.markExercismCompleted(workspace.rootURL.lastPathComponent)
-            }
-
-            appendSessionMessage("Submitted \(exercise.title) to Exercism")
-        } catch {
-            consoleOutput += "Exercism submit failed: \(error.localizedDescription)\n"
-            if let cliError = error as? ExercismCLI.CLIError, case .submitFailed(let message) = cliError {
-                let stripped = message.components(separatedBy: "\n")
-                    .map { $0.trimmingCharacters(in: .whitespaces) }
-                    .filter { !$0.isEmpty }
-                    .joined(separator: ": ")
-                    .replacingOccurrences(of: "Error: ", with: "")
-                
-                let maxLen = 65
-                let truncated = stripped.count > maxLen ? "\(stripped.prefix(maxLen))..." : stripped
-                appendSessionMessage("Submit failed: \(truncated)")
-            } else {
-                appendSessionMessage("Exercism submit failed for \(exercise.title)")
-            }
-        }
-    }
-
-    private func applyCheckResults(from result: ProcessOutput) {
+    func applyCheckResults(from result: ProcessOutput) {
         guard
             var workspaceLocal = workspace,
             let selectedExerciseID = selectedExerciseID,
@@ -3238,7 +2707,6 @@ final class WorkspaceStore {
         selectedExerciseID = nil
         workspaceFileBaseline = [:]
         draftEditorTextByPath = [:]
-        diagnostics = []
         runState = .idle
         lastCommandDescription = ""
         lastTerminationStatus = nil
@@ -3308,60 +2776,6 @@ final class WorkspaceStore {
         return label
     }
 
-    private func resolveExercismDownloadInput(
-        command: String,
-        track: String,
-        exercise: String
-    ) throws -> (track: String, exercise: String) {
-        let trimmedCommand = command.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedCommand.isEmpty {
-            return try parseExercismDownloadCommand(trimmedCommand)
-        }
-
-        let trimmedTrack = track.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedExercise = exercise.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        guard !trimmedTrack.isEmpty, !trimmedExercise.isEmpty else {
-            throw PromptValidationError.missingTrackOrExercise
-        }
-
-        return (trimmedTrack, trimmedExercise)
-    }
-
-    private func parseExercismDownloadCommand(_ command: String) throws -> (track: String, exercise: String) {
-        let track = firstRegexCapture(
-            pattern: #"--track(?:=|\s+)([A-Za-z0-9_-]+)"#,
-            in: command
-        )
-        let exercise = firstRegexCapture(
-            pattern: #"--exercise(?:=|\s+)([A-Za-z0-9_-]+)"#,
-            in: command
-        )
-
-        guard let track, let exercise else {
-            throw PromptValidationError.invalidExercismCommand
-        }
-
-        return (track, exercise)
-    }
-
-    private func firstRegexCapture(pattern: String, in text: String) -> String? {
-        guard let regex = try? NSRegularExpression(pattern: pattern) else {
-            return nil
-        }
-
-        let range = NSRange(text.startIndex..<text.endIndex, in: text)
-        guard
-            let match = regex.firstMatch(in: text, range: range),
-            match.numberOfRanges > 1,
-            let captureRange = Range(match.range(at: 1), in: text)
-        else {
-            return nil
-        }
-
-        return String(text[captureRange])
-    }
-
     private func showBlockingAlert(title: String, message: String, style: NSAlert.Style) {
         activateApplication()
 
@@ -3385,40 +2799,13 @@ final class WorkspaceStore {
         return alert.runModal() == .alertFirstButtonReturn
     }
 
-    private func appendSessionMessage(_ message: String) {
+    func appendSessionMessage(_ message: String) {
         sessionLog.insert(
             "\(Date().formatted(date: .omitted, time: .shortened))  \(message)",
             at: 0
         )
         if sessionLog.count > 4000 {
             sessionLog.removeLast(sessionLog.count - 4000)
-        }
-    }
-
-    private func appendAIRuntimeEvent(_ message: String) {
-        let stamped = "\(Date().formatted(date: .omitted, time: .shortened))  \(message)"
-        aiRuntimeLastEvent = stamped
-        aiRuntimeEvents.insert(stamped, at: 0)
-        if aiRuntimeEvents.count > 200 {
-            aiRuntimeEvents.removeLast(aiRuntimeEvents.count - 200)
-        }
-        appendAISessionMessage(message)
-    }
-
-    private func updateAIToolCall(id: String, title: String, status: String) {
-        if let index = aiRuntimeToolCalls.firstIndex(where: { $0.id == id }) {
-            aiRuntimeToolCalls[index].title = title
-            aiRuntimeToolCalls[index].status = status
-            aiRuntimeToolCalls[index].updatedAt = Date()
-            return
-        }
-
-        aiRuntimeToolCalls.insert(
-            AIToolCallSnapshot(id: id, title: title, status: status, updatedAt: Date()),
-            at: 0
-        )
-        if aiRuntimeToolCalls.count > 40 {
-            aiRuntimeToolCalls.removeLast(aiRuntimeToolCalls.count - 40)
         }
     }
 
@@ -3493,20 +2880,6 @@ private final class PromptTextField: NSTextField {
     }
 }
 
-private enum PromptValidationError: LocalizedError {
-    case missingTrackOrExercise
-    case invalidExercismCommand
-
-    var errorDescription: String? {
-        switch self {
-        case .missingTrackOrExercise:
-            return "Enter both a track and exercise slug, or paste a full Exercism download command."
-        case .invalidExercismCommand:
-            return "\(AppBrand.shortName) could not parse that Exercism command. Use a command like `exercism download --track=rust --exercise=hello-world`."
-        }
-    }
-}
-
 private struct ExplorerVisibleEntry {
     let node: WorkspaceFileNode
     let depth: Int
@@ -3514,5 +2887,34 @@ private struct ExplorerVisibleEntry {
 
     var path: String {
         node.url.standardizedFileURL.path
+    }
+}
+
+// Restore toggleTerminalVisibility
+extension WorkspaceStore {
+    func toggleTerminalVisibility() {
+        if terminalDisplayMode == .hidden {
+            // ── SHOW terminal ────────────────────────────────────────────────
+            lastFocusTarget = .terminal
+            terminalDisplayMode = .split
+            persistCurrentWorkspaceSnapshot()
+            // Diagnostics tab with items: resign editor so the global key bridge
+            // (DiagnosticsKeyBridge) picks up j/k/enter for list navigation.
+            if selectedConsoleTab == .diagnostics {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    NSApp.keyWindow?.makeFirstResponder(nil)
+                }
+            }
+        } else {
+            // ── HIDE terminal ─────────────────────────────────────────────────
+            lastFocusTarget = .editor
+            terminalDisplayMode = .hidden
+            persistCurrentWorkspaceSnapshot()
+            
+            // Re-focus the split editor pane if possible
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                NSApp.keyWindow?.makeFirstResponder(nil)
+            }
+        }
     }
 }

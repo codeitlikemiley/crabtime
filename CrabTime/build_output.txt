@@ -1,0 +1,978 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild build -scheme CrabTime -destination generic/platform=macOS
+
+Resolve Package Graph
+2026-04-13 08:01:59.426 xcodebuild[57435:43526302] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+
+
+Resolved source packages:
+  CrabTime: /Volumes/goldcoders/rustgoblin/CrabTime
+
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:macOS, name:Any Mac }
+{ platform:macOS, variant:Mac Catalyst, name:Any Mac }
+ComputePackagePrebuildTargetDependencyGraph
+
+Prepare packages
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (2 targets)
+    Target 'CrabTime' in project 'CrabTime'
+        ➜ Explicit dependency on target 'CrabTime_CrabTime' in project 'CrabTime'
+    Target 'CrabTime_CrabTime' in project 'CrabTime' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk /Users/uriah/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx26.1-25B74-3885c01c3e6b6a337905948deab2002e3ae1261907bdadc328169391a47051a6.sdkstatcache
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk -o /Users/uriah/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx26.1-25B74-3885c01c3e6b6a337905948deab2002e3ae1261907bdadc328169391a47051a6.sdkstatcache
+
+SwiftDriver CrabTime normal x86_64 com.apple.xcode.tools.swift.compiler (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    builtin-SwiftDriver -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name CrabTime -Onone -enforce-exclusivity\=checked @/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime.SwiftFileList -DSWIFT_PACKAGE -DDEBUG -DSWIFT_MODULE_RESOURCE_BUNDLE_AVAILABLE -DXcode -plugin-path /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk -target x86_64-apple-macos26.0 -g -module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -profile-coverage-mapping -profile-generate -enable-testing -index-store-path /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 6 -I /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug -Isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib -F /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug -F /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks -c -j8 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/uriah/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx26.1-25B74-3885c01c3e6b6a337905948deab2002e3ae1261907bdadc328169391a47051a6.sdkstatcache -output-file-map /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -package-name crabtime -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime_const_extract_protocols.json -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/include -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources-normal/x86_64 -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources/x86_64 -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources -Xcc -DSWIFT_PACKAGE -Xcc -DDEBUG\=1 -working-directory /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode -experimental-emit-module-separately -disable-cmo
+
+SwiftDriver CrabTime normal arm64 com.apple.xcode.tools.swift.compiler (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    builtin-SwiftDriver -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name CrabTime -Onone -enforce-exclusivity\=checked @/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime.SwiftFileList -DSWIFT_PACKAGE -DDEBUG -DSWIFT_MODULE_RESOURCE_BUNDLE_AVAILABLE -DXcode -plugin-path /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk -target arm64-apple-macos26.0 -g -module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -profile-coverage-mapping -profile-generate -enable-testing -index-store-path /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 6 -I /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug -Isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib -F /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug -F /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks -c -j8 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/uriah/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx26.1-25B74-3885c01c3e6b6a337905948deab2002e3ae1261907bdadc328169391a47051a6.sdkstatcache -output-file-map /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -package-name crabtime -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime_const_extract_protocols.json -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/include -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources-normal/arm64 -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources/arm64 -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources -Xcc -DSWIFT_PACKAGE -Xcc -DDEBUG\=1 -working-directory /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode -experimental-emit-module-separately -disable-cmo
+
+SwiftCompile normal arm64 Compiling\ TodoExplorerView.swift,\ WorkbenchBackgroundView.swift,\ WorkspaceEmptyStateView.swift,\ WorkspaceExplorerView.swift,\ WorkspaceRailView.swift,\ WorkspaceShellHeaderView.swift,\ WorkspaceSidebarToolbar.swift,\ WorkspaceStore.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/TodoExplorerView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkbenchBackgroundView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceEmptyStateView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceExplorerView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceRailView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceShellHeaderView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceSidebarToolbar.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/WorkspaceStore.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/TodoExplorerView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkbenchBackgroundView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceEmptyStateView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceExplorerView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceExplorerView.swift:201:62: warning: main actor-isolated property 'isKeyWindow' can not be referenced from a nonisolated context
+                guard self.isEnabled, self.hostView?.window?.isKeyWindow == true else {
+                                                             ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSWindow.h:436:47: note: property declared here
+@property (getter=isKeyWindow, readonly) BOOL keyWindow;
+                                              ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceExplorerView.swift:201:54: warning: main actor-isolated property 'window' can not be referenced from a nonisolated context
+                guard self.isEnabled, self.hostView?.window?.isKeyWindow == true else {
+                                                     ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSView.h:86:61: note: property declared here
+@property (nullable, readonly, unsafe_unretained) NSWindow *window;
+                                                            ^
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceRailView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceShellHeaderView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceSidebarToolbar.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceSidebarToolbar.swift:382:62: warning: main actor-isolated property 'isKeyWindow' can not be referenced from a nonisolated context
+                let isHostWindowKey = self.hostView?.window?.isKeyWindow == true
+                                                             ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSWindow.h:436:47: note: property declared here
+@property (getter=isKeyWindow, readonly) BOOL keyWindow;
+                                              ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceSidebarToolbar.swift:382:54: warning: main actor-isolated property 'window' can not be referenced from a nonisolated context
+                let isHostWindowKey = self.hostView?.window?.isKeyWindow == true
+                                                     ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSView.h:86:61: note: property declared here
+@property (nullable, readonly, unsafe_unretained) NSWindow *window;
+                                                            ^
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/WorkspaceStore.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftEmitModule normal arm64 Emitting\ module\ for\ CrabTime (in target 'CrabTime' from project 'CrabTime')
+
+EmitSwiftModule normal arm64 (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 Compiling\ ActiveDocumentTab.swift,\ CheckStatus.swift,\ ConsoleTab.swift,\ ToolHealthStatus.swift,\ WorkspaceFileNode.swift,\ WorkspaceSessionState.swift,\ ACPTransportService.swift,\ AIModelCatalogStore.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/ActiveDocumentTab.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/CheckStatus.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/ConsoleTab.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/ToolHealthStatus.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/WorkspaceFileNode.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/WorkspaceSessionState.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ACPTransportService.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/AIModelCatalogStore.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/ActiveDocumentTab.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/CheckStatus.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/ConsoleTab.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/ToolHealthStatus.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/WorkspaceFileNode.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/WorkspaceSessionState.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ACPTransportService.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/AIModelCatalogStore.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 Compiling\ ExerciseContextBuilder.swift,\ ExercismAPIService.swift,\ ExercismCLI.swift,\ ExercismStore.swift,\ MarkdownHTMLRenderer.swift,\ ProcessStore.swift,\ RepositoryCloner.swift,\ AppSettingsView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ExerciseContextBuilder.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ExercismAPIService.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ExercismCLI.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ExercismStore.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/MarkdownHTMLRenderer.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ProcessStore.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/RepositoryCloner.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/AppSettingsView.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ExerciseContextBuilder.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ExerciseContextBuilder.swift:115:16: warning: immutable value 'processStore' was never used; consider replacing with '_' or removing it
+        if let processStore = processStore, !store.consoleOutput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+           ~~~~^~~~~~~~~~~~
+           _
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ExercismAPIService.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ExercismCLI.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ExercismStore.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ExercismStore.swift:225:21: warning: initialization of immutable value 'initialPrompt' was never used; consider replacing with assignment to '_' or removing it
+                let initialPrompt = expectedTrack.isEmpty ? "" : "exercism download --track=\(expectedTrack) --exercise="
+                ~~~~^~~~~~~~~~~~~
+                _
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/MarkdownHTMLRenderer.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ProcessStore.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/RepositoryCloner.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/AppSettingsView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 Compiling\ MarkdownPreviewView.swift,\ ModelComboBox.swift,\ ProblemBrowserView.swift,\ ProblemStatementView.swift,\ ReadonlyTextPreviewView.swift,\ RightSidebarView.swift,\ SetupWizardView.swift,\ SyntaxHighlighter.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MarkdownPreviewView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ModelComboBox.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ProblemBrowserView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ProblemStatementView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ReadonlyTextPreviewView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/RightSidebarView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/SetupWizardView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/SyntaxHighlighter.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MarkdownPreviewView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ModelComboBox.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ProblemBrowserView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ProblemStatementView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ReadonlyTextPreviewView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ReadonlyTextPreviewView.swift:86:23: warning: main actor-isolated property 'needsDisplay' can not be mutated from a nonisolated context
+            textView?.needsDisplay = true
+                      ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSView.h:187:16: note: mutation of this property is only permitted within the actor
+@property BOOL needsDisplay;
+               ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ReadonlyTextPreviewView.swift:85:20: note: add '@MainActor' to make instance method 'viewDidScroll' part of global actor 'MainActor'
+        @objc func viewDidScroll(_ notification: Notification) {
+                   ^
+        @MainActor 
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/RightSidebarView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/SetupWizardView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/SyntaxHighlighter.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 Compiling\ ExerciseCatalogView.swift,\ ExercismBrowserView.swift,\ EyebrowLabel.swift,\ FlowLayout.swift,\ IconGlassButton.swift,\ InspectorSidebarView.swift,\ MainSplitView.swift,\ MarkdownDocumentView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ExerciseCatalogView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ExercismBrowserView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/EyebrowLabel.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/FlowLayout.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/IconGlassButton.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/InspectorSidebarView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MarkdownDocumentView.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ExerciseCatalogView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ExercismBrowserView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/EyebrowLabel.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/FlowLayout.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/IconGlassButton.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/InspectorSidebarView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:370:31: warning: call to main actor-isolated instance method 'selectPreviousTab' in a synchronous nonisolated context
+            hostView?.window?.selectPreviousTab(nil)
+                              ^
+AppKit.NSWindow.selectPreviousTab:3:34: note: calls to instance method 'selectPreviousTab' from outside of its actor context are implicitly asynchronous
+  @IBAction @MainActor open func selectPreviousTab(_ sender: Any?)}
+                                 ^
+AppKit.NSWindow.selectPreviousTab:3:34: note: main actor isolation inferred from inheritance from class 'NSResponder'
+  @IBAction @MainActor open func selectPreviousTab(_ sender: Any?)}
+                                 ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:369:22: note: add '@MainActor' to make instance method 'selectPreviousNativeTab()' part of global actor 'MainActor'
+        private func selectPreviousNativeTab() {
+                     ^
+        @MainActor 
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:370:23: warning: main actor-isolated property 'window' can not be referenced from a nonisolated context
+            hostView?.window?.selectPreviousTab(nil)
+                      ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSView.h:86:61: note: property declared here
+@property (nullable, readonly, unsafe_unretained) NSWindow *window;
+                                                            ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:369:22: note: add '@MainActor' to make instance method 'selectPreviousNativeTab()' part of global actor 'MainActor'
+        private func selectPreviousNativeTab() {
+                     ^
+        @MainActor 
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:374:31: warning: call to main actor-isolated instance method 'selectNextTab' in a synchronous nonisolated context
+            hostView?.window?.selectNextTab(nil)
+                              ^
+AppKit.NSWindow.selectNextTab:3:34: note: calls to instance method 'selectNextTab' from outside of its actor context are implicitly asynchronous
+  @IBAction @MainActor open func selectNextTab(_ sender: Any?)}
+                                 ^
+AppKit.NSWindow.selectNextTab:3:34: note: main actor isolation inferred from inheritance from class 'NSResponder'
+  @IBAction @MainActor open func selectNextTab(_ sender: Any?)}
+                                 ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:373:22: note: add '@MainActor' to make instance method 'selectNextNativeTab()' part of global actor 'MainActor'
+        private func selectNextNativeTab() {
+                     ^
+        @MainActor 
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:374:23: warning: main actor-isolated property 'window' can not be referenced from a nonisolated context
+            hostView?.window?.selectNextTab(nil)
+                      ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSView.h:86:61: note: property declared here
+@property (nullable, readonly, unsafe_unretained) NSWindow *window;
+                                                            ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:373:22: note: add '@MainActor' to make instance method 'selectNextNativeTab()' part of global actor 'MainActor'
+        private func selectNextNativeTab() {
+                     ^
+        @MainActor 
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:378:42: warning: main actor-isolated property 'window' can not be referenced from a nonisolated context
+            guard let window = hostView?.window else {
+                                         ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSView.h:86:61: note: property declared here
+@property (nullable, readonly, unsafe_unretained) NSWindow *window;
+                                                            ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:377:22: note: add '@MainActor' to make instance method 'selectNativeTab(number:)' part of global actor 'MainActor'
+        private func selectNativeTab(number: Int) {
+                     ^
+        @MainActor 
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:382:40: warning: main actor-isolated property 'tabbedWindows' can not be referenced from a nonisolated context
+            let tabbedWindows = window.tabbedWindows ?? [window]
+                                       ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSWindow.h:716:59: note: property declared here
+@property (readonly, copy, nullable) NSArray<NSWindow *> *tabbedWindows API_AVAILABLE(macos(10.12));
+                                                          ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:377:22: note: add '@MainActor' to make instance method 'selectNativeTab(number:)' part of global actor 'MainActor'
+        private func selectNativeTab(number: Int) {
+                     ^
+        @MainActor 
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:398:34: warning: call to main actor-isolated instance method 'makeKeyAndOrderFront' in a synchronous nonisolated context
+            tabbedWindows[index].makeKeyAndOrderFront(nil)
+                                 ^
+AppKit.NSWindow.makeKeyAndOrderFront:2:22: note: calls to instance method 'makeKeyAndOrderFront' from outside of its actor context are implicitly asynchronous
+@MainActor open func makeKeyAndOrderFront(_ sender: Any?)}
+                     ^
+AppKit.NSWindow.makeKeyAndOrderFront:2:22: note: main actor isolation inferred from inheritance from class 'NSResponder'
+@MainActor open func makeKeyAndOrderFront(_ sender: Any?)}
+                     ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:377:22: note: add '@MainActor' to make instance method 'selectNativeTab(number:)' part of global actor 'MainActor'
+        private func selectNativeTab(number: Int) {
+                     ^
+        @MainActor 
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MarkdownDocumentView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 Compiling\ resource_bundle_accessor.swift,\ AppBrand.swift,\ CrabTimeApp.swift,\ AIProviderKind.swift,\ AIProviderPreference.swift,\ AIProviderReply.swift,\ AIRuntimeState.swift,\ AITransportKind.swift /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources/resource_bundle_accessor.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/AppBrand.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/CrabTimeApp.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/AIProviderKind.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/AIProviderPreference.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/AIProviderReply.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/AIRuntimeState.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/AITransportKind.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal arm64 /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources/resource_bundle_accessor.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/AppBrand.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/CrabTimeApp.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/AIProviderKind.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/AIProviderPreference.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/AIProviderReply.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/AIRuntimeState.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/AITransportKind.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 Compiling\ AIProviderManager.swift,\ AISettingsStore.swift,\ AppStoragePaths.swift,\ CargoRunner.swift,\ ChatStore.swift,\ CredentialStore.swift,\ DependencyManager.swift,\ DiagnosticParser.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/AIProviderManager.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/AISettingsStore.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/AppStoragePaths.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/CargoRunner.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ChatStore.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/CredentialStore.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/DependencyManager.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/DiagnosticParser.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/AIProviderManager.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/AISettingsStore.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/AppStoragePaths.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/CargoRunner.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ChatStore.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/CredentialStore.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/DependencyManager.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/DependencyManager.swift:169:17: warning: 'init(validatingUTF8:)' is deprecated: replaced by 'String.init(validatingCString:)'
+                String(validatingUTF8: ptr)
+                ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/DependencyManager.swift:169:17: note: use 'String.init(validatingCString:)' instead
+                String(validatingUTF8: ptr)
+                ^~~~~~ ~~~~~~~~~~~~~~
+                String validatingCString
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/DiagnosticParser.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftEmitModule normal x86_64 Emitting\ module\ for\ CrabTime (in target 'CrabTime' from project 'CrabTime')
+
+EmitSwiftModule normal x86_64 (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling ActiveDocumentTab.swift, CheckStatus.swift, ConsoleTab.swift, ToolHealthStatus.swift, WorkspaceFileNode.swift, WorkspaceSessionState.swift, ACPTransportService.swift, AIModelCatalogStore.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 Compiling\ CloneRepositorySheetView.swift,\ CodeEditorPaneView.swift,\ CodeTextEditorView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/CloneRepositorySheetView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/CodeEditorPaneView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/CodeTextEditorView.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/CloneRepositorySheetView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/CodeEditorPaneView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/CodeTextEditorView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling AIProviderManager.swift, AISettingsStore.swift, AppStoragePaths.swift, CargoRunner.swift, ChatStore.swift, CredentialStore.swift, DependencyManager.swift, DiagnosticParser.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 Compiling\ CommandPaletteView.swift,\ ConsolePanelView.swift,\ EditorWorkbenchView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/CommandPaletteView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ConsolePanelView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/EditorWorkbenchView.swift (in target 'CrabTime' from project 'CrabTime')
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/CommandPaletteView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ConsolePanelView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/EditorWorkbenchView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling MarkdownPreviewView.swift, ModelComboBox.swift, ProblemBrowserView.swift, ProblemStatementView.swift, ReadonlyTextPreviewView.swift, RightSidebarView.swift, SetupWizardView.swift, SyntaxHighlighter.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 Compiling\ FlowLayout.swift,\ IconGlassButton.swift,\ InspectorSidebarView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/FlowLayout.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/IconGlassButton.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/InspectorSidebarView.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/FlowLayout.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/IconGlassButton.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/InspectorSidebarView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling resource_bundle_accessor.swift, AppBrand.swift, CrabTimeApp.swift, AIProviderKind.swift, AIProviderPreference.swift, AIProviderReply.swift, AIRuntimeState.swift, AITransportKind.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 Compiling\ WorkspaceShellHeaderView.swift,\ WorkspaceSidebarToolbar.swift,\ WorkspaceStore.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceShellHeaderView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceSidebarToolbar.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/WorkspaceStore.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceShellHeaderView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceSidebarToolbar.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceSidebarToolbar.swift:382:62: warning: main actor-isolated property 'isKeyWindow' can not be referenced from a nonisolated context
+                let isHostWindowKey = self.hostView?.window?.isKeyWindow == true
+                                                             ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSWindow.h:436:47: note: property declared here
+@property (getter=isKeyWindow, readonly) BOOL keyWindow;
+                                              ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceSidebarToolbar.swift:382:54: warning: main actor-isolated property 'window' can not be referenced from a nonisolated context
+                let isHostWindowKey = self.hostView?.window?.isKeyWindow == true
+                                                     ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSView.h:86:61: note: property declared here
+@property (nullable, readonly, unsafe_unretained) NSWindow *window;
+                                                            ^
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/WorkspaceStore.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal arm64 Emitting module for CrabTime (in target 'CrabTime' from project 'CrabTime')
+
+SwiftDriver\ Compilation\ Requirements CrabTime normal arm64 com.apple.xcode.tools.swift.compiler (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    builtin-Swift-Compilation-Requirements -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name CrabTime -Onone -enforce-exclusivity\=checked @/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime.SwiftFileList -DSWIFT_PACKAGE -DDEBUG -DSWIFT_MODULE_RESOURCE_BUNDLE_AVAILABLE -DXcode -plugin-path /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk -target arm64-apple-macos26.0 -g -module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -profile-coverage-mapping -profile-generate -enable-testing -index-store-path /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 6 -I /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug -Isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib -F /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug -F /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks -c -j8 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/uriah/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx26.1-25B74-3885c01c3e6b6a337905948deab2002e3ae1261907bdadc328169391a47051a6.sdkstatcache -output-file-map /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -package-name crabtime -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime_const_extract_protocols.json -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/include -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources-normal/arm64 -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources/arm64 -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources -Xcc -DSWIFT_PACKAGE -Xcc -DDEBUG\=1 -working-directory /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode -experimental-emit-module-separately -disable-cmo
+
+SwiftDriverJobDiscovery normal arm64 Compiling ExerciseContextBuilder.swift, ExercismAPIService.swift, ExercismCLI.swift, ExercismStore.swift, MarkdownHTMLRenderer.swift, ProcessStore.swift, RepositoryCloner.swift, AppSettingsView.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 Compiling\ CrabTimeApp.swift,\ ExerciseContextBuilder.swift,\ ExercismStore.swift,\ ProcessStore.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/CrabTimeApp.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ExerciseContextBuilder.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ExercismStore.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ProcessStore.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/CrabTimeApp.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ExerciseContextBuilder.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ExerciseContextBuilder.swift:115:16: warning: immutable value 'processStore' was never used; consider replacing with '_' or removing it
+        if let processStore = processStore, !store.consoleOutput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+           ~~~~^~~~~~~~~~~~
+           _
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ExercismStore.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ExercismStore.swift:225:21: warning: initialization of immutable value 'initialPrompt' was never used; consider replacing with assignment to '_' or removing it
+                let initialPrompt = expectedTrack.isEmpty ? "" : "exercism download --track=\(expectedTrack) --exercise="
+                ~~~~^~~~~~~~~~~~~
+                _
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ProcessStore.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+Copy /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/CrabTime.swiftmodule/arm64-apple-macos.swiftmodule /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime.swiftmodule (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime.swiftmodule /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/CrabTime.swiftmodule/arm64-apple-macos.swiftmodule
+
+SwiftDriverJobDiscovery normal x86_64 Emitting module for CrabTime (in target 'CrabTime' from project 'CrabTime')
+
+SwiftDriver\ Compilation\ Requirements CrabTime normal x86_64 com.apple.xcode.tools.swift.compiler (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    builtin-Swift-Compilation-Requirements -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name CrabTime -Onone -enforce-exclusivity\=checked @/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime.SwiftFileList -DSWIFT_PACKAGE -DDEBUG -DSWIFT_MODULE_RESOURCE_BUNDLE_AVAILABLE -DXcode -plugin-path /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk -target x86_64-apple-macos26.0 -g -module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -profile-coverage-mapping -profile-generate -enable-testing -index-store-path /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 6 -I /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug -Isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib -F /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug -F /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks -c -j8 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/uriah/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx26.1-25B74-3885c01c3e6b6a337905948deab2002e3ae1261907bdadc328169391a47051a6.sdkstatcache -output-file-map /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -package-name crabtime -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime_const_extract_protocols.json -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/include -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources-normal/x86_64 -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources/x86_64 -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources -Xcc -DSWIFT_PACKAGE -Xcc -DDEBUG\=1 -working-directory /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode -experimental-emit-module-separately -disable-cmo
+
+Copy /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/CrabTime.swiftmodule/arm64-apple-macos.abi.json /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime.abi.json (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime.abi.json /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/CrabTime.swiftmodule/arm64-apple-macos.abi.json
+
+Copy /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/CrabTime.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime.swiftsourceinfo (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime.swiftsourceinfo /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/CrabTime.swiftmodule/Project/arm64-apple-macos.swiftsourceinfo
+
+Copy /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/CrabTime.swiftmodule/x86_64-apple-macos.swiftmodule /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime.swiftmodule (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime.swiftmodule /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/CrabTime.swiftmodule/x86_64-apple-macos.swiftmodule
+
+Copy /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/CrabTime.swiftmodule/x86_64-apple-macos.abi.json /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime.abi.json (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime.abi.json /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/CrabTime.swiftmodule/x86_64-apple-macos.abi.json
+
+Copy /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/CrabTime.swiftmodule/Project/x86_64-apple-macos.swiftsourceinfo /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime.swiftsourceinfo (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime.swiftsourceinfo /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/CrabTime.swiftmodule/Project/x86_64-apple-macos.swiftsourceinfo
+
+SwiftCompile normal x86_64 Compiling\ AppSettingsView.swift,\ ChatMarkdownView.swift,\ ChatSidebarView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/AppSettingsView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ChatMarkdownView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ChatSidebarView.swift (in target 'CrabTime' from project 'CrabTime')
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/AppSettingsView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ChatMarkdownView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ChatSidebarView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 Compiling\ CrabTimeTheme.swift,\ InteractivePointerModifier.swift,\ PaneCardModifier.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Styling/CrabTimeTheme.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Styling/InteractivePointerModifier.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Styling/PaneCardModifier.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Styling/CrabTimeTheme.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Styling/InteractivePointerModifier.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Styling/PaneCardModifier.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling ExerciseCatalogView.swift, ExercismBrowserView.swift, EyebrowLabel.swift, FlowLayout.swift, IconGlassButton.swift, InspectorSidebarView.swift, MainSplitView.swift, MarkdownDocumentView.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 Compiling\ ExerciseCatalogView.swift,\ ExercismBrowserView.swift,\ EyebrowLabel.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ExerciseCatalogView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ExercismBrowserView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/EyebrowLabel.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ExerciseCatalogView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ExercismBrowserView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/EyebrowLabel.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal x86_64 Compiling CrabTimeTheme.swift, InteractivePointerModifier.swift, PaneCardModifier.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 Compiling\ resource_bundle_accessor.swift,\ ExerciseDifficulty.swift,\ ExerciseFileRole.swift,\ SavedWorkspaceRecord.swift /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources/resource_bundle_accessor.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/ExerciseDifficulty.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/ExerciseFileRole.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/SavedWorkspaceRecord.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources/resource_bundle_accessor.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/ExerciseDifficulty.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/ExerciseFileRole.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Models/SavedWorkspaceRecord.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal x86_64 Compiling CloneRepositorySheetView.swift, CodeEditorPaneView.swift, CodeTextEditorView.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 Compiling\ ACPTransportService.swift,\ AIProviderManager.swift,\ AISettingsStore.swift,\ ChatStore.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ACPTransportService.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/AIProviderManager.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/AISettingsStore.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ChatStore.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ACPTransportService.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/AIProviderManager.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/AISettingsStore.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ChatStore.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal x86_64 Compiling resource_bundle_accessor.swift, ExerciseDifficulty.swift, ExerciseFileRole.swift, SavedWorkspaceRecord.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 Compiling\ WorkspaceEmptyStateView.swift,\ WorkspaceExplorerView.swift,\ WorkspaceRailView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceEmptyStateView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceExplorerView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceRailView.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceEmptyStateView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceExplorerView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceExplorerView.swift:201:62: warning: main actor-isolated property 'isKeyWindow' can not be referenced from a nonisolated context
+                guard self.isEnabled, self.hostView?.window?.isKeyWindow == true else {
+                                                             ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSWindow.h:436:47: note: property declared here
+@property (getter=isKeyWindow, readonly) BOOL keyWindow;
+                                              ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceExplorerView.swift:201:54: warning: main actor-isolated property 'window' can not be referenced from a nonisolated context
+                guard self.isEnabled, self.hostView?.window?.isKeyWindow == true else {
+                                                     ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSView.h:86:61: note: property declared here
+@property (nullable, readonly, unsafe_unretained) NSWindow *window;
+                                                            ^
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkspaceRailView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling TodoExplorerView.swift, WorkbenchBackgroundView.swift, WorkspaceEmptyStateView.swift, WorkspaceExplorerView.swift, WorkspaceRailView.swift, WorkspaceShellHeaderView.swift, WorkspaceSidebarToolbar.swift, WorkspaceStore.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 Compiling\ DependencyManager.swift,\ ExercismCLI.swift,\ ToolingHealthService.swift,\ WorkspaceImporter.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/DependencyManager.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ExercismCLI.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ToolingHealthService.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/WorkspaceImporter.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/DependencyManager.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/DependencyManager.swift:169:17: warning: 'init(validatingUTF8:)' is deprecated: replaced by 'String.init(validatingCString:)'
+                String(validatingUTF8: ptr)
+                ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/DependencyManager.swift:169:17: note: use 'String.init(validatingCString:)' instead
+                String(validatingUTF8: ptr)
+                ^~~~~~ ~~~~~~~~~~~~~~
+                String validatingCString
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ExercismCLI.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/ToolingHealthService.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/WorkspaceImporter.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal x86_64 Compiling FlowLayout.swift, IconGlassButton.swift, InspectorSidebarView.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 Compiling\ RustlingsWorkspaceScaffolder.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/RustlingsWorkspaceScaffolder.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/RustlingsWorkspaceScaffolder.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal x86_64 Compiling DependencyManager.swift, ExercismCLI.swift, ToolingHealthService.swift, WorkspaceImporter.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 Compiling\ MarkdownPreviewView.swift,\ ModelComboBox.swift,\ ProblemBrowserView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MarkdownPreviewView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ModelComboBox.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ProblemBrowserView.swift (in target 'CrabTime' from project 'CrabTime')
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MarkdownPreviewView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ModelComboBox.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ProblemBrowserView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal x86_64 Compiling CrabTimeApp.swift, ExerciseContextBuilder.swift, ExercismStore.swift, ProcessStore.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 Compiling\ SetupWizardView.swift,\ TodoExplorerView.swift,\ WorkbenchBackgroundView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/SetupWizardView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/TodoExplorerView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkbenchBackgroundView.swift (in target 'CrabTime' from project 'CrabTime')
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/SetupWizardView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/TodoExplorerView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/WorkbenchBackgroundView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal x86_64 Compiling ExerciseCatalogView.swift, ExercismBrowserView.swift, EyebrowLabel.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 Compiling\ ProblemStatementView.swift,\ ReadonlyTextPreviewView.swift,\ RightSidebarView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ProblemStatementView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ReadonlyTextPreviewView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/RightSidebarView.swift (in target 'CrabTime' from project 'CrabTime')
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ProblemStatementView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ReadonlyTextPreviewView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ReadonlyTextPreviewView.swift:86:23: warning: main actor-isolated property 'needsDisplay' can not be mutated from a nonisolated context
+            textView?.needsDisplay = true
+                      ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSView.h:187:16: note: mutation of this property is only permitted within the actor
+@property BOOL needsDisplay;
+               ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ReadonlyTextPreviewView.swift:85:20: note: add '@MainActor' to make instance method 'viewDidScroll' part of global actor 'MainActor'
+        @objc func viewDidScroll(_ notification: Notification) {
+                   ^
+        @MainActor 
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/RightSidebarView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal x86_64 Compiling WorkspaceShellHeaderView.swift, WorkspaceSidebarToolbar.swift, WorkspaceStore.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 Compiling\ TodoExplorerStore.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/TodoExplorerStore.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/TodoExplorerStore.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal x86_64 Compiling RustlingsWorkspaceScaffolder.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal arm64 Compiling\ ChatMarkdownView.swift,\ ChatSidebarView.swift,\ CloneRepositorySheetView.swift,\ CodeEditorPaneView.swift,\ CodeTextEditorView.swift,\ CommandPaletteView.swift,\ ConsolePanelView.swift,\ EditorWorkbenchView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ChatMarkdownView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ChatSidebarView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/CloneRepositorySheetView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/CodeEditorPaneView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/CodeTextEditorView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/CommandPaletteView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ConsolePanelView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/EditorWorkbenchView.swift (in target 'CrabTime' from project 'CrabTime')
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ChatMarkdownView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ChatSidebarView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/CloneRepositorySheetView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/CodeEditorPaneView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/CodeTextEditorView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/CommandPaletteView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/ConsolePanelView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/EditorWorkbenchView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal x86_64 Compiling ACPTransportService.swift, AIProviderManager.swift, AISettingsStore.swift, ChatStore.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal arm64 Compiling\ TodoExplorerStore.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/TodoExplorerStore.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/TodoExplorerStore.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal x86_64 Compiling WorkspaceEmptyStateView.swift, WorkspaceExplorerView.swift, WorkspaceRailView.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 Compiling\ WorkspaceLibraryDatabase.swift,\ MainSplitView.swift,\ MarkdownDocumentView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/WorkspaceLibraryDatabase.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MarkdownDocumentView.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/WorkspaceLibraryDatabase.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:370:31: warning: call to main actor-isolated instance method 'selectPreviousTab' in a synchronous nonisolated context
+            hostView?.window?.selectPreviousTab(nil)
+                              ^
+AppKit.NSWindow.selectPreviousTab:3:34: note: calls to instance method 'selectPreviousTab' from outside of its actor context are implicitly asynchronous
+  @IBAction @MainActor open func selectPreviousTab(_ sender: Any?)}
+                                 ^
+AppKit.NSWindow.selectPreviousTab:3:34: note: main actor isolation inferred from inheritance from class 'NSResponder'
+  @IBAction @MainActor open func selectPreviousTab(_ sender: Any?)}
+                                 ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:369:22: note: add '@MainActor' to make instance method 'selectPreviousNativeTab()' part of global actor 'MainActor'
+        private func selectPreviousNativeTab() {
+                     ^
+        @MainActor 
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:370:23: warning: main actor-isolated property 'window' can not be referenced from a nonisolated context
+            hostView?.window?.selectPreviousTab(nil)
+                      ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSView.h:86:61: note: property declared here
+@property (nullable, readonly, unsafe_unretained) NSWindow *window;
+                                                            ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:369:22: note: add '@MainActor' to make instance method 'selectPreviousNativeTab()' part of global actor 'MainActor'
+        private func selectPreviousNativeTab() {
+                     ^
+        @MainActor 
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:374:31: warning: call to main actor-isolated instance method 'selectNextTab' in a synchronous nonisolated context
+            hostView?.window?.selectNextTab(nil)
+                              ^
+AppKit.NSWindow.selectNextTab:3:34: note: calls to instance method 'selectNextTab' from outside of its actor context are implicitly asynchronous
+  @IBAction @MainActor open func selectNextTab(_ sender: Any?)}
+                                 ^
+AppKit.NSWindow.selectNextTab:3:34: note: main actor isolation inferred from inheritance from class 'NSResponder'
+  @IBAction @MainActor open func selectNextTab(_ sender: Any?)}
+                                 ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:373:22: note: add '@MainActor' to make instance method 'selectNextNativeTab()' part of global actor 'MainActor'
+        private func selectNextNativeTab() {
+                     ^
+        @MainActor 
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:374:23: warning: main actor-isolated property 'window' can not be referenced from a nonisolated context
+            hostView?.window?.selectNextTab(nil)
+                      ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSView.h:86:61: note: property declared here
+@property (nullable, readonly, unsafe_unretained) NSWindow *window;
+                                                            ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:373:22: note: add '@MainActor' to make instance method 'selectNextNativeTab()' part of global actor 'MainActor'
+        private func selectNextNativeTab() {
+                     ^
+        @MainActor 
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:378:42: warning: main actor-isolated property 'window' can not be referenced from a nonisolated context
+            guard let window = hostView?.window else {
+                                         ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSView.h:86:61: note: property declared here
+@property (nullable, readonly, unsafe_unretained) NSWindow *window;
+                                                            ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:377:22: note: add '@MainActor' to make instance method 'selectNativeTab(number:)' part of global actor 'MainActor'
+        private func selectNativeTab(number: Int) {
+                     ^
+        @MainActor 
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:382:40: warning: main actor-isolated property 'tabbedWindows' can not be referenced from a nonisolated context
+            let tabbedWindows = window.tabbedWindows ?? [window]
+                                       ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk/System/Library/Frameworks/AppKit.framework/Headers/NSWindow.h:716:59: note: property declared here
+@property (readonly, copy, nullable) NSArray<NSWindow *> *tabbedWindows API_AVAILABLE(macos(10.12));
+                                                          ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:377:22: note: add '@MainActor' to make instance method 'selectNativeTab(number:)' part of global actor 'MainActor'
+        private func selectNativeTab(number: Int) {
+                     ^
+        @MainActor 
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:398:34: warning: call to main actor-isolated instance method 'makeKeyAndOrderFront' in a synchronous nonisolated context
+            tabbedWindows[index].makeKeyAndOrderFront(nil)
+                                 ^
+AppKit.NSWindow.makeKeyAndOrderFront:2:22: note: calls to instance method 'makeKeyAndOrderFront' from outside of its actor context are implicitly asynchronous
+@MainActor open func makeKeyAndOrderFront(_ sender: Any?)}
+                     ^
+AppKit.NSWindow.makeKeyAndOrderFront:2:22: note: main actor isolation inferred from inheritance from class 'NSResponder'
+@MainActor open func makeKeyAndOrderFront(_ sender: Any?)}
+                     ^
+/Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MainSplitView.swift:377:22: note: add '@MainActor' to make instance method 'selectNativeTab(number:)' part of global actor 'MainActor'
+        private func selectNativeTab(number: Int) {
+                     ^
+        @MainActor 
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/MarkdownDocumentView.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal x86_64 Compiling CommandPaletteView.swift, ConsolePanelView.swift, EditorWorkbenchView.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 Compiling\ SyntaxHighlighter.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/SyntaxHighlighter.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Views/SyntaxHighlighter.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal x86_64 Compiling AppSettingsView.swift, ChatMarkdownView.swift, ChatSidebarView.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 Compiling\ DiagnosticParser.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/DiagnosticParser.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal x86_64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/DiagnosticParser.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal x86_64 Compiling SyntaxHighlighter.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftDriverJobDiscovery normal x86_64 Compiling DiagnosticParser.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftDriverJobDiscovery normal x86_64 Compiling TodoExplorerStore.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftDriverJobDiscovery normal x86_64 Compiling MarkdownPreviewView.swift, ModelComboBox.swift, ProblemBrowserView.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftDriverJobDiscovery normal arm64 Compiling TodoExplorerStore.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftDriverJobDiscovery normal x86_64 Compiling SetupWizardView.swift, TodoExplorerView.swift, WorkbenchBackgroundView.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftDriverJobDiscovery normal x86_64 Compiling ProblemStatementView.swift, ReadonlyTextPreviewView.swift, RightSidebarView.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftDriverJobDiscovery normal x86_64 Compiling WorkspaceLibraryDatabase.swift, MainSplitView.swift, MarkdownDocumentView.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftDriver\ Compilation CrabTime normal x86_64 com.apple.xcode.tools.swift.compiler (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    builtin-Swift-Compilation -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name CrabTime -Onone -enforce-exclusivity\=checked @/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime.SwiftFileList -DSWIFT_PACKAGE -DDEBUG -DSWIFT_MODULE_RESOURCE_BUNDLE_AVAILABLE -DXcode -plugin-path /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk -target x86_64-apple-macos26.0 -g -module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -profile-coverage-mapping -profile-generate -enable-testing -index-store-path /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 6 -I /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug -Isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib -F /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug -F /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks -c -j8 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/uriah/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx26.1-25B74-3885c01c3e6b6a337905948deab2002e3ae1261907bdadc328169391a47051a6.sdkstatcache -output-file-map /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -package-name crabtime -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime_const_extract_protocols.json -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/include -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources-normal/x86_64 -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources/x86_64 -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources -Xcc -DSWIFT_PACKAGE -Xcc -DDEBUG\=1 -working-directory /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode -experimental-emit-module-separately -disable-cmo
+
+Ld /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/Binary/CrabTime normal x86_64 (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target x86_64-apple-macos26.0 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk -O0 -L/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/EagerLinkingTBDs/Debug -L/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug -L/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib -F/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/EagerLinkingTBDs/Debug -F/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug -iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks -filelist /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime.LinkFileList -Xlinker -rpath -Xlinker @executable_path/../lib -Xlinker -object_path_lto -Xlinker /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime_lto.o -rdynamic -Xlinker -no_deduplicate -Xlinker -debug_variant -Xlinker -dependency_info -Xlinker /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime_dependency_info.dat -fobjc-link-runtime -fprofile-instr-generate -L/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx -L/usr/lib/swift -Xlinker -add_ast_path -Xlinker /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime.swiftmodule @/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/CrabTime-linker-args.resp -o /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/Binary/CrabTime
+
+SwiftDriverJobDiscovery normal arm64 Compiling ChatMarkdownView.swift, ChatSidebarView.swift, CloneRepositorySheetView.swift, CodeEditorPaneView.swift, CodeTextEditorView.swift, CommandPaletteView.swift, ConsolePanelView.swift, EditorWorkbenchView.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal arm64 Compiling\ RustlingsWorkspaceScaffolder.swift /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/RustlingsWorkspaceScaffolder.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftCompile normal arm64 /Volumes/goldcoders/rustgoblin/CrabTime/Sources/CrabTime/Services/RustlingsWorkspaceScaffolder.swift (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling RustlingsWorkspaceScaffolder.swift (in target 'CrabTime' from project 'CrabTime')
+
+SwiftDriver\ Compilation CrabTime normal arm64 com.apple.xcode.tools.swift.compiler (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode
+    builtin-Swift-Compilation -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name CrabTime -Onone -enforce-exclusivity\=checked @/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime.SwiftFileList -DSWIFT_PACKAGE -DDEBUG -DSWIFT_MODULE_RESOURCE_BUNDLE_AVAILABLE -DXcode -plugin-path /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk -target arm64-apple-macos26.0 -g -module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -profile-coverage-mapping -profile-generate -enable-testing -index-store-path /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 6 -I /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug -Isystem /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib -F /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug -F /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks -c -j8 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/uriah/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx26.1-25B74-3885c01c3e6b6a337905948deab2002e3ae1261907bdadc328169391a47051a6.sdkstatcache -output-file-map /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/uriah/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -package-name crabtime -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime_const_extract_protocols.json -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/include -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources-normal/arm64 -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources/arm64 -Xcc -I/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/DerivedSources -Xcc -DSWIFT_PACKAGE -Xcc -DDEBUG\=1 -working-directory /Volumes/goldcoders/rustgoblin/CrabTime/.swiftpm/xcode -experimental-emit-module-separately -disable-cmo
+
+Ld /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/Binary/CrabTime normal arm64 (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-macos26.0 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk -O0 -L/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/EagerLinkingTBDs/Debug -L/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug -L/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib -F/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/EagerLinkingTBDs/Debug -F/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug -iframework /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks -filelist /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime.LinkFileList -Xlinker -rpath -Xlinker @executable_path/../lib -Xlinker -object_path_lto -Xlinker /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime_lto.o -rdynamic -Xlinker -no_deduplicate -Xlinker -debug_variant -Xlinker -dependency_info -Xlinker /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime_dependency_info.dat -fobjc-link-runtime -fprofile-instr-generate -L/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/macosx -L/usr/lib/swift -Xlinker -add_ast_path -Xlinker /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime.swiftmodule @/Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/CrabTime-linker-args.resp -o /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/Binary/CrabTime
+
+CreateUniversalBinary /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/CrabTime normal arm64\ x86_64 (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/lipo -create /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/arm64/Binary/CrabTime /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Intermediates.noindex/CrabTime.build/Debug/CrabTime.build/Objects-normal/x86_64/Binary/CrabTime -output /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/CrabTime
+
+RegisterExecutionPolicyException /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/CrabTime (in target 'CrabTime' from project 'CrabTime')
+    cd /Volumes/goldcoders/rustgoblin/CrabTime
+    builtin-RegisterExecutionPolicyException /Users/uriah/Library/Developer/Xcode/DerivedData/CrabTime-arzwejsuhhlsqvhdtlmrvsvbxzdd/Build/Products/Debug/CrabTime
+
+** BUILD SUCCEEDED **
+

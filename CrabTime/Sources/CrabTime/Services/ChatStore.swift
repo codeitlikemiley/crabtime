@@ -14,6 +14,7 @@ final class ChatStore {
     @ObservationIgnored private let database: WorkspaceLibraryDatabase
     @ObservationIgnored let providerManager: AIProviderManager
     @ObservationIgnored private let contextBuilder: ExerciseContextBuilder
+    @ObservationIgnored weak var processStore: ProcessStore?
 
     init(
         database: WorkspaceLibraryDatabase,
@@ -38,6 +39,10 @@ final class ChatStore {
 
     func selectedModel(using settingsStore: AISettingsStore) -> String {
         selectedSession?.model ?? settingsStore.preference(for: settingsStore.defaultProvider).model
+    }
+
+    func attachProcessStore(_ store: ProcessStore) {
+        self.processStore = store
     }
 
     func syncSelection(using store: WorkspaceStore) {
@@ -119,10 +124,10 @@ final class ChatStore {
                         previousProvider,
                         reason: "provider switched to \(provider.title)",
                         eventSink: { event in
-                            Task { @MainActor in
-                                store.handleAITransportEvent(event)
-                            }
+                        Task { @MainActor [weak self] in
+                            self?.processStore?.handleAITransportEvent(event)
                         }
+                    }
                     )
                 }
             }
@@ -193,7 +198,7 @@ final class ChatStore {
         do {
             try database.upsertChatSession(session)
             replaceSession(session)
-            store.handleAITransportEvent(.note(provider: session.providerKind, message: "Warm ACP session reset. The next send will create a new session."))
+            processStore?.handleAITransportEvent(.note(provider: session.providerKind, message: "Warm ACP session reset. The next send will create a new session."))
             store.persistChatSelection()
         } catch {
             errorMessage = error.localizedDescription
@@ -209,13 +214,13 @@ final class ChatStore {
             await providerManager.restartACPConnection(
                 session: session,
                 eventSink: { event in
-                    Task { @MainActor in
-                        store.handleAITransportEvent(event)
+                    Task { @MainActor [weak self] in
+                        self?.processStore?.handleAITransportEvent(event)
                     }
                 }
             )
             await MainActor.run {
-                store.handleAITransportEvent(.note(provider: session.providerKind, message: "ACP connection restarted."))
+                processStore?.handleAITransportEvent(.note(provider: session.providerKind, message: "ACP connection restarted."))
             }
         }
     }
@@ -275,7 +280,7 @@ final class ChatStore {
                     providerManager.settingsStore.preference(for: updatedSession.providerKind).transport
                 }
                 await MainActor.run {
-                    store.handleAITransportEvent(
+                    processStore?.handleAITransportEvent(
                         .transportSelected(
                             provider: updatedSession.providerKind,
                             transport: transport,
@@ -284,14 +289,14 @@ final class ChatStore {
                     )
                 }
 
-                let context = contextBuilder.build(from: store)
+                let context = contextBuilder.build(from: store, processStore: processStore)
                 let reply = try await providerManager.sendMessage(
                     session: updatedSession,
                     messages: messages + [outgoingMessage],
                     context: context,
                     eventSink: { event in
-                        Task { @MainActor in
-                            store.handleAITransportEvent(event)
+                        Task { @MainActor [weak self] in
+                            self?.processStore?.handleAITransportEvent(event)
                         }
                     }
                 )
@@ -307,7 +312,7 @@ final class ChatStore {
                     isSending = false
                     store.selectedChatSessionID = updatedSession.id
                     if reply.didRecoverStaleSession {
-                        store.handleAITransportEvent(.note(provider: updatedSession.providerKind, message: "Recovered from stale ACP session without clearing chat history."))
+                        processStore?.handleAITransportEvent(.note(provider: updatedSession.providerKind, message: "Recovered from stale ACP session without clearing chat history."))
                     }
                     store.persistChatSelection()
                 }
@@ -331,10 +336,10 @@ final class ChatStore {
                     let failedProvider = selectedSession?.providerKind ?? providerManager.settingsStore.defaultProvider
                     let isACP = providerManager.transport(for: failedProvider) == .acp
                     if isACP {
-                        store.handleAITransportEvent(.transportError(
+                        processStore?.handleAITransportEvent(.transportError(
                             provider: failedProvider,
                             message: error.localizedDescription,
-                            logFilePath: store.aiRuntimeLogPath
+                            logFilePath: processStore?.aiRuntimeLogPath
                         ))
                         store.selectConsoleTab(.aiRuntime)
                         self.errorMessage = "ACP chat failed. Open AI Runtime for status and logs. \(error.localizedDescription)"

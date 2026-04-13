@@ -111,7 +111,7 @@ struct CargoRunner: Sendable {
 
         return try await processRunner(
             projectRootURL,
-            ["cargo", "runner", "run", targetArg],
+            ["cargo", "runner", "run", "--", targetArg],
             "cargo runner run \(targetArg)",
             environment
         )
@@ -487,10 +487,22 @@ struct CargoRunner: Sendable {
         process.standardError = stderrPipe
 
         let stdoutTask = Task.detached {
-            try stdoutPipe.fileHandleForReading.readToEnd() ?? Data()
+            var data = Data()
+            for try await byte in stdoutPipe.fileHandleForReading.bytes {
+                if data.count < 1_048_576 {
+                    data.append(byte)
+                }
+            }
+            return data
         }
         let stderrTask = Task.detached {
-            try stderrPipe.fileHandleForReading.readToEnd() ?? Data()
+            var data = Data()
+            for try await byte in stderrPipe.fileHandleForReading.bytes {
+                if data.count < 1_048_576 {
+                    data.append(byte)
+                }
+            }
+            return data
         }
 
         return try await withCheckedThrowingContinuation { continuation in
