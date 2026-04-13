@@ -268,58 +268,11 @@ struct ToolingHealthService {
         currentDirectoryURL: URL?,
         stdin: Data? = nil
     ) async throws -> ProcessOutput {
-        let process = Process()
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-        let stdinPipe = Pipe()
-
-        process.executableURL = executableURL
-        process.arguments = arguments
-        process.currentDirectoryURL = currentDirectoryURL
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-        process.standardInput = stdinPipe
-        process.environment = DependencyManager.shared.defaultEnvironment
-
-        let stdoutTask = Task.detached {
-            try stdoutPipe.fileHandleForReading.readToEnd() ?? Data()
-        }
-        let stderrTask = Task.detached {
-            try stderrPipe.fileHandleForReading.readToEnd() ?? Data()
-        }
-
-        return try await withCheckedThrowingContinuation { continuation in
-            process.terminationHandler = { terminatedProcess in
-                Task {
-                    do {
-                        let stdoutData = try await stdoutTask.value
-                        let stderrData = try await stderrTask.value
-
-                        continuation.resume(
-                            returning: ProcessOutput(
-                                commandDescription: ([executableURL.lastPathComponent] + arguments).joined(separator: " "),
-                                stdout: String(decoding: stdoutData, as: UTF8.self),
-                                stderr: String(decoding: stderrData, as: UTF8.self),
-                                terminationStatus: terminatedProcess.terminationStatus
-                            )
-                        )
-                    } catch {
-                        continuation.resume(throwing: error)
-                    }
-                }
-            }
-
-            do {
-                try process.run()
-                if let stdin {
-                    stdinPipe.fileHandleForWriting.write(stdin)
-                }
-                try? stdinPipe.fileHandleForWriting.close()
-            } catch {
-                stdoutTask.cancel()
-                stderrTask.cancel()
-                continuation.resume(throwing: error)
-            }
-        }
+        try await UnifiedProcessRunner.run(
+            executableURL: executableURL,
+            arguments: arguments,
+            currentDirectoryURL: currentDirectoryURL ?? FileManager.default.temporaryDirectory,
+            stdin: stdin
+        )
     }
 }

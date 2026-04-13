@@ -24,53 +24,27 @@ struct RepositoryCloner: Sendable {
             }
         }
 
-        let process = Process()
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = [
-            "git",
-            "clone",
-            "--depth", "1",
-            repositorySpecifier,
-            destinationURL.path
-        ]
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-        process.environment = DependencyManager.shared.defaultEnvironment
-
-        let stdoutTask = Task.detached {
-            try stdoutPipe.fileHandleForReading.readToEnd() ?? Data()
-        }
-        let stderrTask = Task.detached {
-            try stderrPipe.fileHandleForReading.readToEnd() ?? Data()
-        }
-
-        return try await withCheckedThrowingContinuation { continuation in
-            process.terminationHandler = { terminatedProcess in
-                Task {
-                    let stderrData = (try? await stderrTask.value) ?? Data()
-
-                    if terminatedProcess.terminationStatus == 0 {
-                        continuation.resume(returning: destinationURL)
-                    } else {
-                        continuation.resume(
-                            throwing: CloneError.cloneFailed(
-                                message: String(decoding: stderrData, as: UTF8.self)
-                            )
-                        )
-                    }
-                }
+        do {
+            let result = try await UnifiedProcessRunner.run(
+                arguments: [
+                    "git",
+                    "clone",
+                    "--depth", "1",
+                    repositorySpecifier,
+                    destinationURL.path
+                ],
+                currentDirectoryURL: FileManager.default.temporaryDirectory
+            )
+            
+            if result.terminationStatus == 0 {
+                return destinationURL
+            } else {
+                throw CloneError.cloneFailed(message: result.combinedText)
             }
-
-            do {
-                try process.run()
-            } catch {
-                stdoutTask.cancel()
-                stderrTask.cancel()
-                continuation.resume(throwing: error)
-            }
+        } catch let error as CloneError {
+            throw error
+        } catch {
+            throw CloneError.cloneFailed(message: error.localizedDescription)
         }
     }
 

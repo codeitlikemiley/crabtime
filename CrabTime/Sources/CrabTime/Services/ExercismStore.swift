@@ -127,7 +127,7 @@ final class ExercismStore {
             store.consoleOutput += "Exercism submit failed: \(error.localizedDescription)\n"
             if let cliError = error as? ExercismCLI.CLIError, case .submitFailed(let message) = cliError {
                 let stripped = message.components(separatedBy: "\n")
-                    .map { $0.trimmingCharacters(in: .whitespaces) }
+                    .map { $0.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines) }
                     .filter { !$0.isEmpty }
                     .joined(separator: ": ")
                     .replacingOccurrences(of: "Error: ", with: "")

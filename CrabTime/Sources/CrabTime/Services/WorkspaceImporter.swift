@@ -70,7 +70,15 @@ struct WorkspaceImporter {
 
     private func discoverExerciseSourceFiles(from rootURL: URL) throws -> [ExerciseCandidate] {
         var candidates: [ExerciseCandidate] = []
-        for url in try descendantURLs(at: rootURL) {
+        guard let children = fileManager.enumerator(
+            at: rootURL,
+            includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else {
+            return []
+        }
+
+        for case let url as URL in children {
             guard isRegularFile(url) else {
                 continue
             }
@@ -98,7 +106,15 @@ struct WorkspaceImporter {
             matches.append(rootCandidate)
         }
 
-        for candidateURL in try descendantURLs(at: rootURL) {
+        guard let children = fileManager.enumerator(
+            at: rootURL,
+            includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else {
+            return matches
+        }
+
+        for case let candidateURL as URL in children {
             guard isDirectory(candidateURL) else {
                 continue
             }
@@ -514,7 +530,15 @@ struct WorkspaceImporter {
     }
 
     private func containsExerciseCollectionDescendant(in rootURL: URL) throws -> Bool {
-        for candidateURL in try descendantURLs(at: rootURL) {
+        guard let children = fileManager.enumerator(
+            at: rootURL,
+            includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else {
+            return false
+        }
+
+        for case let candidateURL as URL in children {
             guard isDirectory(candidateURL) else {
                 continue
             }
@@ -525,25 +549,6 @@ struct WorkspaceImporter {
         }
 
         return false
-    }
-
-    private func descendantURLs(at rootURL: URL) throws -> [URL] {
-        let children = try fileManager.contentsOfDirectory(
-            at: rootURL,
-            includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey],
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]
-        )
-
-        var descendants: [URL] = []
-        for childURL in children {
-            descendants.append(childURL)
-
-            if isDirectory(childURL) {
-                descendants.append(contentsOf: try descendantURLs(at: childURL))
-            }
-        }
-
-        return descendants
     }
 
     private func isDirectory(_ url: URL) -> Bool {

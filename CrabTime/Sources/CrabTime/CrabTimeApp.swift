@@ -131,6 +131,7 @@ struct WorkspaceSceneRoot: View {
                     .environment(processStore)
                     .environment(services.aiSettingsStore)
                     .environment(services.modelCatalogStore)
+                    .environment(navigationStore)
                     
                     .focusedSceneValue(\.workspaceStore, workspaceStore)
                     .focusedSceneValue(\.navigationStore, navigationStore)
@@ -293,12 +294,6 @@ struct CrabTimeAppCommands: Commands {
 
             Button("Clear Output") { workspaceStore?.clearConsoleOutput() }
                 .keyboardShortcut("k", modifiers: .command)
-                .disabled(workspaceStore == nil)
-
-
-
-
-                .keyboardShortcut("a", modifiers: [.command, .shift])
                 .disabled(workspaceStore == nil)
 
             Button("Show TODO Explorer") { workspaceStore?.showTodoAndFocus() }

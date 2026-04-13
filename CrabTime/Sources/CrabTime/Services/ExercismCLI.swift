@@ -52,7 +52,13 @@ struct ExercismCLI: Sendable {
         self.executableResolver = executableResolver ?? {
             candidateExecutableURLs.first { FileManager.default.isExecutableFile(atPath: $0.path) }
         }
-        self.processRunner = processRunner ?? Self.runProcess(executableURL:arguments:currentDirectoryURL:)
+        self.processRunner = processRunner ?? { executableURL, arguments, currentDirectoryURL in
+            try await UnifiedProcessRunner.run(
+                executableURL: executableURL,
+                arguments: arguments,
+                currentDirectoryURL: currentDirectoryURL ?? FileManager.default.temporaryDirectory
+            )
+        }
     }
 
     func status() throws -> Status {
@@ -261,59 +267,6 @@ struct ExercismCLI: Sendable {
         return candidates.filter { seen.insert($0.path).inserted }
     }
 
-    private static func runProcess(
-        executableURL: URL,
-        arguments: [String],
-        currentDirectoryURL: URL?
-    ) async throws -> ProcessOutput {
-        let process = Process()
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-
-        process.executableURL = executableURL
-        process.arguments = arguments
-        process.currentDirectoryURL = currentDirectoryURL
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-        process.environment = DependencyManager.shared.defaultEnvironment
-
-        let stdoutTask = Task.detached {
-            try stdoutPipe.fileHandleForReading.readToEnd() ?? Data()
-        }
-        let stderrTask = Task.detached {
-            try stderrPipe.fileHandleForReading.readToEnd() ?? Data()
-        }
-
-        return try await withCheckedThrowingContinuation { continuation in
-            process.terminationHandler = { terminatedProcess in
-                Task {
-                    do {
-                        let stdoutData = try await stdoutTask.value
-                        let stderrData = try await stderrTask.value
-
-                        continuation.resume(
-                            returning: ProcessOutput(
-                                commandDescription: ([executableURL.path] + arguments).joined(separator: " "),
-                                stdout: String(decoding: stdoutData, as: UTF8.self),
-                                stderr: String(decoding: stderrData, as: UTF8.self),
-                                terminationStatus: terminatedProcess.terminationStatus
-                            )
-                        )
-                    } catch {
-                        continuation.resume(throwing: error)
-                    }
-                }
-            }
-
-            do {
-                try process.run()
-            } catch {
-                stdoutTask.cancel()
-                stderrTask.cancel()
-                continuation.resume(throwing: error)
-            }
-        }
-    }
 }
 
 extension ExercismCLI {

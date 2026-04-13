@@ -228,14 +228,14 @@ struct RustlingsWorkspaceScaffolder {
     private func runRustlingsDevUpdateIfAvailable(in workspaceRootURL: URL) async throws -> String? {
         guard ToolingHealthService.resolveExecutable(named: "rustlings") != nil else { return nil }
 
-        let update = try await runProcess(
-            currentDirectoryURL: workspaceRootURL,
+        let update = try await UnifiedProcessRunner.run(
             arguments: ["rustlings", "dev", "update"],
+            currentDirectoryURL: workspaceRootURL,
             commandDescription: "rustlings dev update"
         )
-        let check = try await runProcess(
-            currentDirectoryURL: workspaceRootURL,
+        let check = try await UnifiedProcessRunner.run(
             arguments: ["rustlings", "dev", "check"],
+            currentDirectoryURL: workspaceRootURL,
             commandDescription: "rustlings dev check"
         )
 
@@ -643,51 +643,7 @@ struct RustlingsWorkspaceScaffolder {
         """
     }
 
-    private func runProcess(
-        currentDirectoryURL: URL,
-        arguments: [String],
-        commandDescription: String
-    ) async throws -> ProcessOutput {
-        let process = Process()
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
 
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = arguments
-        process.currentDirectoryURL = currentDirectoryURL
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-        process.environment = DependencyManager.shared.defaultEnvironment
-
-        let stdoutTask = Task.detached { try stdoutPipe.fileHandleForReading.readToEnd() ?? Data() }
-        let stderrTask = Task.detached { try stderrPipe.fileHandleForReading.readToEnd() ?? Data() }
-
-        return try await withCheckedThrowingContinuation { continuation in
-            process.terminationHandler = { terminatedProcess in
-                Task {
-                    do {
-                        let stdoutData = try await stdoutTask.value
-                        let stderrData = try await stderrTask.value
-                        continuation.resume(returning: ProcessOutput(
-                            commandDescription: commandDescription,
-                            stdout: String(decoding: stdoutData, as: UTF8.self),
-                            stderr: String(decoding: stderrData, as: UTF8.self),
-                            terminationStatus: terminatedProcess.terminationStatus
-                        ))
-                    } catch {
-                        continuation.resume(throwing: error)
-                    }
-                }
-            }
-            do {
-                try process.run()
-            } catch {
-                stdoutTask.cancel()
-                stderrTask.cancel()
-                continuation.resume(throwing: error)
-            }
-        }
-    }
 }
 
 extension RustlingsWorkspaceScaffolder {
