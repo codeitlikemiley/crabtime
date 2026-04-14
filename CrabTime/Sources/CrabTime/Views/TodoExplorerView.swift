@@ -4,6 +4,8 @@ struct TodoExplorerView: View {
     @Environment(WorkspaceStore.self) private var workspaceStore
     @Environment(NavigationStore.self) private var navigationStore
     @Environment(TodoExplorerStore.self) private var store
+    
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         @Bindable var store = store
@@ -36,6 +38,7 @@ struct TodoExplorerView: View {
                         .textFieldStyle(.plain)
                         .font(.system(size: 12))
                         .foregroundStyle(CrabTimeTheme.Palette.ink)
+                        .focused($isFocused)
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
@@ -137,6 +140,12 @@ struct TodoExplorerView: View {
         .paneCard()
         .onAppear {
             store.refreshTodoItems(using: workspaceStore)
+        }
+        .task(id: workspaceStore.todoFocusToken) {
+            guard workspaceStore.todoFocusToken > 0 else {
+                return
+            }
+            isFocused = true
         }
         .background(
             TodoKeyBridge(
