@@ -118,75 +118,6 @@ struct ChatSidebarView: View {
                 .interactivePointer()
             }
 
-            HStack(spacing: 8) {
-                Menu {
-                    Picker("Provider", selection: Binding(
-                        get: { chatStore.selectedProvider(using: settingsStore) },
-                        set: { chatStore.updateSelectedProvider($0, using: store, settingsStore: settingsStore) }
-                    )) {
-                        ForEach(AIProviderKind.defaultChatProviders) { kind in
-                            Text(kind.title).tag(kind)
-                        }
-                    }
-                } label: {
-                    let provider = chatStore.selectedProvider(using: settingsStore)
-                    Label(provider.shortTitle, systemImage: provider.systemImage)
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
-                        .foregroundStyle(CrabTimeTheme.Palette.ink)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Capsule().fill(CrabTimeTheme.Palette.buttonFill))
-                        .overlay {
-                            Capsule().stroke(CrabTimeTheme.Palette.divider, lineWidth: 1)
-                        }
-                }
-                .menuStyle(.borderlessButton)
-                .interactivePointer()
-
-                ModelComboBox(
-                    text: Binding(
-                        get: { chatStore.selectedModel(using: settingsStore) },
-                        set: { chatStore.updateSelectedModel($0, using: store, settingsStore: settingsStore) }
-                    ),
-                    items: modelCatalogStore.models(
-                        for: chatStore.selectedProvider(using: settingsStore),
-                        selectedModel: chatStore.selectedModel(using: settingsStore)
-                    ),
-                    placeholder: chatStore.selectedProvider(using: settingsStore).defaultModel
-                ) { value in
-                    chatStore.updateSelectedModel(value, using: store, settingsStore: settingsStore)
-                }
-                .frame(height: 28)
-
-                if chatStore.selectedProvider(using: settingsStore) == .openCodeCLI {
-                    Button {
-                        Task {
-                            await modelCatalogStore.refreshModels(for: .openCodeCLI)
-                        }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(CrabTimeTheme.Palette.textMuted)
-                    }
-                    .buttonStyle(.plain)
-                    .interactivePointer()
-                }
-
-                Spacer()
-
-                SettingsLink {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(CrabTimeTheme.Palette.ink)
-                        .frame(width: 32, height: 32)
-                        .background(Circle().fill(CrabTimeTheme.Palette.buttonFill))
-                        .overlay {
-                            Circle().stroke(CrabTimeTheme.Palette.divider, lineWidth: 1)
-                        }
-                }
-                .buttonStyle(.plain)
-                .interactivePointer()
-            }
 
             HStack(spacing: 8) {
                 Menu {
@@ -328,19 +259,19 @@ struct ChatSidebarView: View {
                 activeMenu
             }
 
-            ScrollView(.vertical, showsIndicators: true) {
-                TextField(
-                    composerPlaceholder,
-                    text: Binding(
-                        get: { chatStore.composerText },
-                        set: { chatStore.composerText = $0 }
-                    ),
-                    axis: .vertical
-                )
-                .textFieldStyle(.plain)
-                .padding(12)
-            }
-            .frame(maxHeight: 180)
+            // AutoGrowingTextEditor: 1 line → grows → caps at 180pt then scrolls
+            // Enter = newline, Cmd+Enter = submit
+            AutoGrowingTextEditor(
+                text: Binding(
+                    get: { chatStore.composerText },
+                    set: { chatStore.composerText = $0 }
+                ),
+                placeholder: composerPlaceholder,
+                maxHeight: 180,
+                isDisabled: chatStore.isSending,
+                isFocused: isComposerFocused,
+                onSubmit: handleComposerSubmit
+            )
             .background(
                 RoundedRectangle(cornerRadius: CrabTimeTheme.Layout.subpanelRadius, style: .continuous)
                     .fill(CrabTimeTheme.Palette.raisedFill)
@@ -348,12 +279,6 @@ struct ChatSidebarView: View {
             .overlay {
                 RoundedRectangle(cornerRadius: CrabTimeTheme.Layout.subpanelRadius, style: .continuous)
                     .stroke(CrabTimeTheme.Palette.divider, lineWidth: 1)
-            }
-            .foregroundStyle(CrabTimeTheme.Palette.ink)
-            .focused($isComposerFocused)
-            .disabled(chatStore.isSending)
-            .onSubmit {
-                handleComposerSubmit()
             }
             .background(
                 ChatComposerKeyBridge(
@@ -366,39 +291,94 @@ struct ChatSidebarView: View {
                 )
             )
 
-            HStack {
+            VStack(alignment: .leading, spacing: 10) {
                 Text(contextDescription)
                     .font(.caption)
                     .foregroundStyle(CrabTimeTheme.Palette.textMuted)
 
-                Spacer()
+                HStack(spacing: 8) {
+                    Menu {
+                        Picker("Provider", selection: Binding(
+                            get: { chatStore.selectedProvider(using: settingsStore) },
+                            set: { chatStore.updateSelectedProvider($0, using: store, settingsStore: settingsStore) }
+                        )) {
+                            ForEach(AIProviderKind.defaultChatProviders) { kind in
+                                Text(kind.title).tag(kind)
+                            }
+                        }
+                    } label: {
+                        let provider = chatStore.selectedProvider(using: settingsStore)
+                        Label(provider.shortTitle, systemImage: provider.systemImage)
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .foregroundStyle(CrabTimeTheme.Palette.ink)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Capsule().fill(CrabTimeTheme.Palette.buttonFill))
+                            .overlay {
+                                Capsule().stroke(CrabTimeTheme.Palette.divider, lineWidth: 1)
+                            }
+                    }
+                    .menuStyle(.borderlessButton)
+                    .interactivePointer()
 
-                Button {
-                    handleComposerSubmit()
-                } label: {
-                    HStack(spacing: 8) {
-                        if chatStore.isSending {
-                            ProgressView()
-                                .controlSize(.small)
-                                .tint(CrabTimeTheme.Palette.ink)
-                            Text(elapsedSeconds > 0 ? "\(elapsedSeconds)s…" : "Generating…")
-                        } else {
-                            Image(systemName: "arrow.up.circle.fill")
-                            Text("Send")
+                    ModelComboBox(
+                        text: Binding(
+                            get: { chatStore.selectedModel(using: settingsStore) },
+                            set: { chatStore.updateSelectedModel($0, using: store, settingsStore: settingsStore) }
+                        ),
+                        items: modelCatalogStore.models(
+                            for: chatStore.selectedProvider(using: settingsStore),
+                            selectedModel: chatStore.selectedModel(using: settingsStore)
+                        ),
+                        placeholder: chatStore.selectedProvider(using: settingsStore).defaultModel
+                    ) { value in
+                        chatStore.updateSelectedModel(value, using: store, settingsStore: settingsStore)
+                    }
+                    .frame(height: 28)
+
+                    if chatStore.selectedProvider(using: settingsStore) == .openCodeCLI {
+                        Button {
+                            Task {
+                                await modelCatalogStore.refreshModels(for: .openCodeCLI)
+                            }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(CrabTimeTheme.Palette.textMuted)
+                        }
+                        .buttonStyle(.plain)
+                        .interactivePointer()
+                    }
+
+                    Spacer()
+
+                    Button {
+                        handleComposerSubmit()
+                    } label: {
+                        HStack(spacing: 8) {
+                            if chatStore.isSending {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .tint(CrabTimeTheme.Palette.ink)
+                                Text(elapsedSeconds > 0 ? "\(elapsedSeconds)s…" : "Generating…")
+                            } else {
+                                Image(systemName: "arrow.up.circle.fill")
+                                Text("Send")
+                            }
+                        }
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(CrabTimeTheme.Palette.ink)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Capsule().fill(CrabTimeTheme.Palette.selectionFill))
+                        .overlay {
+                            Capsule().stroke(CrabTimeTheme.Palette.strongDivider, lineWidth: 1)
                         }
                     }
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(CrabTimeTheme.Palette.ink)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Capsule().fill(CrabTimeTheme.Palette.selectionFill))
-                    .overlay {
-                        Capsule().stroke(CrabTimeTheme.Palette.strongDivider, lineWidth: 1)
-                    }
+                    .buttonStyle(.plain)
+                    .interactivePointer()
+                    .disabled(chatStore.isSending)
                 }
-                .buttonStyle(.plain)
-                .interactivePointer()
-                .disabled(chatStore.isSending)
             }
         }
     }
@@ -920,10 +900,12 @@ private struct ChatComposerKeyBridge: NSViewRepresentable {
                     if modifiers.isEmpty, [36, 48, 76].contains(event.keyCode), self.onAcceptMenu() {
                         return nil
                     }
-                } else if modifiers.isEmpty, [36, 76].contains(event.keyCode) {
+                // Cmd+Return → submit
+                } else if modifiers == .command, [36, 76].contains(event.keyCode) {
                     self.onSubmit()
                     return nil
                 }
+                // bare Return → let the text field insert a newline (fall through)
 
                 return event
             }
