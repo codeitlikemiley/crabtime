@@ -106,6 +106,7 @@ final class WorkspaceStore {
     var selectedExercismIndex: Int = 0
     private(set) var exercismDownloadedExercises: Set<String> = []
     private(set) var exercismCompletedExercises: Set<String> = []
+    private(set) var locallyCompletedExercises: Set<String> = []
 
     @ObservationIgnored private let importer: WorkspaceImporter
     @ObservationIgnored private let exercismAPIService = ExercismAPIService()
@@ -177,6 +178,7 @@ final class WorkspaceStore {
 
         self.exercismDownloadedExercises = Set((defaults.string(forKey: "exercismDownloadedExercises") ?? "").split(separator: ",").map(String.init))
         self.exercismCompletedExercises = Set((defaults.string(forKey: "exercismCompletedExercises") ?? "").split(separator: ",").map(String.init))
+        self.locallyCompletedExercises = Set((defaults.string(forKey: "locallyCompletedExercises") ?? "").split(separator: ",").map(String.init))
 
         restorePersistedLibrary()
     }
@@ -217,6 +219,10 @@ final class WorkspaceStore {
 
     var currentFileTree: [WorkspaceFileNode] {
         filteredFileTree(workspace?.fileTree ?? [])
+    }
+
+    var allWorkspaceFiles: [WorkspaceFileNode] {
+        flattenToFiles(workspace?.fileTree ?? [])
     }
 
     var visibleExplorerFileCount: Int {
@@ -440,6 +446,22 @@ final class WorkspaceStore {
         currentWorkspaceRecord?.sourceKind == .exercism
     }
 
+    var isCodeCraftersWorkspace: Bool {
+        currentWorkspaceRecord?.sourceKind == .codeCrafters
+    }
+
+    func submissionProvider(exercismStore: ExercismStore) -> (any ExerciseSubmissionProvider)? {
+        guard let kind = currentWorkspaceRecord?.sourceKind else { return nil }
+        switch kind {
+        case .exercism:
+            return ExercismSubmissionProvider(exercismStore: exercismStore)
+        case .codeCrafters:
+            return CodeCraftersSubmissionProvider()
+        case .created, .imported, .cloned:
+            return LocalCompletionProvider()
+        }
+    }
+
     var canSubmitSelectedExerciseToExercism: Bool {
         isExercismWorkspace
             && hasSelection
@@ -622,16 +644,29 @@ final class WorkspaceStore {
     }
 
 
+    func markExerciseCompleted(_ key: String) {
+        locallyCompletedExercises.insert(key)
+        defaults.set(locallyCompletedExercises.joined(separator: ","), forKey: "locallyCompletedExercises")
+    }
+
     func importWorkspace(from url: URL, sourceKind: WorkspaceSourceKind = .imported, cloneURL: String? = nil) {
         if isEditorDirty {
             saveSelectedExercise()
         }
 
         do {
-            let managedWorkspace = try prepareWorkspaceForImport(from: url, sourceKind: sourceKind)
+            var appliedSourceKind = sourceKind
+            if sourceKind == .imported || sourceKind == .cloned {
+                let codeCraftersDir = url.appendingPathComponent(".codecrafters", isDirectory: true)
+                if FileManager.default.fileExists(atPath: codeCraftersDir.path) {
+                    appliedSourceKind = .codeCrafters
+                }
+            }
+
+            let managedWorkspace = try prepareWorkspaceForImport(from: url, sourceKind: appliedSourceKind)
             loadWorkspace(
                 at: managedWorkspace.rootURL,
-                sourceKind: sourceKind,
+                sourceKind: appliedSourceKind,
                 cloneURL: cloneURL,
                 originPath: managedWorkspace.originPath,
                 restoreState: true,
@@ -2082,8 +2117,20 @@ final class WorkspaceStore {
         return .idle
     }
 
-    private func isExerciseCompleted(_ exercise: ExerciseDocument) -> Bool {
-        !exercise.checks.isEmpty && exercise.checks.allSatisfy { $0.status == .passed }
+    var isCurrentExerciseCompleted: Bool {
+        guard let exercise = selectedExercise, let workspace = workspace else { return false }
+        return isExerciseCompleted(exercise, in: workspace)
+    }
+
+    private func isExerciseCompleted(_ exercise: ExerciseDocument, in workspace: ExerciseWorkspace? = nil) -> Bool {
+        let slug = workspace?.rootURL.lastPathComponent ?? ""
+        let key = "\(slug)/\(exercise.title)"
+        
+        if locallyCompletedExercises.contains(key) {
+            return true
+        }
+
+        return !exercise.checks.isEmpty && exercise.checks.allSatisfy { $0.status == .passed }
     }
 
     func applyCheckResults(from result: ProcessOutput) {
@@ -2241,6 +2288,18 @@ final class WorkspaceStore {
         return (nameMatches || pathMatches) ? node : nil
     }
 
+    private func flattenToFiles(_ nodes: [WorkspaceFileNode]) -> [WorkspaceFileNode] {
+        var files: [WorkspaceFileNode] = []
+        for node in nodes {
+            if node.isDirectory {
+                files.append(contentsOf: flattenToFiles(node.children))
+            } else {
+                files.append(node)
+            }
+        }
+        return files
+    }
+
     private func countFiles(in nodes: [WorkspaceFileNode]) -> Int {
         nodes.reduce(0) { partial, node in
             partial + (node.isDirectory ? countFiles(in: node.children) : 1)
@@ -2388,7 +2447,7 @@ final class WorkspaceStore {
     private func managedWorkspaceURL(for sourceRootURL: URL, sourceKind: WorkspaceSourceKind) -> URL {
         let containerURL: URL
         switch sourceKind {
-        case .imported:
+        case .imported, .codeCrafters:
             containerURL = appPaths.importedLibraryURL
         case .cloned:
             containerURL = appPaths.cloneLibraryURL

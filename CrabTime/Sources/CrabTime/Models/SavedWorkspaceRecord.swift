@@ -4,6 +4,7 @@ enum WorkspaceSourceKind: String, Codable, Sendable {
     case imported
     case cloned
     case exercism
+    case codeCrafters
     case created
 }
 

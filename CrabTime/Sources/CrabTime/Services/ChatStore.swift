@@ -289,7 +289,12 @@ final class ChatStore {
                     )
                 }
 
-                let context = contextBuilder.build(from: store, processStore: processStore)
+                let tokens = store.workspace.map { 
+                    ChatContextTokenParser.parse(userMessage, workspaceRoot: $0.rootURL)
+                } ?? []
+
+                let context = contextBuilder.build(from: store, processStore: processStore, contextTokens: tokens)
+                
                 let reply = try await providerManager.sendMessage(
                     session: updatedSession,
                     messages: messages + [outgoingMessage],
@@ -302,7 +307,7 @@ final class ChatStore {
                 )
                 updatedSession.backendSessionID = reply.backendSessionID ?? updatedSession.backendSessionID
 
-                let assistantMessage = ExerciseChatMessage(sessionID: updatedSession.id, role: .assistant, content: reply.content)
+                let assistantMessage = ExerciseChatMessage(sessionID: updatedSession.id, role: .assistant, content: reply.content, thinkingContent: reply.thinkingContent)
                 try database.insertChatMessage(assistantMessage)
                 try database.upsertChatSession(updatedSession)
 

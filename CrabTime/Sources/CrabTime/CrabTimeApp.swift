@@ -90,6 +90,7 @@ struct WorkspaceSceneRoot: View {
     @State private var exercismStore: ExercismStore
     @State private var processStore: ProcessStore
     @State private var navigationStore: NavigationStore
+    @State private var submissionService: ExerciseSubmissionService
     @State private var didApplyInitialWorkspace = false
 
     init(services: AppServices, initialWorkspaceRootPath: String? = nil) {
@@ -116,6 +117,7 @@ struct WorkspaceSceneRoot: View {
         _exercismStore = State(initialValue: exercismStore)
         _processStore = State(initialValue: processStore)
         _navigationStore = State(initialValue: NavigationStore())
+        _submissionService = State(initialValue: ExerciseSubmissionService())
     }
 
     @State private var dependencyManager = DependencyManager.shared
@@ -132,6 +134,7 @@ struct WorkspaceSceneRoot: View {
                     .environment(services.aiSettingsStore)
                     .environment(services.modelCatalogStore)
                     .environment(navigationStore)
+                    .environment(submissionService)
                     
                     .focusedSceneValue(\.workspaceStore, workspaceStore)
                     .focusedSceneValue(\.navigationStore, navigationStore)

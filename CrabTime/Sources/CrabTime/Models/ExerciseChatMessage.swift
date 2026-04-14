@@ -18,6 +18,7 @@ struct ExerciseChatMessage: Identifiable, Equatable, Codable, Sendable {
     let sessionID: UUID
     let role: ExerciseChatRole
     var content: String
+    var thinkingContent: String?
     let createdAt: Date
     var status: ExerciseChatMessageStatus
     var metadataJSON: String?
@@ -27,6 +28,7 @@ struct ExerciseChatMessage: Identifiable, Equatable, Codable, Sendable {
         sessionID: UUID,
         role: ExerciseChatRole,
         content: String,
+        thinkingContent: String? = nil,
         createdAt: Date = Date(),
         status: ExerciseChatMessageStatus = .complete,
         metadataJSON: String? = nil
@@ -35,6 +37,7 @@ struct ExerciseChatMessage: Identifiable, Equatable, Codable, Sendable {
         self.sessionID = sessionID
         self.role = role
         self.content = content
+        self.thinkingContent = thinkingContent
         self.createdAt = createdAt
         self.status = status
         self.metadataJSON = metadataJSON

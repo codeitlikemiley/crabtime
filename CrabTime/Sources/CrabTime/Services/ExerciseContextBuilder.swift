@@ -76,6 +76,56 @@ struct ExerciseContextBuilder {
         return sections.joined(separator: "\n\n")
     }
 
+    @MainActor
+    func build(from store: WorkspaceStore, processStore: ProcessStore?, contextTokens: [ChatContextToken]) -> String {
+        var sections: [String] = []
+
+        if let workspace = store.workspace {
+            let rootURL = workspace.rootURL.standardizedFileURL
+
+            if store.selectedExercise != nil {
+                sections.append(exerciseInstructions)
+            } else {
+                sections.append("""
+                You are helping a learner inside a Rust workspace in Crab Time.
+                Focus on explanation, debugging, and next steps.
+                """)
+            }
+
+            if let activeDocumentURL = store.activeDocumentURL?.standardizedFileURL {
+                sections.append("Active document: \(relativePath(for: activeDocumentURL, rootURL: rootURL))")
+            }
+
+            for token in contextTokens {
+                switch token {
+                case .file(let url):
+                    if let content = renderFileContents(at: url, rootURL: rootURL) {
+                        sections.append("Explicitly Referenced File:\n" + content)
+                    }
+                case .output:
+                    if !store.consoleOutput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        sections.append("Terminal Output:\n```text\n\(store.consoleOutput)\n```")
+                    }
+                case .diagnostics:
+                    if let processStore = processStore, !processStore.diagnostics.isEmpty {
+                        let diagnosticsText = processStore.diagnostics.map { diagnostic in
+                            let lineSuffix = diagnostic.line.map { " @ line \($0)" } ?? ""
+                            return "[\(diagnostic.severity.rawValue.uppercased())] \(diagnostic.message)\(lineSuffix)"
+                        }.joined(separator: "\n")
+                        sections.append("Diagnostics:\n```text\n\(diagnosticsText)\n```")
+                    }
+                }
+            }
+        } else {
+            sections.append("""
+            You are helping a learner in Crab Time.
+            Answer general Rust, debugging, tooling, or exercise-authoring questions.
+            """)
+        }
+
+        return sections.joined(separator: "\n\n")
+    }
+
     private func loadSiblingFiles(for exercise: ExerciseDocument, rootURL: URL) -> [String] {
         guard let fileURLs = try? FileManager.default.contentsOfDirectory(
             at: exercise.directoryURL,

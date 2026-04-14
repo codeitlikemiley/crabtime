@@ -80,8 +80,7 @@ struct AIProviderManager {
                 content: try await runCLI(command: "opencode", arguments: ["run", prompt, "-m", session.model])
             )
         case .openAI:
-            return AIProviderReply(
-                content: try await sendOpenAICompatibleMessage(
+            let result = try await sendOpenAICompatibleMessage(
                 endpoint: URL(string: "https://api.openai.com/v1/chat/completions")!,
                 apiKey: try apiKey(for: .openAI),
                 model: session.model,
@@ -89,10 +88,9 @@ struct AIProviderManager {
                 messages: messages,
                 isOpenRouter: false
             )
-            )
+            return AIProviderReply(content: result.content, thinkingContent: result.thinking)
         case .openRouter:
-            return AIProviderReply(
-                content: try await sendOpenAICompatibleMessage(
+            let result = try await sendOpenAICompatibleMessage(
                 endpoint: URL(string: "https://openrouter.ai/api/v1/chat/completions")!,
                 apiKey: try apiKey(for: .openRouter),
                 model: session.model,
@@ -100,7 +98,27 @@ struct AIProviderManager {
                 messages: messages,
                 isOpenRouter: true
             )
+            return AIProviderReply(content: result.content, thinkingContent: result.thinking)
+        case .groq:
+            let result = try await sendOpenAICompatibleMessage(
+                endpoint: URL(string: "https://api.groq.com/openai/v1/chat/completions")!,
+                apiKey: try apiKey(for: .groq),
+                model: session.model,
+                systemPrompt: context,
+                messages: messages,
+                isOpenRouter: false
             )
+            return AIProviderReply(content: result.content, thinkingContent: result.thinking)
+        case .nexum:
+            let result = try await sendOpenAICompatibleMessage(
+                endpoint: URL(string: "https://www.dialagram.me/router/v1/chat/completions")!,
+                apiKey: try apiKey(for: .nexum),
+                model: session.model,
+                systemPrompt: context,
+                messages: messages,
+                isOpenRouter: false
+            )
+            return AIProviderReply(content: result.content, thinkingContent: result.thinking)
         case .anthropic:
             return AIProviderReply(
                 content: try await sendAnthropicMessage(
@@ -255,6 +273,11 @@ struct AIProviderManager {
         )
     }
 
+    private struct OpenAICompatibleResult {
+        let content: String
+        let thinking: String?
+    }
+
     private func sendOpenAICompatibleMessage(
         endpoint: URL,
         apiKey: String,
@@ -262,25 +285,27 @@ struct AIProviderManager {
         systemPrompt: String,
         messages: [ExerciseChatMessage],
         isOpenRouter: Bool
-    ) async throws -> String {
+    ) async throws -> OpenAICompatibleResult {
         struct RequestBody: Encodable {
             struct ChatMessage: Encodable {
                 let role: String
                 let content: String
             }
-
             let model: String
             let messages: [ChatMessage]
+            let stream: Bool
         }
 
-        struct ResponseBody: Decodable {
-            struct Choice: Decodable {
-                struct ChatMessage: Decodable {
-                    let content: String
-                }
-                let message: ChatMessage
+        // content can be null when a thinking model puts all its text in reasoning_content
+        struct ResponseChoice: Decodable {
+            struct ChatMessage: Decodable {
+                let content: String?
+                let reasoning_content: String?
             }
-            let choices: [Choice]
+            let message: ChatMessage
+        }
+        struct ResponseBody: Decodable {
+            let choices: [ResponseChoice]
         }
 
         let allMessages = [RequestBody.ChatMessage(role: "system", content: systemPrompt)] + messages.map {
@@ -294,15 +319,52 @@ struct AIProviderManager {
             request.addValue(AppBrand.bundleIdentifier, forHTTPHeaderField: "HTTP-Referer")
             request.addValue(AppBrand.shortName, forHTTPHeaderField: "X-Title")
         }
-        request.httpBody = try JSONEncoder().encode(RequestBody(model: model, messages: allMessages))
+        request.httpBody = try JSONEncoder().encode(RequestBody(model: model, messages: allMessages, stream: false))
 
         let (data, response) = try await URLSession.shared.data(for: request)
         try validateHTTP(response: response, data: data)
+
         let decoded = try JSONDecoder().decode(ResponseBody.self, from: data)
-        guard let content = decoded.choices.first?.message.content else {
+        guard let choice = decoded.choices.first else {
             throw AIProviderError.emptyResponse(endpoint.absoluteString)
         }
-        return content
+
+        // Combine content fields — some providers (Nexum/Qwen) return null content
+        // with the actual reply in reasoning_content when in thinking mode.
+        let rawText = [choice.message.content, choice.message.reasoning_content]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+
+        guard !rawText.isEmpty else {
+            throw AIProviderError.emptyResponse(endpoint.absoluteString)
+        }
+
+        let extracted = Self.extractThinkingBlock(from: rawText)
+        return OpenAICompatibleResult(content: extracted.content, thinking: extracted.thinking)
+    }
+
+    /// Strips one leading `<think>…</think>` block from a model response.
+    /// Returns the extracted thinking and the cleaned visible text.
+    /// Works for Qwen3, DeepSeek-R1, and any similar model.
+    private static func extractThinkingBlock(from raw: String) -> (content: String, thinking: String?) {
+        let thinkOpen = "<think>"
+        let thinkClose = "</think>"
+
+        guard let openRange = raw.range(of: thinkOpen),
+              let closeRange = raw.range(of: thinkClose, range: openRange.upperBound..<raw.endIndex)
+        else {
+            return (raw.trimmingCharacters(in: .whitespacesAndNewlines), nil)
+        }
+
+        let thinkingText = String(raw[openRange.upperBound..<closeRange.lowerBound])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let visibleText = String(raw[closeRange.upperBound...])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let thinking = thinkingText.isEmpty ? nil : thinkingText
+        let content = visibleText.isEmpty ? raw.trimmingCharacters(in: .whitespacesAndNewlines) : visibleText
+        return (content, thinking)
     }
 
     private func sendAnthropicMessage(

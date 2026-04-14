@@ -50,6 +50,8 @@ private struct WorkspacePaletteButton: View {
             "arrow.down.circle"
         case .exercism:
             "graduationcap.circle"
+        case .codeCrafters:
+            "hammer.circle"
         default:
             "folder"
         }
@@ -246,6 +248,8 @@ struct WorkspaceCommandPaletteView: View {
             "arrow.down.circle.fill"
         case .exercism:
             "graduationcap.circle.fill"
+        case .codeCrafters:
+            "hammer.circle.fill"
         case .created:
             "plus.square.fill"
         case .imported:

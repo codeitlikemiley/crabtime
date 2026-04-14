@@ -9,7 +9,10 @@ struct ChatSidebarView: View {
     @Environment(AISettingsStore.self) private var settingsStore
     @Environment(AIModelCatalogStore.self) private var modelCatalogStore
     @FocusState private var isComposerFocused: Bool
+    @State private var menuState: ComposerMenuState = .none
     @State private var selectedSlashCommandID: String?
+    @State private var selectedFileNodeID: URL?
+    @State private var selectedLogTokenID: String?
     @State private var elapsedSeconds: Int = 0
 
     private let slashCommands: [ChatSlashCommand] = [
@@ -43,10 +46,10 @@ struct ChatSidebarView: View {
             }
         }
         .onChange(of: chatStore.composerText) { _, _ in
-            syncSlashCommandSelection()
+            syncMenuState()
         }
         .onChange(of: isComposerFocused) { _, _ in
-            syncSlashCommandSelection()
+            syncMenuState()
         }
         .onChange(of: chatStore.isSending) { _, isSending in
             if isSending {
@@ -315,8 +318,8 @@ struct ChatSidebarView: View {
                     .foregroundStyle(.red)
             }
 
-            if isShowingSlashCommandMenu {
-                slashCommandMenu
+            if menuState != .none {
+                activeMenu
             }
 
             TextField(
@@ -347,10 +350,10 @@ struct ChatSidebarView: View {
             .background(
                 ChatComposerKeyBridge(
                     isEnabled: isComposerFocused,
-                    isShowingSlashCommandMenu: isShowingSlashCommandMenu,
-                    onMoveUp: moveSlashCommandSelectionUp,
-                    onMoveDown: moveSlashCommandSelectionDown,
-                    onAcceptSlashCommand: acceptSelectedSlashCommand,
+                    isShowingMenu: menuState != .none,
+                    onMoveUp: moveSelectionUp,
+                    onMoveDown: moveSelectionDown,
+                    onAcceptMenu: acceptSelectedMenu,
                     onSubmit: handleComposerSubmit
                 )
             )
@@ -433,157 +436,314 @@ struct ChatSidebarView: View {
         return "Ask anything about Rust…"
     }
 
+
     private var contextDescription: String {
-        if store.selectedExercise != nil {
-            return "Context: selected exercise, related .rs/.md/Cargo.toml files, current buffer, and latest run output."
-        }
-        if store.workspace != nil {
-            return "Context: workspace files when available, current buffer, and latest run output."
-        }
-        return "Context: general chat until you load a workspace or exercise."
-    }
-
-    private var currentSlashQuery: String? {
         let text = chatStore.composerText
-        guard text.hasPrefix("/") else {
+        let tokens = store.workspace.map { ChatContextTokenParser.parse(text, workspaceRoot: $0.rootURL) } ?? []
+        
+        if tokens.isEmpty {
+            if store.selectedExercise != nil {
+                return "Context: exercise files, current buffer, and output."
+            }
+            if store.workspace != nil {
+                return "Context: workspace files, current buffer, and output."
+            }
+            return "Context: general chat until you load a workspace."
+        }
+        
+        let fileTokens = tokens.compactMap { token -> String? in
+            if case .file(let url) = token { return "@\(url.lastPathComponent)" }
             return nil
         }
-
-        let token = text.split(maxSplits: 1, whereSeparator: \.isWhitespace).first.map(String.init) ?? ""
-        guard token.hasPrefix("/") else {
-            return nil
-        }
-
-        if text.contains(where: \.isWhitespace) {
-            return nil
-        }
-
-        return String(token.dropFirst())
-    }
-
-    private var filteredSlashCommands: [ChatSlashCommand] {
-        guard let query = currentSlashQuery else {
-            return []
-        }
-
-        if query.isEmpty {
-            return slashCommands
-        }
-
-        return slashCommands.filter { command in
-            command.command.localizedCaseInsensitiveContains(query) ||
-            command.title.localizedCaseInsensitiveContains(query)
-        }
-    }
-
-    private var isShowingSlashCommandMenu: Bool {
-        isComposerFocused && currentSlashQuery != nil && !filteredSlashCommands.isEmpty
-    }
-
-    private var selectedSlashCommand: ChatSlashCommand? {
-        if let selectedSlashCommandID {
-            return filteredSlashCommands.first(where: { $0.id == selectedSlashCommandID })
-        }
-        return filteredSlashCommands.first
-    }
-
-    private var slashCommandMenu: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ForEach(filteredSlashCommands) { command in
-                Button {
-                    applySlashCommand(command)
-                } label: {
-                    HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: "terminal")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(isSlashCommandSelected(command) ? CrabTimeTheme.Palette.panelTint : CrabTimeTheme.Palette.textMuted)
-                            .frame(width: 14)
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(command.title)
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(CrabTimeTheme.Palette.ink)
-
-                            Text(command.detail)
-                                .font(.caption)
-                                .foregroundStyle(CrabTimeTheme.Palette.textMuted)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-
-                        Spacer()
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(isSlashCommandSelected(command) ? CrabTimeTheme.Palette.selectionFill : CrabTimeTheme.Palette.buttonFill)
-                    )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(isSlashCommandSelected(command) ? CrabTimeTheme.Palette.strongDivider : CrabTimeTheme.Palette.divider, lineWidth: 1)
-                    }
-                }
-                .buttonStyle(.plain)
-                .interactivePointer()
+        
+        var descs: [String] = []
+        if !fileTokens.isEmpty {
+            if fileTokens.count == 1 {
+                descs.append("\(fileTokens[0])")
+            } else {
+                descs.append("\(fileTokens[0]) + \(fileTokens.count - 1) more")
             }
         }
-        .padding(8)
-        .background(
-            RoundedRectangle(cornerRadius: CrabTimeTheme.Layout.subpanelRadius, style: .continuous)
-                .fill(CrabTimeTheme.Palette.panelFill)
+        if tokens.contains(.output) { descs.append("#output") }
+        if tokens.contains(.diagnostics) { descs.append("#diagnostics") }
+        
+        return "Context: " + descs.joined(separator: ", ")
+    }
+
+    // --- Menu State Management ---
+
+    private func syncMenuState() {
+        guard isComposerFocused else {
+            menuState = .none
+            return
+        }
+
+        let text = chatStore.composerText
+        guard !text.hasSuffix(" ") else {
+            menuState = .none
+            return
+        }
+
+        let words = text.split(separator: " ", omittingEmptySubsequences: false)
+        guard let lastWord = words.last.map(String.init), !lastWord.isEmpty else {
+            menuState = .none
+            return
+        }
+
+        if text.hasPrefix("/") && words.count == 1 {
+            let query = String(lastWord.dropFirst())
+            menuState = .slash(query)
+            if selectedSlashCommandID == nil || !filteredSlashCommands(query).contains(where: { $0.id == selectedSlashCommandID }) {
+                selectedSlashCommandID = filteredSlashCommands(query).first?.id
+            }
+            return
+        }
+
+        if lastWord.hasPrefix("@") {
+            let query = String(lastWord.dropFirst())
+            menuState = .filePicker(query)
+            if selectedFileNodeID == nil || !filteredWorkspaceFiles(query).contains(where: { $0.id == selectedFileNodeID }) {
+                selectedFileNodeID = filteredWorkspaceFiles(query).first?.id
+            }
+            return
+        }
+
+        if lastWord.hasPrefix("#") {
+            let query = String(lastWord.dropFirst())
+            menuState = .logPicker(query)
+            if selectedLogTokenID == nil || !filteredLogTokens(query).contains(where: { $0.token == selectedLogTokenID }) {
+                selectedLogTokenID = filteredLogTokens(query).first?.token
+            }
+            return
+        }
+
+        menuState = .none
+    }
+
+    private func filteredSlashCommands(_ query: String) -> [ChatSlashCommand] {
+        if query.isEmpty { return slashCommands }
+        return slashCommands.filter {
+            $0.command.localizedCaseInsensitiveContains(query) ||
+            $0.title.localizedCaseInsensitiveContains(query)
+        }
+    }
+
+    private func filteredWorkspaceFiles(_ query: String) -> [WorkspaceFileNode] {
+        let all = store.allWorkspaceFiles
+        if query.isEmpty { return Array(all.prefix(8)) }
+        return Array(all.filter {
+            $0.name.localizedCaseInsensitiveContains(query) ||
+            $0.url.path.localizedCaseInsensitiveContains(query)
+        }.prefix(8))
+    }
+
+    private func filteredLogTokens(_ query: String) -> [ChatLogToken] {
+        if query.isEmpty { return standardLogTokens }
+        return standardLogTokens.filter {
+            $0.token.localizedCaseInsensitiveContains(query)
+        }
+    }
+
+    // --- Menus UI ---
+
+    @ViewBuilder
+    private var activeMenu: some View {
+        switch menuState {
+        case .slash(let query):
+            slashCommandMenu(query: query)
+        case .filePicker(let query):
+            filePickerMenu(query: query)
+        case .logPicker(let query):
+            logPickerMenu(query: query)
+        case .none:
+            EmptyView()
+        }
+    }
+
+    private func slashCommandMenu(query: String) -> some View {
+        let commands = filteredSlashCommands(query)
+        guard !commands.isEmpty else { return AnyView(EmptyView()) }
+        
+        return AnyView(
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(commands) { command in
+                    let isSelected = command.id == selectedSlashCommandID
+                    Button {
+                        applySlashCommand(command)
+                    } label: {
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: "terminal")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(isSelected ? CrabTimeTheme.Palette.panelTint : CrabTimeTheme.Palette.textMuted)
+                                .frame(width: 14)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(command.title)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(CrabTimeTheme.Palette.ink)
+                                Text(command.detail)
+                                    .font(.caption)
+                                    .foregroundStyle(CrabTimeTheme.Palette.textMuted)
+                            }
+                            Spacer()
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(isSelected ? CrabTimeTheme.Palette.selectionFill : CrabTimeTheme.Palette.buttonFill))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(isSelected ? CrabTimeTheme.Palette.strongDivider : CrabTimeTheme.Palette.divider, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(8)
+            .background(RoundedRectangle(cornerRadius: CrabTimeTheme.Layout.subpanelRadius).fill(CrabTimeTheme.Palette.panelFill))
+            .overlay(RoundedRectangle(cornerRadius: CrabTimeTheme.Layout.subpanelRadius).stroke(CrabTimeTheme.Palette.strongDivider, lineWidth: 1))
         )
-        .overlay {
-            RoundedRectangle(cornerRadius: CrabTimeTheme.Layout.subpanelRadius, style: .continuous)
-                .stroke(CrabTimeTheme.Palette.strongDivider, lineWidth: 1)
+    }
+
+    private func filePickerMenu(query: String) -> some View {
+        let files = filteredWorkspaceFiles(query)
+        guard !files.isEmpty else { return AnyView(EmptyView()) }
+        
+        let rootPath = store.workspace?.rootURL.standardizedFileURL.path ?? ""
+
+        return AnyView(
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(files) { file in
+                    let isSelected = file.id == selectedFileNodeID
+                    let filePath = file.url.standardizedFileURL.path
+                    let relPath = filePath.hasPrefix(rootPath + "/") ? String(filePath.dropFirst(rootPath.count + 1)) : file.name
+
+                    Button {
+                        applyFileToken(file, query: query)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(file.name)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(CrabTimeTheme.Palette.ink)
+                            Text(relPath)
+                                .font(.system(size: 10))
+                                .foregroundStyle(CrabTimeTheme.Palette.textMuted)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(isSelected ? CrabTimeTheme.Palette.selectionFill : CrabTimeTheme.Palette.buttonFill))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(isSelected ? CrabTimeTheme.Palette.strongDivider : Color.clear, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(8)
+            .background(RoundedRectangle(cornerRadius: CrabTimeTheme.Layout.subpanelRadius).fill(CrabTimeTheme.Palette.panelFill))
+            .overlay(RoundedRectangle(cornerRadius: CrabTimeTheme.Layout.subpanelRadius).stroke(CrabTimeTheme.Palette.strongDivider, lineWidth: 1))
+        )
+    }
+
+    private func logPickerMenu(query: String) -> some View {
+        let tokens = filteredLogTokens(query)
+        guard !tokens.isEmpty else { return AnyView(EmptyView()) }
+        
+        return AnyView(
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(tokens) { token in
+                    let isSelected = token.token == selectedLogTokenID
+                    Button {
+                        applyLogToken(token, query: query)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(token.token)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(CrabTimeTheme.Palette.ink)
+                            Text(token.detail)
+                                .font(.system(size: 10))
+                                .foregroundStyle(CrabTimeTheme.Palette.textMuted)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(isSelected ? CrabTimeTheme.Palette.selectionFill : CrabTimeTheme.Palette.buttonFill))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(isSelected ? CrabTimeTheme.Palette.strongDivider : Color.clear, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(8)
+            .background(RoundedRectangle(cornerRadius: CrabTimeTheme.Layout.subpanelRadius).fill(CrabTimeTheme.Palette.panelFill))
+            .overlay(RoundedRectangle(cornerRadius: CrabTimeTheme.Layout.subpanelRadius).stroke(CrabTimeTheme.Palette.strongDivider, lineWidth: 1))
+        )
+    }
+
+    // --- Navigation ---
+
+    private func moveSelectionUp() {
+        switch menuState {
+        case .slash(let query):
+            let items = filteredSlashCommands(query)
+            guard !items.isEmpty else { return }
+            let idx = items.firstIndex(where: { $0.id == selectedSlashCommandID }) ?? 0
+            selectedSlashCommandID = items[idx == 0 ? items.count - 1 : idx - 1].id
+        case .filePicker(let query):
+            let items = filteredWorkspaceFiles(query)
+            guard !items.isEmpty else { return }
+            let idx = items.firstIndex(where: { $0.id == selectedFileNodeID }) ?? 0
+            selectedFileNodeID = items[idx == 0 ? items.count - 1 : idx - 1].id
+        case .logPicker(let query):
+            let items = filteredLogTokens(query)
+            guard !items.isEmpty else { return }
+            let idx = items.firstIndex(where: { $0.token == selectedLogTokenID }) ?? 0
+            selectedLogTokenID = items[idx == 0 ? items.count - 1 : idx - 1].token
+        case .none:
+            break
         }
     }
 
-    private func syncSlashCommandSelection() {
-        guard isShowingSlashCommandMenu else {
-            selectedSlashCommandID = nil
-            return
+    private func moveSelectionDown() {
+        switch menuState {
+        case .slash(let query):
+            let items = filteredSlashCommands(query)
+            guard !items.isEmpty else { return }
+            let idx = items.firstIndex(where: { $0.id == selectedSlashCommandID }) ?? -1
+            selectedSlashCommandID = items[(idx + 1) % items.count].id
+        case .filePicker(let query):
+            let items = filteredWorkspaceFiles(query)
+            guard !items.isEmpty else { return }
+            let idx = items.firstIndex(where: { $0.id == selectedFileNodeID }) ?? -1
+            selectedFileNodeID = items[(idx + 1) % items.count].id
+        case .logPicker(let query):
+            let items = filteredLogTokens(query)
+            guard !items.isEmpty else { return }
+            let idx = items.firstIndex(where: { $0.token == selectedLogTokenID }) ?? -1
+            selectedLogTokenID = items[(idx + 1) % items.count].token
+        case .none:
+            break
         }
-
-        if let selectedSlashCommandID,
-           filteredSlashCommands.contains(where: { $0.id == selectedSlashCommandID }) {
-            return
-        }
-
-        selectedSlashCommandID = filteredSlashCommands.first?.id
-    }
-
-    private func moveSlashCommandSelectionUp() {
-        guard !filteredSlashCommands.isEmpty else {
-            return
-        }
-
-        let currentIndex = filteredSlashCommands.firstIndex(where: { $0.id == selectedSlashCommandID }) ?? 0
-        let nextIndex = currentIndex == 0 ? filteredSlashCommands.count - 1 : currentIndex - 1
-        selectedSlashCommandID = filteredSlashCommands[nextIndex].id
-    }
-
-    private func moveSlashCommandSelectionDown() {
-        guard !filteredSlashCommands.isEmpty else {
-            return
-        }
-
-        let currentIndex = filteredSlashCommands.firstIndex(where: { $0.id == selectedSlashCommandID }) ?? -1
-        let nextIndex = (currentIndex + 1) % filteredSlashCommands.count
-        selectedSlashCommandID = filteredSlashCommands[nextIndex].id
     }
 
     @discardableResult
-    private func acceptSelectedSlashCommand() -> Bool {
-        guard let selectedSlashCommand else {
-            return false
+    private func acceptSelectedMenu() -> Bool {
+        switch menuState {
+        case .slash(let query):
+            if let cmd = filteredSlashCommands(query).first(where: { $0.id == selectedSlashCommandID }) {
+                applySlashCommand(cmd)
+                return true
+            }
+        case .filePicker(let query):
+            if let file = filteredWorkspaceFiles(query).first(where: { $0.id == selectedFileNodeID }) {
+                applyFileToken(file, query: query)
+                return true
+            }
+        case .logPicker(let query):
+            if let tkn = filteredLogTokens(query).first(where: { $0.token == selectedLogTokenID }) {
+                applyLogToken(tkn, query: query)
+                return true
+            }
+        case .none:
+            break
         }
-
-        applySlashCommand(selectedSlashCommand)
-        return true
-    }
-
-    private func isSlashCommandSelected(_ command: ChatSlashCommand) -> Bool {
-        command.id == selectedSlashCommandID
+        return false
     }
 
     private func applySlashCommand(_ command: ChatSlashCommand) {
@@ -592,8 +752,32 @@ struct ChatSidebarView: View {
         isComposerFocused = true
     }
 
+    private func applyFileToken(_ node: WorkspaceFileNode, query: String) {
+        let rootPath = store.workspace?.rootURL.standardizedFileURL.path ?? ""
+        let filePath = node.url.standardizedFileURL.path
+        let relPath = filePath.hasPrefix(rootPath + "/") ? String(filePath.dropFirst(rootPath.count + 1)) : node.name
+        
+        replaceLastWord(with: "@\(relPath) ")
+        isComposerFocused = true
+    }
+
+    private func applyLogToken(_ token: ChatLogToken, query: String) {
+        replaceLastWord(with: "\(token.token) ")
+        isComposerFocused = true
+    }
+
+    private func replaceLastWord(with newText: String) {
+        var text = chatStore.composerText
+        if let lastSpace = text.lastIndex(where: \.isWhitespace) {
+            let prefix = text[...lastSpace]
+            chatStore.composerText = String(prefix) + newText
+        } else {
+            chatStore.composerText = newText
+        }
+    }
+
     private func handleComposerSubmit() {
-        if isShowingSlashCommandMenu, acceptSelectedSlashCommand() {
+        if menuState != .none, acceptSelectedMenu() {
             return
         }
 
@@ -612,19 +796,19 @@ private struct ChatSlashCommand: Identifiable {
 
 private struct ChatComposerKeyBridge: NSViewRepresentable {
     let isEnabled: Bool
-    let isShowingSlashCommandMenu: Bool
+    let isShowingMenu: Bool
     let onMoveUp: () -> Void
     let onMoveDown: () -> Void
-    let onAcceptSlashCommand: () -> Bool
+    let onAcceptMenu: () -> Bool
     let onSubmit: () -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
             isEnabled: isEnabled,
-            isShowingSlashCommandMenu: isShowingSlashCommandMenu,
+            isShowingMenu: isShowingMenu,
             onMoveUp: onMoveUp,
             onMoveDown: onMoveDown,
-            onAcceptSlashCommand: onAcceptSlashCommand,
+            onAcceptMenu: onAcceptMenu,
             onSubmit: onSubmit
         )
     }
@@ -638,10 +822,10 @@ private struct ChatComposerKeyBridge: NSViewRepresentable {
     func updateNSView(_ nsView: NSView, context: Context) {
         context.coordinator.attach(to: nsView)
         context.coordinator.isEnabled = isEnabled
-        context.coordinator.isShowingSlashCommandMenu = isShowingSlashCommandMenu
+        context.coordinator.isShowingMenu = isShowingMenu
         context.coordinator.onMoveUp = onMoveUp
         context.coordinator.onMoveDown = onMoveDown
-        context.coordinator.onAcceptSlashCommand = onAcceptSlashCommand
+        context.coordinator.onAcceptMenu = onAcceptMenu
         context.coordinator.onSubmit = onSubmit
     }
 
@@ -652,27 +836,27 @@ private struct ChatComposerKeyBridge: NSViewRepresentable {
     @MainActor
     final class Coordinator {
         var isEnabled: Bool
-        var isShowingSlashCommandMenu: Bool
+        var isShowingMenu: Bool
         var onMoveUp: () -> Void
         var onMoveDown: () -> Void
-        var onAcceptSlashCommand: () -> Bool
+        var onAcceptMenu: () -> Bool
         var onSubmit: () -> Void
         private weak var hostView: NSView?
         private var monitor: Any?
 
         init(
             isEnabled: Bool,
-            isShowingSlashCommandMenu: Bool,
+            isShowingMenu: Bool,
             onMoveUp: @escaping () -> Void,
             onMoveDown: @escaping () -> Void,
-            onAcceptSlashCommand: @escaping () -> Bool,
+            onAcceptMenu: @escaping () -> Bool,
             onSubmit: @escaping () -> Void
         ) {
             self.isEnabled = isEnabled
-            self.isShowingSlashCommandMenu = isShowingSlashCommandMenu
+            self.isShowingMenu = isShowingMenu
             self.onMoveUp = onMoveUp
             self.onMoveDown = onMoveDown
-            self.onAcceptSlashCommand = onAcceptSlashCommand
+            self.onAcceptMenu = onAcceptMenu
             self.onSubmit = onSubmit
         }
 
@@ -703,7 +887,7 @@ private struct ChatComposerKeyBridge: NSViewRepresentable {
                 let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
                 let characters = event.charactersIgnoringModifiers?.lowercased()
 
-                if self.isShowingSlashCommandMenu {
+                if self.isShowingMenu {
                     if modifiers.isEmpty, event.keyCode == 125 {
                         self.onMoveDown()
                         return nil
@@ -724,7 +908,8 @@ private struct ChatComposerKeyBridge: NSViewRepresentable {
                         return nil
                     }
 
-                    if modifiers.isEmpty, [36, 76].contains(event.keyCode), self.onAcceptSlashCommand() {
+                    // 48 is tab, 36 is return, 76 is enter
+                    if modifiers.isEmpty, [36, 48, 76].contains(event.keyCode), self.onAcceptMenu() {
                         return nil
                     }
                 } else if modifiers.isEmpty, [36, 76].contains(event.keyCode) {
@@ -741,6 +926,7 @@ private struct ChatComposerKeyBridge: NSViewRepresentable {
 private struct ChatMessageBubble: View {
     @Environment(ChatStore.self) private var chatStore
     let message: ExerciseChatMessage
+    @State private var isThinkingExpanded: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -765,6 +951,9 @@ private struct ChatMessageBubble: View {
             }
 
             if message.role == .assistant {
+                if let thinking = message.thinkingContent {
+                    ThinkingDisclosureView(thinking: thinking, isExpanded: $isThinkingExpanded)
+                }
                 AssistantMarkdownText(markdown: message.content)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
@@ -838,6 +1027,67 @@ private struct ChatMessageBubble: View {
     }
 }
 
+private struct ThinkingDisclosureView: View {
+    let thinking: String
+    @Binding var isExpanded: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "brain")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(CrabTimeTheme.Palette.textMuted)
+                    Text("Thinking")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(CrabTimeTheme.Palette.textMuted)
+                    Spacer()
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(CrabTimeTheme.Palette.textMuted)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(CrabTimeTheme.Palette.subtleFill)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(CrabTimeTheme.Palette.divider, lineWidth: 1)
+                }
+            }
+            .buttonStyle(.plain)
+            .interactivePointer()
+
+            if isExpanded {
+                ScrollView {
+                    Text(thinking)
+                        .font(.system(size: 11, weight: .regular, design: .monospaced))
+                        .foregroundStyle(CrabTimeTheme.Palette.textMuted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(10)
+                }
+                .frame(maxHeight: 200)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(CrabTimeTheme.Palette.subtleFill.opacity(0.6))
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(CrabTimeTheme.Palette.divider, lineWidth: 1)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+}
+
 private struct AssistantMarkdownText: View {
     let markdown: String
 
@@ -846,3 +1096,21 @@ private struct AssistantMarkdownText: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
+
+private enum ComposerMenuState: Equatable {
+    case none
+    case slash(String)
+    case filePicker(String)
+    case logPicker(String)
+}
+
+private struct ChatLogToken: Identifiable {
+    let token: String
+    let detail: String
+    var id: String { token }
+}
+
+private let standardLogTokens: [ChatLogToken] = [
+    ChatLogToken(token: "#output", detail: "Attach latest terminal/console output"),
+    ChatLogToken(token: "#diagnostics", detail: "Attach rustc diagnostics from last run"),
+]
