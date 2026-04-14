@@ -119,6 +119,16 @@ struct AIProviderManager {
                 isOpenRouter: false
             )
             return AIProviderReply(content: result.content, thinkingContent: result.thinking)
+        case .xai:
+            let result = try await sendOpenAICompatibleMessage(
+                endpoint: URL(string: "https://api.x.ai/v1/chat/completions")!,
+                apiKey: try apiKey(for: .xai),
+                model: session.model,
+                systemPrompt: context,
+                messages: messages,
+                isOpenRouter: false
+            )
+            return AIProviderReply(content: result.content, thinkingContent: result.thinking)
         case .anthropic:
             return AIProviderReply(
                 content: try await sendAnthropicMessage(

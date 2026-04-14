@@ -447,7 +447,7 @@ private actor ACPConnection {
             return authMethods.first(where: { $0.id == "opencode-login" })?.id ?? authMethods.first?.id
         case .codexCLI:
             return authMethods.first?.id
-        case .claudeCLI, .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum:
+        case .claudeCLI, .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum, .xai:
             return nil
         }
     }
@@ -457,7 +457,7 @@ private actor ACPConnection {
         switch provider {
         case .geminiCLI:
             return false
-        case .openCodeCLI, .codexCLI, .claudeCLI, .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum:
+        case .openCodeCLI, .codexCLI, .claudeCLI, .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum, .xai:
             return false
         }
     }
@@ -466,7 +466,7 @@ private actor ACPConnection {
         switch provider {
         case .geminiCLI:
             return .seconds(180)
-        case .openCodeCLI, .codexCLI, .claudeCLI, .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum:
+        case .openCodeCLI, .codexCLI, .claudeCLI, .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum, .xai:
             return TimeoutProfile.session
         }
     }
@@ -957,7 +957,7 @@ private actor ACPConnection {
                 displayCommand: "xcrun swift \(adapterURL.path) --model \(model)",
                 logPrefix: "codex-acp-adapter"
             )
-        case .claudeCLI, .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum:
+        case .claudeCLI, .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum, .xai:
             throw AIProviderError.runtimeFailure("\(provider.title) does not expose ACP in this build.")
         }
     }

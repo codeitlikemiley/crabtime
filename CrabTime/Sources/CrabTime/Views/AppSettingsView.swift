@@ -341,7 +341,7 @@ struct AppSettingsView: View {
             toolingStatus.first(where: { $0.id == "claude" })
         case .openCodeCLI:
             toolingStatus.first(where: { $0.id == "opencode" })
-        case .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum:
+        case .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum, .xai:
             nil
         }
     }

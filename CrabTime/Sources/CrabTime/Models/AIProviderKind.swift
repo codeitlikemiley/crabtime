@@ -11,6 +11,7 @@ enum AIProviderKind: String, CaseIterable, Codable, Identifiable, Sendable {
     case openRouter
     case groq
     case nexum
+    case xai
 
     var id: String { rawValue }
 
@@ -36,6 +37,8 @@ enum AIProviderKind: String, CaseIterable, Codable, Identifiable, Sendable {
             "Groq API"
         case .nexum:
             "Nexum Router"
+        case .xai:
+            "xAI Grok"
         }
     }
 
@@ -59,6 +62,8 @@ enum AIProviderKind: String, CaseIterable, Codable, Identifiable, Sendable {
             "Groq"
         case .nexum:
             "Nexum"
+        case .xai:
+            "Grok"
         }
     }
 
@@ -82,6 +87,8 @@ enum AIProviderKind: String, CaseIterable, Codable, Identifiable, Sendable {
             "hare.fill"
         case .nexum:
             "server.rack"
+        case .xai:
+            "bolt.fill"
         }
     }
 
@@ -89,7 +96,7 @@ enum AIProviderKind: String, CaseIterable, Codable, Identifiable, Sendable {
         switch self {
         case .codexCLI, .geminiCLI, .claudeCLI, .openCodeCLI:
             true
-        case .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum:
+        case .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum, .xai:
             false
         }
     }
@@ -98,7 +105,7 @@ enum AIProviderKind: String, CaseIterable, Codable, Identifiable, Sendable {
         switch self {
         case .codexCLI, .geminiCLI, .openCodeCLI:
             true
-        case .claudeCLI, .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum:
+        case .claudeCLI, .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum, .xai:
             false
         }
     }
@@ -107,7 +114,7 @@ enum AIProviderKind: String, CaseIterable, Codable, Identifiable, Sendable {
         switch self {
         case .geminiCLI, .openCodeCLI:
             .acp
-        case .codexCLI, .claudeCLI, .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum:
+        case .codexCLI, .claudeCLI, .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum, .xai:
             .legacyCLI
         }
     }
@@ -120,7 +127,7 @@ enum AIProviderKind: String, CaseIterable, Codable, Identifiable, Sendable {
             "gemini"
         case .openCodeCLI:
             "opencode"
-        case .claudeCLI, .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum:
+        case .claudeCLI, .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum, .xai:
             nil
         }
     }
@@ -133,7 +140,7 @@ enum AIProviderKind: String, CaseIterable, Codable, Identifiable, Sendable {
             "Uses `gemini --acp` so the first startup is cold and later turns reuse the same session."
         case .openCodeCLI:
             "Uses `opencode acp` so the first startup is cold and later turns reuse the same session."
-        case .claudeCLI, .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum:
+        case .claudeCLI, .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum, .xai:
             nil
         }
     }
@@ -148,7 +155,7 @@ enum AIProviderKind: String, CaseIterable, Codable, Identifiable, Sendable {
             "claude"
         case .openCodeCLI:
             "opencode"
-        case .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum:
+        case .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum, .xai:
             nil
         }
     }
@@ -175,6 +182,8 @@ enum AIProviderKind: String, CaseIterable, Codable, Identifiable, Sendable {
             "Add a Groq API key in Settings. Get one free at console.groq.com."
         case .nexum:
             "Add a Nexum Router API key in Settings. Generate one at dialagram.me/router."
+        case .xai:
+            "Add an xAI API key in Settings. Get one at console.x.ai."
         }
     }
 
@@ -198,6 +207,8 @@ enum AIProviderKind: String, CaseIterable, Codable, Identifiable, Sendable {
             "llama-3.3-70b-versatile"
         case .nexum:
             "qwen-3.6-plus"
+        case .xai:
+            "grok-4"
         }
     }
 
@@ -275,6 +286,13 @@ enum AIProviderKind: String, CaseIterable, Codable, Identifiable, Sendable {
                 "qwen-3.5-plus",
                 "qwen-3.5-plus-thinking"
             ]
+        case .xai:
+            [
+                "grok-4.20",
+                "grok-4",
+                "grok-3",
+                "grok-3-mini"
+            ]
         }
     }
 
@@ -283,6 +301,6 @@ enum AIProviderKind: String, CaseIterable, Codable, Identifiable, Sendable {
     }
 
     static var defaultChatProviders: [AIProviderKind] {
-        [.codexCLI, .geminiCLI, .claudeCLI, .openCodeCLI, .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum]
+        [.codexCLI, .geminiCLI, .claudeCLI, .openCodeCLI, .openAI, .anthropic, .geminiAPI, .openRouter, .groq, .nexum, .xai]
     }
 }

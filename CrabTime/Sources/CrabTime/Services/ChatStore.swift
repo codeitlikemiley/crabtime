@@ -241,9 +241,16 @@ final class ChatStore {
 
         Task {
             do {
-                if let localReply = try await store.handleChatSlashCommand(userMessage) {
-                    try await handleLocalSlashCommandReply(localReply, userMessage: userMessage, using: store)
-                    return
+                var activeMessage = userMessage
+
+                if let commandResult = try await store.handleChatSlashCommand(userMessage) {
+                    switch commandResult {
+                    case .localReply(let localReply):
+                        try await handleLocalSlashCommandReply(localReply, userMessage: userMessage, using: store)
+                        return
+                    case .rewritePrompt(let prompt):
+                        activeMessage = prompt
+                    }
                 }
 
                 if selectedSession == nil {
@@ -260,7 +267,7 @@ final class ChatStore {
                     return
                 }
 
-                let outgoingMessage = ExerciseChatMessage(sessionID: session.id, role: .user, content: userMessage)
+                let outgoingMessage = ExerciseChatMessage(sessionID: session.id, role: .user, content: activeMessage)
                 try database.insertChatMessage(outgoingMessage)
                 await MainActor.run {
                     messages.append(outgoingMessage)
@@ -290,7 +297,7 @@ final class ChatStore {
                 }
 
                 let tokens = store.workspace.map { 
-                    ChatContextTokenParser.parse(userMessage, workspaceRoot: $0.rootURL)
+                    ChatContextTokenParser.parse(activeMessage, workspaceRoot: $0.rootURL)
                 } ?? []
 
                 let context = contextBuilder.build(from: store, processStore: processStore, contextTokens: tokens)

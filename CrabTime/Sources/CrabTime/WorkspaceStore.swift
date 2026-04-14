@@ -1359,7 +1359,7 @@ final class WorkspaceStore {
         }
     }
 
-    func handleChatSlashCommand(_ input: String) async throws -> String? {
+    func handleChatSlashCommand(_ input: String) async throws -> ChatSlashCommandResult? {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.hasPrefix("/") else {
             return nil
@@ -1371,14 +1371,78 @@ final class WorkspaceStore {
 
         switch command {
         case "/challenge":
-            return try await createWorkspaceChallenge(named: argument)
+            return .localReply(try await createWorkspaceChallenge(named: argument))
+        case "/verify":
+            return try await verifySelectedExercise()
         default:
             throw NSError(
                 domain: "WorkspaceStore",
                 code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Unknown chat command `\(command)`. Supported: `/challenge <name>`."]
+                userInfo: [NSLocalizedDescriptionKey: "Unknown chat command `\(command)`. Supported: `/challenge <name>`, `/verify`."]
             )
         }
+    }
+
+    private func verifySelectedExercise() async throws -> ChatSlashCommandResult {
+        guard let exercise = selectedExercise else {
+            return .localReply("No exercise selected to verify.")
+        }
+        
+        let target = resolveSelectedExerciseTestTarget()
+        let runExercise = target?.exercise ?? exercise
+        let runCursorLine = target?.cursorLine
+
+        // Save editor contents so we compile the latest code
+        await MainActor.run {
+            saveSelectedExercise()
+        }
+
+        let output = try await cargoRunner.run(exercise: runExercise, cursorLine: runCursorLine)
+        
+        let sourceCode = (try? String(contentsOf: exercise.sourceURL, encoding: .utf8)) ?? ""
+        var solutionCode = ""
+        
+        if let workspace = workspace {
+            let sourcePath = exercise.sourceURL.standardizedFileURL.path
+            let rootPath = workspace.rootURL.standardizedFileURL.path
+            if sourcePath.hasPrefix(rootPath + "/exercises/") {
+                let relPath = String(sourcePath.dropFirst((rootPath + "/exercises/").count))
+                let solutionURL = workspace.rootURL
+                    .appendingPathComponent("solutions")
+                    .appendingPathComponent(relPath)
+                if let code = try? String(contentsOf: solutionURL, encoding: .utf8) {
+                    solutionCode = code
+                }
+            }
+            
+            if output.terminationStatus == 0 {
+                let slug = workspace.rootURL.lastPathComponent
+                let key = "\(slug)/\(exercise.title)"
+                await MainActor.run {
+                    markExerciseCompleted(key)
+                }
+            }
+        }
+        
+        let prompt = """
+        I ran `/verify` on my solution.
+
+        ### Terminal Output
+        ```text
+        \(output.stdout)\(output.stderr.isEmpty ? "" : "\n" + output.stderr)
+        ```
+
+        ### My Code (\(exercise.sourceURL.lastPathComponent))
+        ```rust
+        \(sourceCode)
+        ```
+        \(solutionCode.isEmpty ? "" : "\n### Reference Solution\n```rust\n\(solutionCode)\n```")
+
+        Please verify my code. If there are compiler errors or the terminal output shows test failures or panics, explain what went wrong and how I can fix it. Be very beginner-friendly.
+        If the code ran successfully, compare it with the solution/requirements and tell me if it correctly fulfills the objective. If it's correct, confirm and praise my work!
+        """
+        
+        return .rewritePrompt(prompt)
     }
 
     func applyCargoRunnerOverride(args: String) async {
