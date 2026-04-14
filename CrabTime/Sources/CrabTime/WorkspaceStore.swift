@@ -83,6 +83,8 @@ final class WorkspaceStore {
     /// Tracks the last intentional keyboard-driven focus target for ping-pong toggling.
     var lastFocusTarget: FocusTarget = .editor
     var explorerKeyboardFocusActive: Bool = false
+    var exerciseKeyboardFocusActive: Bool = false
+    var selectedExerciseListIndex: Int = 0
     var expandedExplorerDirectoryPaths: Set<String> = []
     var showLineNumbers: Bool = true
     var isCommandPalettePresented: Bool = false
@@ -1457,6 +1459,26 @@ final class WorkspaceStore {
     func persistExplorerSearchTextChange() {
         explorerKeyboardFocusActive = false
         selectFirstVisibleExplorerEntry()
+    }
+
+    func setExerciseKeyboardFocus(active: Bool) {
+        exerciseKeyboardFocusActive = active
+    }
+
+    func moveExerciseSelectionUp() {
+        selectedExerciseListIndex = max(selectedExerciseListIndex - 1, 0)
+    }
+
+    func moveExerciseSelectionDown() {
+        let count = visibleExercises.count
+        guard count > 0 else { return }
+        selectedExerciseListIndex = min(selectedExerciseListIndex + 1, count - 1)
+    }
+
+    func openSelectedExerciseListIndex() {
+        let items = visibleExercises
+        guard items.indices.contains(selectedExerciseListIndex) else { return }
+        selectAndOpenExercise(id: items[selectedExerciseListIndex].id)
     }
 
     func moveExplorerSelectionDown() {

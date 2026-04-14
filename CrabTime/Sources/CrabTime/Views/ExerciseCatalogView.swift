@@ -22,15 +22,30 @@ struct ExerciseCatalogView: View {
                         : "Try a different search term or switch between open and done exercises."
                 )
             } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        ForEach(Array(store.visibleExercises.enumerated()), id: \.element.id) { index, exercise in
-                            ExerciseCard(
-                                index: index,
-                                exercise: exercise,
-                                isSelected: store.selectedExercise?.id == exercise.id,
-                                action: { store.selectAndOpenExercise(id: exercise.id) }
-                            )
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 12) {
+                            ForEach(Array(store.visibleExercises.enumerated()), id: \.element.id) { index, exercise in
+                                ExerciseCard(
+                                    index: index,
+                                    exercise: exercise,
+                                    isSelected: index == store.selectedExerciseListIndex,
+                                    action: { 
+                                        store.selectedExerciseListIndex = index
+                                        store.selectAndOpenExercise(id: exercise.id) 
+                                    }
+                                )
+                                .id(exercise.id)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .onChange(of: store.selectedExerciseListIndex) { _, newValue in
+                        let items = store.visibleExercises
+                        if items.indices.contains(newValue) {
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                proxy.scrollTo(items[newValue].id, anchor: .center)
+                            }
                         }
                     }
                 }

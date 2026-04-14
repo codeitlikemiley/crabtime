@@ -37,8 +37,16 @@ struct TodoExplorerView: View {
                     TextField("Filter TODOs…", text: $store.todoSearchText)
                         .textFieldStyle(.plain)
                         .font(.system(size: 12))
-                        .foregroundStyle(CrabTimeTheme.Palette.ink)
                         .focused($isFocused)
+                        .background(
+                            TodoSearchKeyBridge(
+                                isEnabled: isFocused,
+                                onMoveUp: { store.moveTodoSelectionUp(using: workspaceStore) },
+                                onMoveDown: { store.moveTodoSelectionDown(using: workspaceStore) },
+                                onActivate: { store.activateSelectedTodo(using: workspaceStore) },
+                                onDismiss: { isFocused = false }
+                            )
+                        )
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 5)
@@ -340,6 +348,116 @@ private struct TodoKeyBridge: NSViewRepresentable {
             if let monitor {
                 NSEvent.removeMonitor(monitor)
                 self.monitor = nil
+            }
+        }
+    }
+}
+
+private struct TodoSearchKeyBridge: NSViewRepresentable {
+    let isEnabled: Bool
+    let onMoveUp: () -> Void
+    let onMoveDown: () -> Void
+    let onActivate: () -> Void
+    let onDismiss: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onMoveUp: onMoveUp, onMoveDown: onMoveDown, onActivate: onActivate, onDismiss: onDismiss, isEnabled: isEnabled)
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        context.coordinator.attach(to: view)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.attach(to: nsView)
+        context.coordinator.isEnabled = isEnabled
+        context.coordinator.onMoveUp = onMoveUp
+        context.coordinator.onMoveDown = onMoveDown
+        context.coordinator.onActivate = onActivate
+        context.coordinator.onDismiss = onDismiss
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.stopMonitoring()
+    }
+
+    final class Coordinator: @unchecked Sendable {
+        var onMoveUp: () -> Void
+        var onMoveDown: () -> Void
+        var onActivate: () -> Void
+        var onDismiss: () -> Void
+        var isEnabled: Bool
+        private weak var hostView: NSView?
+        private var monitor: Any?
+
+        init(onMoveUp: @escaping () -> Void, onMoveDown: @escaping () -> Void, onActivate: @escaping () -> Void, onDismiss: @escaping () -> Void, isEnabled: Bool) {
+            self.onMoveUp = onMoveUp
+            self.onMoveDown = onMoveDown
+            self.onActivate = onActivate
+            self.onDismiss = onDismiss
+            self.isEnabled = isEnabled
+        }
+
+        func attach(to view: NSView) {
+            hostView = view
+            if monitor == nil {
+                startMonitoring()
+            }
+        }
+
+        func stopMonitoring() {
+            if let monitor {
+                NSEvent.removeMonitor(monitor)
+                self.monitor = nil
+            }
+        }
+
+        private func startMonitoring() {
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self else { return event }
+                guard self.isEnabled, self.hostView?.window?.isKeyWindow == true else {
+                    return event
+                }
+
+                let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                let chars = event.charactersIgnoringModifiers?.lowercased()
+
+                if modifiers.isEmpty, event.keyCode == 125 {
+                    self.onMoveDown()
+                    return nil
+                }
+
+                if modifiers.isEmpty, event.keyCode == 126 {
+                    self.onMoveUp()
+                    return nil
+                }
+
+                if modifiers == .control, chars == "n" {
+                    self.onMoveDown()
+                    return nil
+                }
+
+                if modifiers == .control, chars == "p" {
+                    self.onMoveUp()
+                    return nil
+                }
+
+                if modifiers.isEmpty, [36, 76].contains(event.keyCode) {
+                    self.onActivate()
+                    return nil
+                }
+
+                // Escape → dismiss search
+                if modifiers.isEmpty, event.keyCode == 53 {
+                    MainActor.assumeIsolated {
+                        self.onDismiss()
+                    }
+                    return nil
+                }
+
+                return event
             }
         }
     }
