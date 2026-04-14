@@ -328,17 +328,19 @@ struct ChatSidebarView: View {
                 activeMenu
             }
 
-            TextField(
-                composerPlaceholder,
-                text: Binding(
-                    get: { chatStore.composerText },
-                    set: { chatStore.composerText = $0 }
-                ),
-                axis: .vertical
-            )
-            .textFieldStyle(.plain)
-            .lineLimit(3...7)
-            .padding(12)
+            ScrollView(.vertical, showsIndicators: true) {
+                TextField(
+                    composerPlaceholder,
+                    text: Binding(
+                        get: { chatStore.composerText },
+                        set: { chatStore.composerText = $0 }
+                    ),
+                    axis: .vertical
+                )
+                .textFieldStyle(.plain)
+                .padding(12)
+            }
+            .frame(maxHeight: 180)
             .background(
                 RoundedRectangle(cornerRadius: CrabTimeTheme.Layout.subpanelRadius, style: .continuous)
                     .fill(CrabTimeTheme.Palette.raisedFill)
@@ -933,6 +935,8 @@ private struct ChatMessageBubble: View {
     @Environment(ChatStore.self) private var chatStore
     let message: ExerciseChatMessage
     @State private var isThinkingExpanded: Bool = false
+    @State private var isErrorExpanded: Bool = false
+    @State private var isCopied: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -946,6 +950,24 @@ private struct ChatMessageBubble: View {
                     .foregroundStyle(CrabTimeTheme.Palette.textMuted)
 
                 Button {
+                    let pasteboard = NSPasteboard.general
+                    pasteboard.clearContents()
+                    pasteboard.setString(message.content, forType: .string)
+                    isCopied = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        isCopied = false
+                    }
+                } label: {
+                    Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(isCopied ? Color.green : CrabTimeTheme.Palette.textMuted)
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .buttonStyle(.plain)
+                .interactivePointer()
+                .help("Copy message")
+
+                Button {
                     chatStore.deleteMessage(message.id)
                 } label: {
                     Image(systemName: "trash")
@@ -954,6 +976,7 @@ private struct ChatMessageBubble: View {
                 }
                 .buttonStyle(.plain)
                 .interactivePointer()
+                .help("Delete message")
             }
 
             if message.role == .assistant {
@@ -962,10 +985,22 @@ private struct ChatMessageBubble: View {
                 }
                 AssistantMarkdownText(markdown: message.content)
                     .frame(maxWidth: .infinity, alignment: .leading)
+            } else if message.role == .error {
+                let parsed = parseErrorContent(message.content)
+                Text(parsed.summary)
+                    .font(.body)
+                    .foregroundStyle(CrabTimeTheme.Palette.ink)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                
+                if let detail = parsed.detail {
+                    ErrorDisclosureView(errorDetail: detail, isExpanded: $isErrorExpanded)
+                }
             } else {
                 Text(message.content)
                     .font(.body)
                     .foregroundStyle(CrabTimeTheme.Palette.ink)
+                    .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -1031,6 +1066,17 @@ private struct ChatMessageBubble: View {
             Color.red.opacity(0.12)
         }
     }
+
+    private func parseErrorContent(_ content: String) -> (summary: String, detail: String?) {
+        guard let data = content.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return (content, nil)
+        }
+        let summary = (json["error"] as? String)
+            ?? (json["message"] as? String)
+            ?? "An API error occurred."
+        return (summary, content)
+    }
 }
 
 private struct ThinkingDisclosureView: View {
@@ -1075,6 +1121,7 @@ private struct ThinkingDisclosureView: View {
                     Text(thinking)
                         .font(.system(size: 11, weight: .regular, design: .monospaced))
                         .foregroundStyle(CrabTimeTheme.Palette.textMuted)
+                        .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(10)
@@ -1094,12 +1141,79 @@ private struct ThinkingDisclosureView: View {
     }
 }
 
-private struct AssistantMarkdownText: View {
-    let markdown: String
+private struct ErrorDisclosureView: View {
+    let errorDetail: String
+    @Binding var isExpanded: Bool
 
     var body: some View {
-        ChatMarkdownView(markdown: markdown)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.red.opacity(0.8))
+                    Text("Raw Error")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.red.opacity(0.8))
+                    Spacer()
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.red.opacity(0.8))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.red.opacity(0.1))
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.red.opacity(0.2), lineWidth: 1)
+                }
+            }
+            .buttonStyle(.plain)
+            .interactivePointer()
+
+            if isExpanded {
+                ScrollView {
+                    Text(errorDetail)
+                        .font(.system(size: 11, weight: .regular, design: .monospaced))
+                        .foregroundStyle(.red.opacity(0.9))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(10)
+                }
+                .frame(maxHeight: 200)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.red.opacity(0.05))
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.red.opacity(0.2), lineWidth: 1)
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+}
+
+private struct AssistantMarkdownText: View {
+    let markdown: String
+    @State private var contentHeight: CGFloat = 40
+
+    var body: some View {
+        MarkdownPreviewView(
+            markdown: markdown,
+            sizingMode: .intrinsicHeight,
+            contentHeight: $contentHeight
+        )
+        .frame(height: contentHeight)
     }
 }
 

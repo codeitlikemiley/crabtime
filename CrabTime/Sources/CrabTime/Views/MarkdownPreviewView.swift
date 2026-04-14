@@ -20,7 +20,7 @@ struct MarkdownPreviewView: NSViewRepresentable {
         controller.add(context.coordinator, name: Coordinator.copyCodeMessageName)
         configuration.userContentController = controller
 
-        let webView = WKWebView(frame: .zero, configuration: configuration)
+        let webView = PassthroughWKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         webView.setValue(false, forKey: "drawsBackground")
         webView.allowsBackForwardNavigationGestures = false
@@ -34,6 +34,9 @@ struct MarkdownPreviewView: NSViewRepresentable {
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
+        if let passthrough = webView as? PassthroughWKWebView {
+            passthrough.passThroughScrollEvents = (sizingMode == .intrinsicHeight)
+        }
         context.coordinator.parent = self
         context.coordinator.configureScrollBehavior()
         context.coordinator.loadIfNeeded()
@@ -133,6 +136,18 @@ extension MarkdownPreviewView {
 
             NSWorkspace.shared.open(url)
             decisionHandler(.cancel)
+        }
+    }
+}
+
+private class PassthroughWKWebView: WKWebView {
+    var passThroughScrollEvents = false
+
+    override func scrollWheel(with event: NSEvent) {
+        if passThroughScrollEvents {
+            self.nextResponder?.scrollWheel(with: event)
+        } else {
+            super.scrollWheel(with: event)
         }
     }
 }
