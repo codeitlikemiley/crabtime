@@ -1,5 +1,20 @@
 import Foundation
 
+/// Module-level actor cache for `cargo runner --help` availability checks.
+/// Keyed by project root path so each workspace is checked at most once per session.
+private actor CargoRunnerAvailabilityCache {
+    static let shared = CargoRunnerAvailabilityCache()
+    private var cache: [String: Bool] = [:]
+
+    func availability(for path: String) -> Bool? {
+        cache[path]
+    }
+
+    func setAvailability(_ available: Bool, for path: String) {
+        cache[path] = available
+    }
+}
+
 struct CargoRunner: Sendable {
     typealias ProcessRunner = @Sendable (URL, [String], String, [String: String]) async throws -> ProcessOutput
 
@@ -117,99 +132,6 @@ struct CargoRunner: Sendable {
         )
     }
 
-    private func runRustlingsExerciseIfNeeded(
-        exercise: ExerciseDocument,
-        projectRootURL: URL,
-        environment: [String: String]
-    ) async throws -> ProcessOutput? {
-        guard isRustlingsExercise(exercise.sourceURL, projectRootURL: projectRootURL) else {
-            return nil
-        }
-
-        if let cliResult = try await runRustlingsCLIIfAvailable(
-            exercise: exercise,
-            projectRootURL: projectRootURL,
-            environment: environment
-        ) {
-            return cliResult
-        }
-
-        let sourceCode = try String(contentsOf: exercise.sourceURL, encoding: .utf8)
-        let sourcePresentation = sourcePresentationBuilder.build(from: sourceCode)
-        let targetPath = runnerTargetPath(for: exercise.sourceURL, relativeTo: projectRootURL)
-
-        if !sourcePresentation.hiddenChecks.isEmpty {
-            return try await runRustlingsTests(
-                harnessURL: exercise.sourceURL,
-                displayTargetPath: targetPath,
-                projectRootURL: projectRootURL,
-                environment: environment,
-                cleanupURLs: []
-            )
-        }
-
-        guard
-            let solutionURL = rustlingsMirroredSolutionURL(for: exercise.sourceURL, projectRootURL: projectRootURL),
-            let solutionCode = try? String(contentsOf: solutionURL, encoding: .utf8)
-        else {
-            return try await runRustlingsScript(
-                sourceURL: exercise.sourceURL,
-                displayTargetPath: targetPath,
-                projectRootURL: projectRootURL,
-                environment: environment
-            )
-        }
-
-        let solutionPresentation = sourcePresentationBuilder.build(from: solutionCode)
-        guard !solutionPresentation.hiddenChecks.isEmpty else {
-            return try await runRustlingsScript(
-                sourceURL: exercise.sourceURL,
-                displayTargetPath: targetPath,
-                projectRootURL: projectRootURL,
-                environment: environment
-            )
-        }
-
-        let mergedSource = mergedRustlingsSource(
-            sourcePresentation: sourcePresentation,
-            solutionPresentation: solutionPresentation
-        )
-        let temporaryHarnessURL = try writeRustlingsHarness(
-            mergedSource: mergedSource,
-            nextTo: exercise.sourceURL
-        )
-
-        return try await runRustlingsTests(
-            harnessURL: temporaryHarnessURL,
-            displayTargetPath: targetPath,
-            projectRootURL: projectRootURL,
-            environment: environment,
-            cleanupURLs: [temporaryHarnessURL]
-        )
-    }
-
-    private func runRustlingsCLIIfAvailable(
-        exercise: ExerciseDocument,
-        projectRootURL: URL,
-        environment: [String: String]
-    ) async throws -> ProcessOutput? {
-        // Only use this path if the project is a Cargo workspace (has Cargo.toml with [[bin]])
-        let cargoTomlURL = projectRootURL.appendingPathComponent("Cargo.toml")
-        guard FileManager.default.fileExists(atPath: cargoTomlURL.path) else {
-            return nil
-        }
-
-        let slug = exercise.sourceURL.deletingPathExtension().lastPathComponent
-        // Use `cargo test --bin <slug>` for non-interactive execution.
-        // `rustlings run <slug>` is an interactive watch mode that never terminates.
-        return try await processRunner(
-            projectRootURL,
-            ["cargo", "test", "--bin", slug, "--", "--color", "never"],
-            "cargo test --bin \(slug)",
-            environment
-        )
-    }
-
     private func runCargoProject(in directoryURL: URL, environment: [String: String]) async throws -> ProcessOutput {
         try await processRunner(
             directoryURL,
@@ -233,6 +155,12 @@ struct CargoRunner: Sendable {
     }
 
     private func isCargoRunnerAvailable(in directoryURL: URL, environment: [String: String]) async throws -> Bool {
+        let key = directoryURL.standardizedFileURL.path
+        // Check the session-level cache first — avoids spawning cargo runner --help on every run.
+        if let cached = await CargoRunnerAvailabilityCache.shared.availability(for: key) {
+            return cached
+        }
+
         let result = try await processRunner(
             directoryURL,
             ["cargo", "runner", "--help"],
@@ -240,7 +168,9 @@ struct CargoRunner: Sendable {
             environment
         )
 
-        return result.terminationStatus == 0
+        let available = result.terminationStatus == 0
+        await CargoRunnerAvailabilityCache.shared.setAvailability(available, for: key)
+        return available
     }
 
     private func runnerEnvironment(projectRootURL: URL) -> [String: String] {
@@ -249,96 +179,6 @@ struct CargoRunner: Sendable {
         return environment
     }
 
-    private func runRustlingsTests(
-        harnessURL: URL,
-        displayTargetPath: String,
-        projectRootURL: URL,
-        environment: [String: String],
-        cleanupURLs: [URL]
-    ) async throws -> ProcessOutput {
-        let binaryURL = harnessURL.deletingLastPathComponent()
-            .appendingPathComponent(".rustgoblin-test-\(UUID().uuidString)")
-
-        defer {
-            cleanupURLs.forEach { try? FileManager.default.removeItem(at: $0) }
-            try? FileManager.default.removeItem(at: binaryURL)
-        }
-
-        let compileArguments =
-            ["rustc", "--test"]
-            + cargoEditionArguments(in: projectRootURL)
-            + ["-o", binaryURL.path, "--", harnessURL.path]
-        let compileDescription = "rustc --test \(displayTargetPath)"
-        let compileResult = try await processRunner(
-            projectRootURL,
-            compileArguments,
-            compileDescription,
-            environment
-        )
-
-        guard compileResult.terminationStatus == 0 else {
-            return compileResult
-        }
-
-        let runDescription = "\(displayTargetPath) tests"
-        let runResult = try await processRunner(
-            projectRootURL,
-            [binaryURL.path, "--color", "never"],
-            runDescription,
-            environment
-        )
-
-        return ProcessOutput(
-            commandDescription: "\(compileDescription) && \(runDescription)",
-            stdout: mergedStream(compileResult.stdout, runResult.stdout),
-            stderr: mergedStream(compileResult.stderr, runResult.stderr),
-            terminationStatus: runResult.terminationStatus
-        )
-    }
-
-    private func runRustlingsScript(
-        sourceURL: URL,
-        displayTargetPath: String,
-        projectRootURL: URL,
-        environment: [String: String]
-    ) async throws -> ProcessOutput {
-        let binaryURL = projectRootURL
-            .appendingPathComponent(".rustgoblin-run-\(UUID().uuidString)")
-
-        defer {
-            try? FileManager.default.removeItem(at: binaryURL)
-        }
-
-        let compileArguments =
-            ["rustc"]
-            + cargoEditionArguments(in: projectRootURL)
-            + ["-o", binaryURL.path, "--", sourceURL.path]
-        let compileDescription = "rustc \(displayTargetPath)"
-        let compileResult = try await processRunner(
-            projectRootURL,
-            compileArguments,
-            compileDescription,
-            environment
-        )
-
-        guard compileResult.terminationStatus == 0 else {
-            return compileResult
-        }
-
-        let runResult = try await processRunner(
-            projectRootURL,
-            [binaryURL.path],
-            displayTargetPath,
-            environment
-        )
-
-        return ProcessOutput(
-            commandDescription: "\(compileDescription) && \(displayTargetPath)",
-            stdout: mergedStream(compileResult.stdout, runResult.stdout),
-            stderr: mergedStream(compileResult.stderr, runResult.stderr),
-            terminationStatus: runResult.terminationStatus
-        )
-    }
 
     private func projectRootURL(for sourceURL: URL, fallbackDirectoryURL: URL) -> URL {
         var candidateURL = sourceURL.deletingLastPathComponent().standardizedFileURL
@@ -363,12 +203,6 @@ struct CargoRunner: Sendable {
         FileManager.default.fileExists(atPath: url.appendingPathComponent("Cargo.toml").path)
     }
 
-    private func isRustlingsExercise(_ sourceURL: URL, projectRootURL: URL) -> Bool {
-        runnerTargetPath(for: sourceURL, relativeTo: projectRootURL)
-            .split(separator: "/")
-            .contains(where: { $0 == "exercises" })
-    }
-
     private func runnerTargetPath(for sourceURL: URL, relativeTo rootURL: URL) -> String {
         let standardizedSourceURL = sourceURL.standardizedFileURL
         let standardizedRootURL = rootURL.standardizedFileURL
@@ -384,73 +218,6 @@ struct CargoRunner: Sendable {
         }
 
         return sourcePath
-    }
-
-    private func rustlingsMirroredSolutionURL(for sourceURL: URL, projectRootURL: URL) -> URL? {
-        let targetPathComponents = runnerTargetPath(for: sourceURL, relativeTo: projectRootURL)
-            .split(separator: "/")
-            .map(String.init)
-        guard targetPathComponents.first == "exercises" else {
-            return nil
-        }
-
-        var solutionURL = projectRootURL
-        for component in ["solutions"] + Array(targetPathComponents.dropFirst()) {
-            solutionURL.appendPathComponent(component)
-        }
-
-        let standardizedURL = solutionURL.standardizedFileURL
-        guard FileManager.default.fileExists(atPath: standardizedURL.path) else {
-            return nil
-        }
-
-        return standardizedURL
-    }
-
-    private func mergedRustlingsSource(
-        sourcePresentation: SourcePresentation,
-        solutionPresentation: SourcePresentation
-    ) -> String {
-        var merged = sourcePresentation.visibleSource
-        if !merged.hasSuffix("\n") {
-            merged += "\n"
-        }
-        if !merged.hasSuffix("\n\n") {
-            merged += "\n"
-        }
-
-        // Extract the test module from the solution's visible source
-        let solutionSource = solutionPresentation.visibleSource
-        if let testRange = solutionSource.range(of: "#[cfg(test", options: .backwards) {
-            let testBlock = String(solutionSource[testRange.lowerBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
-            if !testBlock.isEmpty {
-                merged += testBlock
-                if !merged.hasSuffix("\n") {
-                    merged += "\n"
-                }
-            }
-        }
-
-        return merged
-    }
-
-    private func writeRustlingsHarness(mergedSource: String, nextTo sourceURL: URL) throws -> URL {
-        let harnessURL = sourceURL.deletingLastPathComponent()
-            .appendingPathComponent(".rustgoblin-\(UUID().uuidString).rs")
-        try mergedSource.write(to: harnessURL, atomically: true, encoding: .utf8)
-        return harnessURL
-    }
-
-    private func cargoEditionArguments(in projectRootURL: URL) -> [String] {
-        let cargoTomlURL = projectRootURL.appendingPathComponent("Cargo.toml")
-        guard
-            let cargoToml = try? String(contentsOf: cargoTomlURL, encoding: .utf8),
-            let match = cargoToml.firstMatch(of: /edition\s*=\s*"([^"]+)"/)
-        else {
-            return []
-        }
-
-        return ["--edition", String(match.output.1)]
     }
 
     private func mergedStream(_ lhs: String, _ rhs: String) -> String {

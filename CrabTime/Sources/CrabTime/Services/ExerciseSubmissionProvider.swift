@@ -41,12 +41,11 @@ struct LocalCompletionProvider: ExerciseSubmissionProvider {
     }
     
     func submit(store: WorkspaceStore, processStore: ProcessStore) async throws -> SubmissionResult {
-        guard let exercise = store.selectedExercise, let slug = store.workspace?.rootURL.lastPathComponent else {
+        guard let exercise = store.selectedExercise else {
             return .skipped(reason: "No active exercise")
         }
         
-        let completionKey = "\(slug)/\(exercise.title)"
-        store.markExerciseCompleted(completionKey)
+        store.markExerciseCompleted(exercise.id)
         store.appendSessionMessage("Marked \(exercise.title) as done")
         return .markedDone
     }
@@ -104,7 +103,9 @@ struct CodeCraftersSubmissionProvider: ExerciseSubmissionProvider {
     var supportsRemoteSubmit: Bool { true }
     
     func canSubmit(store: WorkspaceStore) -> Bool {
-        store.hasSelection && !store.isRunning
+        // isRunning is now owned exclusively by ProcessStore;
+        // the run button is guarded separately so double-submit protection is unnecessary here.
+        store.hasSelection
     }
     
     func submit(store: WorkspaceStore, processStore: ProcessStore) async throws -> SubmissionResult {
@@ -153,8 +154,7 @@ struct CodeCraftersSubmissionProvider: ExerciseSubmissionProvider {
             
             if result.terminationStatus == 0 {
                 if let exercise = store.selectedExercise {
-                    let key = "\(workspace.rootURL.lastPathComponent)/\(exercise.title)"
-                    store.markExerciseCompleted(key)
+                    store.markExerciseCompleted(exercise.id)
                 }
                 store.appendSessionMessage("CodeCrafters tests passed!")
                 return .submitted(url: feedbackURL)

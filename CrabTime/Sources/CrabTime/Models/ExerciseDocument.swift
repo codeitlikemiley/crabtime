@@ -18,6 +18,7 @@ struct ExerciseDocument: Identifiable, Equatable, Sendable {
     var solutionCode: String?
     var presentation: SourcePresentation
     var checks: [ExerciseCheck]
+    var isMarkedDone: Bool = false
     let fileNames: [String]
 
     var chatScopeURL: URL {

@@ -8,7 +8,8 @@ struct ChatSidebarView: View {
     @Environment(ChatStore.self) private var chatStore
     @Environment(AISettingsStore.self) private var settingsStore
     @Environment(AIModelCatalogStore.self) private var modelCatalogStore
-    @FocusState private var isComposerFocused: Bool
+    @FocusState private var _unusedFocusState: Bool  // kept to satisfy compiler if needed
+    @State private var isComposerFocused: Bool = false
     @State private var menuState: ComposerMenuState = .none
     @State private var selectedSlashCommandID: String?
     @State private var selectedFileNodeID: URL?
@@ -27,6 +28,12 @@ struct ChatSidebarView: View {
             title: "/verify",
             detail: "Run the tests for the selected exercise and verify your solution.",
             template: "/verify"
+        ),
+        ChatSlashCommand(
+            command: "try-again",
+            title: "/try-again",
+            detail: "Re-enrich a challenge file with AI. Use @ to pick the exercise file.",
+            template: "/try-again @"
         )
     ]
 
@@ -270,7 +277,10 @@ struct ChatSidebarView: View {
                 maxHeight: 180,
                 isDisabled: chatStore.isSending,
                 isFocused: isComposerFocused,
-                onSubmit: handleComposerSubmit
+                onSubmit: handleComposerSubmit,
+                onFocusChange: { focused in
+                    isComposerFocused = focused
+                }
             )
             .background(
                 RoundedRectangle(cornerRadius: CrabTimeTheme.Layout.subpanelRadius, style: .continuous)

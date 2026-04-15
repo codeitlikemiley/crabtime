@@ -97,14 +97,12 @@ private actor ACPConnection {
         let description: String?
     }
 
-    private final class PromptAccumulator {
+    private struct PromptAccumulator {
         var assistantText = ""
         var observedToolTitles = Set<String>()
+        /// Captured at creation time; calling it from within the actor is safe since the actor
+        /// serialises all mutations. `@Sendable` ensures the closure can cross actor boundaries.
         let eventSink: (@Sendable (AITransportEvent) -> Void)?
-
-        init(eventSink: (@Sendable (AITransportEvent) -> Void)?) {
-            self.eventSink = eventSink
-        }
     }
 
     private let provider: AIProviderKind
@@ -174,7 +172,7 @@ private actor ACPConnection {
         didRecoverStaleSession = false
 
         let sessionID = try await resolveSessionID(existingSessionID: existingSessionID, eventSink: eventSink)
-        let accumulator = PromptAccumulator(eventSink: eventSink)
+        let accumulator = PromptAccumulator(assistantText: "", observedToolTitles: [], eventSink: eventSink)
         activePrompts[sessionID] = accumulator
         defer { activePrompts.removeValue(forKey: sessionID) }
 
@@ -194,9 +192,13 @@ private actor ACPConnection {
 
         let stopReason = Self.string(in: result, key: "stopReason") ?? "end_turn"
         await logLine("[response] stop_reason=\(stopReason) session=\(sessionID)")
-        accumulator.eventSink?(.note(provider: provider, message: "ACP stop reason: \(stopReason)"))
 
-        let responseText = accumulator.assistantText.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Read the final accumulator state from the dictionary (struct is value type;
+        // mutations during sendRequest went through activePrompts[sessionID]?.property).
+        let finalAccumulator = activePrompts[sessionID]
+        finalAccumulator?.eventSink?(.note(provider: provider, message: "ACP stop reason: \(stopReason)"))
+
+        let responseText = (finalAccumulator?.assistantText ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !responseText.isEmpty else {
             throw AIProviderError.emptyResponse(provider.title)
         }
@@ -548,7 +550,7 @@ private actor ACPConnection {
             Task { [weak self] in
                 guard let self else { return }
                 do {
-                    try await self.writeJSONData(payloadData)
+                    try await self.writeData(payloadData)
                 } catch {
                     await self.cancelPendingResponse(
                         requestID: requestID,
@@ -569,20 +571,14 @@ private actor ACPConnection {
         continuation.resume(throwing: error)
     }
 
+    /// Serialises a dictionary payload as JSON and writes it to the process stdin.
     private func writeJSON(_ payload: [String: Any]) async throws {
-        guard let stdinHandle else {
-            throw AIProviderError.runtimeFailure("ACP stdin is not available for \(provider.title).")
-        }
-
         let data = try JSONSerialization.data(withJSONObject: payload)
-        if let line = String(data: data, encoding: .utf8) {
-            await logLine("[out] \(line)")
-        }
-
-        try stdinHandle.write(contentsOf: data + Data([0x0A]))
+        try await writeData(data)
     }
 
-    private func writeJSONData(_ data: Data) async throws {
+    /// Writes pre-serialised JSON data to the process stdin, logging the outgoing line.
+    private func writeData(_ data: Data) async throws {
         guard let stdinHandle else {
             throw AIProviderError.runtimeFailure("ACP stdin is not available for \(provider.title).")
         }
@@ -614,37 +610,42 @@ private actor ACPConnection {
         await flushBufferedStderr(forcePartialLine: false)
     }
 
-    private func flushBufferedStdout(forcePartialLine: Bool) async {
-        while let newlineIndex = stdoutBuffer.firstIndex(of: 0x0A) {
-            let lineData = stdoutBuffer.prefix(upTo: newlineIndex)
-            stdoutBuffer.removeSubrange(...newlineIndex)
+    /// Drains newline-delimited lines from a buffer, invoking `handler` for each one.
+    /// When `forcePartialLine` is true, any remaining data without a trailing newline
+    /// is also emitted and the buffer is cleared (used on EOF / stream close).
+    /// Returns the updated buffer to avoid `inout` mutation inside `async` contexts.
+    private func flush(
+        buffer: Data,
+        forcePartialLine: Bool,
+        handler: (String) async -> Void
+    ) async -> Data {
+        var localBuffer = buffer
+        while let newlineIndex = localBuffer.firstIndex(of: 0x0A) {
+            let lineData = localBuffer.prefix(upTo: newlineIndex)
+            localBuffer.removeSubrange(...newlineIndex)
             if let line = String(data: lineData, encoding: .utf8) {
-                await handleStdoutLine(line)
+                await handler(line)
             }
         }
 
-        if forcePartialLine, !stdoutBuffer.isEmpty {
-            if let line = String(data: stdoutBuffer, encoding: .utf8) {
-                await handleStdoutLine(line)
+        if forcePartialLine, !localBuffer.isEmpty {
+            if let line = String(data: localBuffer, encoding: .utf8) {
+                await handler(line)
             }
-            stdoutBuffer.removeAll(keepingCapacity: false)
+            localBuffer.removeAll(keepingCapacity: false)
+        }
+        return localBuffer
+    }
+
+    private func flushBufferedStdout(forcePartialLine: Bool) async {
+        stdoutBuffer = await flush(buffer: stdoutBuffer, forcePartialLine: forcePartialLine) { [self] line in
+            await handleStdoutLine(line)
         }
     }
 
     private func flushBufferedStderr(forcePartialLine: Bool) async {
-        while let newlineIndex = stderrBuffer.firstIndex(of: 0x0A) {
-            let lineData = stderrBuffer.prefix(upTo: newlineIndex)
-            stderrBuffer.removeSubrange(...newlineIndex)
-            if let line = String(data: lineData, encoding: .utf8) {
-                await logLine("[stderr] \(line)")
-            }
-        }
-
-        if forcePartialLine, !stderrBuffer.isEmpty {
-            if let line = String(data: stderrBuffer, encoding: .utf8) {
-                await logLine("[stderr] \(line)")
-            }
-            stderrBuffer.removeAll(keepingCapacity: false)
+        stderrBuffer = await flush(buffer: stderrBuffer, forcePartialLine: forcePartialLine) { [self] line in
+            await logLine("[stderr] \(line)")
         }
     }
 
@@ -732,29 +733,34 @@ private actor ACPConnection {
             let sessionID = Self.string(in: params, key: "sessionId"),
             let update = Self.dictionary(in: params, key: "update"),
             let updateKind = Self.string(in: update, key: "sessionUpdate"),
-            let accumulator = activePrompts[sessionID]
+            activePrompts[sessionID] != nil
         else {
             return
         }
 
+        // Capture eventSink for read-only calls before the switch; mutations go through
+        // the dictionary subscript so they write back to the struct value.
+        let eventSink = activePrompts[sessionID]?.eventSink
+
         switch updateKind {
         case "agent_message_chunk":
             if let text = Self.textChunk(from: update), !text.isEmpty {
-                accumulator.assistantText += text
+                activePrompts[sessionID]?.assistantText += text
             }
         case "agent_thought_chunk":
             break
         case "tool_call":
             let title = Self.string(in: update, key: "title") ?? "Tool call"
-            if accumulator.observedToolTitles.insert(title).inserted {
+            let isNew = activePrompts[sessionID]?.observedToolTitles.insert(title).inserted ?? false
+            if isNew {
                 let toolCallID = Self.string(in: update, key: "toolCallId") ?? title
-                accumulator.eventSink?(.toolCall(provider: provider, id: toolCallID, title: title, status: "started"))
+                eventSink?(.toolCall(provider: provider, id: toolCallID, title: title, status: "started"))
             }
         case "tool_call_update":
             let title = Self.string(in: update, key: "title") ?? "Tool update"
             let status = Self.string(in: update, key: "status")
             let toolCallID = Self.string(in: update, key: "toolCallId") ?? title
-            accumulator.eventSink?(.toolCall(provider: provider, id: toolCallID, title: title, status: status ?? "updated"))
+            eventSink?(.toolCall(provider: provider, id: toolCallID, title: title, status: status ?? "updated"))
         case "plan":
             let entries = Self.arrayOfDictionaries(in: update, key: "entries")
             let summary = entries.compactMap { entry -> String? in
@@ -764,19 +770,19 @@ private actor ACPConnection {
                 return status.map { "[\($0)] \(text)" } ?? text
             }.joined(separator: " | ")
             if !summary.isEmpty {
-                accumulator.eventSink?(.note(provider: provider, message: "Plan: \(summary)"))
+                eventSink?(.note(provider: provider, message: "Plan: \(summary)"))
             }
         case "current_mode_update":
             if let modeID = Self.string(in: update, key: "currentModeId") {
-                accumulator.eventSink?(.note(provider: provider, message: "ACP mode: \(modeID)"))
+                eventSink?(.note(provider: provider, message: "ACP mode: \(modeID)"))
             }
         case "config_option_update":
-            accumulator.eventSink?(.note(provider: provider, message: "ACP configuration updated"))
+            eventSink?(.note(provider: provider, message: "ACP configuration updated"))
         case "available_commands_update":
             let commands = Self.arrayOfDictionaries(in: update, key: "availableCommands")
                 .compactMap { Self.string(in: $0, key: "name") }
             if !commands.isEmpty {
-                accumulator.eventSink?(.note(provider: provider, message: "ACP commands: \(commands.joined(separator: ", "))"))
+                eventSink?(.note(provider: provider, message: "ACP commands: \(commands.joined(separator: ", "))"))
             }
         default:
             break

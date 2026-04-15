@@ -47,7 +47,7 @@ struct CodeEditorPaneView: View {
                     if store.hasSelection {
                         RunCapsuleButton(
                             action: { store.runSelectedExercise(processStore: processStore) },
-                            isEnabled: store.hasSelection && !store.isRunning && !store.isCurrentExerciseEnriching
+                            isEnabled: store.hasSelection && processStore.runState != .running && !store.isCurrentExerciseEnriching
                         )
                     }
 

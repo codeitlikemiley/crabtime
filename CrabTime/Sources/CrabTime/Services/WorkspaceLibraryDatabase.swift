@@ -46,10 +46,14 @@ final class WorkspaceLibraryDatabase {
                 last_run_status TEXT NOT NULL,
                 last_opened_at REAL NOT NULL,
                 check_statuses_json TEXT NOT NULL,
+                is_marked_done INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (workspace_root_path, exercise_path)
             );
             """
         )
+
+        // Ensure new column exists for older DBs, ignoring error if it already exists
+        _ = try? execute("ALTER TABLE exercise_progress ADD COLUMN is_marked_done INTEGER NOT NULL DEFAULT 0;")
 
         try execute(
             """
@@ -72,54 +76,7 @@ final class WorkspaceLibraryDatabase {
             """
         )
 
-        try? execute(
-            """
-            ALTER TABLE workspaces
-            ADD COLUMN origin_path TEXT;
-            """
-        )
-        try? execute(
-            """
-            ALTER TABLE workspace_state
-            ADD COLUMN shows_completed_exercises INTEGER NOT NULL DEFAULT 0;
-            """
-        )
-        try? execute(
-            """
-            ALTER TABLE workspace_state
-            ADD COLUMN right_sidebar_tab TEXT NOT NULL DEFAULT 'inspector';
-            """
-        )
-        try? execute(
-            """
-            ALTER TABLE workspace_state
-            ADD COLUMN selected_chat_session_id TEXT;
-            """
-        )
-        try? execute(
-            """
-            ALTER TABLE workspace_state
-            ADD COLUMN right_sidebar_width REAL NOT NULL DEFAULT 360;
-            """
-        )
-        try? execute(
-            """
-            ALTER TABLE workspace_state
-            ADD COLUMN inspector_visible INTEGER NOT NULL DEFAULT 1;
-            """
-        )
-        try? execute(
-            """
-            ALTER TABLE workspace_state
-            ADD COLUMN terminal_display_mode TEXT NOT NULL DEFAULT 'split';
-            """
-        )
-        try? execute(
-            """
-            ALTER TABLE workspace_state
-            ADD COLUMN tests_only INTEGER NOT NULL DEFAULT 0;
-            """
-        )
+        try runMigrations()
 
         try execute(
             """
@@ -167,17 +124,18 @@ final class WorkspaceLibraryDatabase {
         defer { sqlite3_finalize(statement) }
 
         var records: [SavedWorkspaceRecord] = []
+        let row = Row(statement: statement)
         while sqlite3_step(statement) == SQLITE_ROW {
             records.append(
                 SavedWorkspaceRecord(
-                    rootPath: string(at: 0, in: statement),
-                    title: string(at: 1, in: statement),
-                    sourceKind: WorkspaceSourceKind(rawValue: string(at: 2, in: statement)) ?? .imported,
-                    cloneURL: optionalString(at: 3, in: statement),
-                    originPath: optionalString(at: 4, in: statement),
-                    addedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 5)),
-                    lastOpenedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 6)),
-                    isMissing: sqlite3_column_int(statement, 7) != 0
+                    rootPath: row.string("root_path"),
+                    title: row.string("title"),
+                    sourceKind: WorkspaceSourceKind(rawValue: row.string("source_kind")) ?? .imported,
+                    cloneURL: row.optionalString("clone_url"),
+                    originPath: row.optionalString("origin_path"),
+                    addedAt: Date(timeIntervalSince1970: row.double("added_at")),
+                    lastOpenedAt: Date(timeIntervalSince1970: row.double("last_opened_at")),
+                    isMissing: row.bool("missing_path")
                 )
             )
         }
@@ -201,15 +159,16 @@ final class WorkspaceLibraryDatabase {
             return nil
         }
 
+        let row = Row(statement: statement)
         return SavedWorkspaceRecord(
-            rootPath: string(at: 0, in: statement),
-            title: string(at: 1, in: statement),
-            sourceKind: WorkspaceSourceKind(rawValue: string(at: 2, in: statement)) ?? .imported,
-            cloneURL: optionalString(at: 3, in: statement),
-            originPath: optionalString(at: 4, in: statement),
-            addedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 5)),
-            lastOpenedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 6)),
-            isMissing: sqlite3_column_int(statement, 7) != 0
+            rootPath: row.string("root_path"),
+            title: row.string("title"),
+            sourceKind: WorkspaceSourceKind(rawValue: row.string("source_kind")) ?? .imported,
+            cloneURL: row.optionalString("clone_url"),
+            originPath: row.optionalString("origin_path"),
+            addedAt: Date(timeIntervalSince1970: row.double("added_at")),
+            lastOpenedAt: Date(timeIntervalSince1970: row.double("last_opened_at")),
+            isMissing: row.bool("missing_path")
         )
     }
 
@@ -249,7 +208,7 @@ final class WorkspaceLibraryDatabase {
     func fetchProgress(for workspaceRootPath: String) throws -> [String: StoredExerciseProgress] {
         let statement = try prepare(
             """
-            SELECT exercise_path, difficulty, passed_check_count, total_check_count, last_run_status, last_opened_at, check_statuses_json
+            SELECT exercise_path, difficulty, passed_check_count, total_check_count, last_run_status, last_opened_at, check_statuses_json, is_marked_done
             FROM exercise_progress
             WHERE workspace_root_path = ?;
             """
@@ -258,21 +217,23 @@ final class WorkspaceLibraryDatabase {
 
         bind(workspaceRootPath, at: 1, in: statement)
 
+        let row = Row(statement: statement)
         var progressLookup: [String: StoredExerciseProgress] = [:]
         while sqlite3_step(statement) == SQLITE_ROW {
-            let exercisePath = string(at: 0, in: statement)
-            let difficulty = ExerciseDifficulty(rawValue: string(at: 1, in: statement)) ?? .unknown
-            let checkStatuses = decodeCheckStatuses(from: string(at: 6, in: statement))
+            let exercisePath = row.string("exercise_path")
+            let difficulty = ExerciseDifficulty(rawValue: row.string("difficulty")) ?? .unknown
+            let checkStatuses = decodeCheckStatuses(from: row.string("check_statuses_json"))
 
             progressLookup[exercisePath] = StoredExerciseProgress(
                 workspaceRootPath: workspaceRootPath,
                 exercisePath: exercisePath,
                 difficulty: difficulty,
-                passedCheckCount: Int(sqlite3_column_int(statement, 2)),
-                totalCheckCount: Int(sqlite3_column_int(statement, 3)),
-                lastRunStatus: RunState(rawValue: string(at: 4, in: statement)) ?? .idle,
-                lastOpenedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 5)),
-                checkStatuses: checkStatuses
+                passedCheckCount: row.int("passed_check_count"),
+                totalCheckCount: row.int("total_check_count"),
+                lastRunStatus: RunState(rawValue: row.string("last_run_status")) ?? .idle,
+                lastOpenedAt: Date(timeIntervalSince1970: row.double("last_opened_at")),
+                checkStatuses: checkStatuses,
+                isMarkedDone: row.int("is_marked_done") == 1
             )
         }
 
@@ -324,16 +285,17 @@ final class WorkspaceLibraryDatabase {
             """
             INSERT INTO exercise_progress (
                 workspace_root_path, exercise_path, difficulty, passed_check_count, total_check_count,
-                last_run_status, last_opened_at, check_statuses_json
+                last_run_status, last_opened_at, check_statuses_json, is_marked_done
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(workspace_root_path, exercise_path) DO UPDATE SET
                 difficulty = excluded.difficulty,
                 passed_check_count = excluded.passed_check_count,
                 total_check_count = excluded.total_check_count,
                 last_run_status = excluded.last_run_status,
                 last_opened_at = excluded.last_opened_at,
-                check_statuses_json = excluded.check_statuses_json;
+                check_statuses_json = excluded.check_statuses_json,
+                is_marked_done = excluded.is_marked_done;
             """
         )
         defer { sqlite3_finalize(statement) }
@@ -350,6 +312,7 @@ final class WorkspaceLibraryDatabase {
             bind(entry.lastRunStatus.rawValue, at: 6, in: statement)
             sqlite3_bind_double(statement, 7, entry.lastOpenedAt.timeIntervalSince1970)
             bind(encodeCheckStatuses(entry.checkStatuses), at: 8, in: statement)
+            sqlite3_bind_int(statement, 9, Int32(entry.isMarkedDone ? 1 : 0))
 
             guard sqlite3_step(statement) == SQLITE_DONE else {
                 throw DatabaseError.executionFailed(message: String(cString: sqlite3_errmsg(database)))
@@ -373,28 +336,29 @@ final class WorkspaceLibraryDatabase {
             return nil
         }
 
-        let openTabs = decodeOpenTabs(from: string(at: 2, in: statement))
-        let sidebarMode = SidebarMode(rawValue: string(at: 3, in: statement)) ?? .exercises
-        let inspectorVisible = sqlite3_column_int(statement, 4) != 0
-        let rightSidebarTab = RightSidebarTab(rawValue: string(at: 5, in: statement)) ?? .inspector
-        let terminalDisplayMode = TerminalDisplayMode(rawValue: string(at: 7, in: statement)) ?? .split
-        let difficultyFilter = optionalString(at: 9, in: statement).flatMap(ExerciseDifficulty.init(rawValue:))
+        let row = Row(statement: statement)
+        let openTabs = decodeOpenTabs(from: row.string("open_tabs_json"))
+        let sidebarMode = SidebarMode(rawValue: row.string("sidebar_mode")) ?? .exercises
+        let inspectorVisible = row.bool("inspector_visible")
+        let rightSidebarTab = RightSidebarTab(rawValue: row.string("right_sidebar_tab")) ?? .inspector
+        let terminalDisplayMode = TerminalDisplayMode(rawValue: row.string("terminal_display_mode")) ?? .split
+        let difficultyFilter = row.optionalString("difficulty_filter").flatMap(ExerciseDifficulty.init(rawValue:))
 
         return WorkspaceSessionState(
             workspaceRootPath: workspaceRootPath,
-            selectedExercisePath: optionalString(at: 0, in: statement),
-            activeTabPath: optionalString(at: 1, in: statement),
+            selectedExercisePath: row.optionalString("selected_exercise_path"),
+            activeTabPath: row.optionalString("active_tab_path"),
             openTabs: openTabs,
             sidebarMode: sidebarMode,
             isInspectorVisible: inspectorVisible,
             rightSidebarTab: rightSidebarTab,
-            rightSidebarWidth: sqlite3_column_double(statement, 6),
+            rightSidebarWidth: row.double("right_sidebar_width"),
             terminalDisplayMode: terminalDisplayMode,
-            searchQuery: string(at: 8, in: statement),
+            searchQuery: row.string("search_query"),
             difficultyFilter: difficultyFilter,
-            showsOnlyTestExercises: sqlite3_column_int(statement, 10) != 0,
-            completionFilter: sqlite3_column_int(statement, 11) != 0 ? .done : .open,
-            selectedChatSessionID: optionalString(at: 12, in: statement).flatMap(UUID.init(uuidString:))
+            showsOnlyTestExercises: row.bool("tests_only"),
+            completionFilter: row.bool("shows_completed_exercises") ? .done : .open,
+            selectedChatSessionID: row.optionalString("selected_chat_session_id").flatMap(UUID.init(uuidString:))
         )
     }
 
@@ -461,22 +425,23 @@ final class WorkspaceLibraryDatabase {
         bind(exercisePath, at: 2, in: statement)
 
         var result: [ExerciseChatSession] = []
+        let row = Row(statement: statement)
         while sqlite3_step(statement) == SQLITE_ROW {
-            guard let id = UUID(uuidString: string(at: 0, in: statement)) else {
+            guard let id = UUID(uuidString: row.string("id")) else {
                 continue
             }
 
             result.append(
                 ExerciseChatSession(
                     id: id,
-                    workspaceRootPath: string(at: 1, in: statement),
-                    exercisePath: string(at: 2, in: statement),
-                    title: string(at: 3, in: statement),
-                    providerKind: AIProviderKind(rawValue: string(at: 4, in: statement)) ?? .codexCLI,
-                    model: string(at: 5, in: statement),
-                    backendSessionID: optionalString(at: 6, in: statement),
-                    createdAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 7)),
-                    updatedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 8))
+                    workspaceRootPath: row.string("workspace_root_path"),
+                    exercisePath: row.string("exercise_path"),
+                    title: row.string("title"),
+                    providerKind: AIProviderKind(rawValue: row.string("provider_kind")) ?? .codexCLI,
+                    model: row.string("model"),
+                    backendSessionID: row.optionalString("backend_session_id"),
+                    createdAt: Date(timeIntervalSince1970: row.double("created_at")),
+                    updatedAt: Date(timeIntervalSince1970: row.double("updated_at"))
                 )
             )
         }
@@ -532,9 +497,10 @@ final class WorkspaceLibraryDatabase {
         bind(sessionID.uuidString, at: 1, in: statement)
 
         var result: [ExerciseChatMessage] = []
+        let row = Row(statement: statement)
         while sqlite3_step(statement) == SQLITE_ROW {
-            guard let id = UUID(uuidString: string(at: 0, in: statement)),
-                  let resolvedSessionID = UUID(uuidString: string(at: 1, in: statement))
+            guard let id = UUID(uuidString: row.string("id")),
+                  let resolvedSessionID = UUID(uuidString: row.string("session_id"))
             else {
                 continue
             }
@@ -543,11 +509,11 @@ final class WorkspaceLibraryDatabase {
                 ExerciseChatMessage(
                     id: id,
                     sessionID: resolvedSessionID,
-                    role: ExerciseChatRole(rawValue: string(at: 2, in: statement)) ?? .assistant,
-                    content: string(at: 3, in: statement),
-                    createdAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 4)),
-                    status: ExerciseChatMessageStatus(rawValue: string(at: 5, in: statement)) ?? .complete,
-                    metadataJSON: optionalString(at: 6, in: statement)
+                    role: ExerciseChatRole(rawValue: row.string("role")) ?? .assistant,
+                    content: row.string("content"),
+                    createdAt: Date(timeIntervalSince1970: row.double("created_at")),
+                    status: ExerciseChatMessageStatus(rawValue: row.string("status")) ?? .complete,
+                    metadataJSON: row.optionalString("metadata_json")
                 )
             )
         }
@@ -609,11 +575,75 @@ final class WorkspaceLibraryDatabase {
         }
     }
 
+    // MARK: - Schema Migrations
+
+    private func getUserVersion() throws -> Int {
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, "PRAGMA user_version;", -1, &statement, nil) == SQLITE_OK else {
+            return 0
+        }
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW else {
+            return 0
+        }
+        return Int(sqlite3_column_int(statement, 0))
+    }
+
+    /// Applies incremental schema migrations guarded by PRAGMA user_version.
+    /// Each version block runs exactly once; errors are propagated rather than silenced.
+    private func runMigrations() throws {
+        let currentVersion = try getUserVersion()
+
+        // v1: Add origin_path to workspaces table
+        if currentVersion < 1 {
+            try? execute("ALTER TABLE workspaces ADD COLUMN origin_path TEXT;")
+        }
+
+        // v2: Add shows_completed_exercises and right_sidebar_tab to workspace_state
+        if currentVersion < 2 {
+            try? execute("ALTER TABLE workspace_state ADD COLUMN shows_completed_exercises INTEGER NOT NULL DEFAULT 0;")
+            try? execute("ALTER TABLE workspace_state ADD COLUMN right_sidebar_tab TEXT NOT NULL DEFAULT 'inspector';")
+        }
+
+        // v3: Add selected_chat_session_id
+        if currentVersion < 3 {
+            try? execute("ALTER TABLE workspace_state ADD COLUMN selected_chat_session_id TEXT;")
+        }
+
+        // v4: Add right_sidebar_width
+        if currentVersion < 4 {
+            try? execute("ALTER TABLE workspace_state ADD COLUMN right_sidebar_width REAL NOT NULL DEFAULT 360;")
+        }
+
+        // v5: Add inspector_visible
+        if currentVersion < 5 {
+            try? execute("ALTER TABLE workspace_state ADD COLUMN inspector_visible INTEGER NOT NULL DEFAULT 1;")
+        }
+
+        // v6: Add terminal_display_mode
+        if currentVersion < 6 {
+            try? execute("ALTER TABLE workspace_state ADD COLUMN terminal_display_mode TEXT NOT NULL DEFAULT 'split';")
+        }
+
+        // v7: Add tests_only filter
+        if currentVersion < 7 {
+            try? execute("ALTER TABLE workspace_state ADD COLUMN tests_only INTEGER NOT NULL DEFAULT 0;")
+        }
+
+        // Bump schema version to latest
+        guard sqlite3_exec(database, "PRAGMA user_version = 7;", nil, nil, nil) == SQLITE_OK else {
+            throw DatabaseError.executionFailed(message: "Failed to update schema version: \(String(cString: sqlite3_errmsg(database)))")
+        }
+    }
+
+    // MARK: - Private helpers
+
     private func execute(_ sql: String) throws {
         guard sqlite3_exec(database, sql, nil, nil, nil) == SQLITE_OK else {
             throw DatabaseError.executionFailed(message: String(cString: sqlite3_errmsg(database)))
         }
     }
+
 
     private func prepare(_ sql: String) throws -> OpaquePointer? {
         var statement: OpaquePointer?
@@ -643,15 +673,51 @@ final class WorkspaceLibraryDatabase {
         sqlite3_bind_text(statement, index, value, -1, sqliteTransient)
     }
 
-    private func string(at index: Int32, in statement: OpaquePointer?) -> String {
-        String(cString: sqlite3_column_text(statement, index))
-    }
+    private struct Row {
+        let statement: OpaquePointer?
+        private let columnIndices: [String: Int32]
 
-    private func optionalString(at index: Int32, in statement: OpaquePointer?) -> String? {
-        guard let pointer = sqlite3_column_text(statement, index) else {
-            return nil
+        init(statement: OpaquePointer?) {
+            self.statement = statement
+            let count = sqlite3_column_count(statement)
+            var indices: [String: Int32] = [:]
+            for i in 0..<count {
+                if let name = sqlite3_column_name(statement, i) {
+                    indices[String(cString: name).lowercased()] = i
+                }
+            }
+            self.columnIndices = indices
         }
-        return String(cString: pointer)
+
+        func string(_ name: String) -> String {
+            guard let index = columnIndices[name.lowercased()],
+                  let ptr = sqlite3_column_text(statement, index) else {
+                return ""
+            }
+            return String(cString: ptr)
+        }
+
+        func optionalString(_ name: String) -> String? {
+            guard let index = columnIndices[name.lowercased()],
+                  let ptr = sqlite3_column_text(statement, index) else {
+                return nil
+            }
+            return String(cString: ptr)
+        }
+
+        func double(_ name: String) -> Double {
+            guard let index = columnIndices[name.lowercased()] else { return 0 }
+            return sqlite3_column_double(statement, index)
+        }
+
+        func int(_ name: String) -> Int {
+            guard let index = columnIndices[name.lowercased()] else { return 0 }
+            return Int(sqlite3_column_int(statement, index))
+        }
+
+        func bool(_ name: String) -> Bool {
+            int(name) != 0
+        }
     }
 
     private func encodeOpenTabs(_ tabs: [ActiveDocumentTab]) -> String {

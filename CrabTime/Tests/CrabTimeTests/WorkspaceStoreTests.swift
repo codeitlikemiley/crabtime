@@ -13,7 +13,7 @@ final class WorkspaceStoreTests: XCTestCase {
         try fileManager.copyItem(at: fixtureURL, to: tempWorkspaceURL)
         defer { try? fileManager.removeItem(at: tempRootURL) }
 
-        let store = WorkspaceStore(appPaths: appPaths)
+        let store = WorkspaceStore(appPaths: appPaths, database: try! WorkspaceLibraryDatabase(paths: appPaths), editorStore: EditorStateStore(), explorerStore: ExplorerStore())
         store.importWorkspace(from: tempWorkspaceURL)
 
         XCTAssertEqual(store.selectedExercise?.sourceURL.lastPathComponent, "challenge.rs")
@@ -45,10 +45,9 @@ final class WorkspaceStoreTests: XCTestCase {
         try FileManager.default.copyItem(at: fixtureURL, to: tempWorkspaceURL)
         defer { try? FileManager.default.removeItem(at: tempRootURL) }
 
-        let store = WorkspaceStore(appPaths: appPaths)
+        let store = WorkspaceStore(appPaths: appPaths, database: try! WorkspaceLibraryDatabase(paths: appPaths), editorStore: EditorStateStore(), explorerStore: ExplorerStore())
 
         store.importWorkspace(from: tempWorkspaceURL)
-        store.selectSidebarMode(.explorer)
         let managedWorkspaceURL = try XCTUnwrap(store.currentWorkspaceRecord?.rootURL)
         let managedReadmeURL = managedWorkspaceURL.appendingPathComponent("README.md")
         store.openExplorerFile(managedReadmeURL)
@@ -67,7 +66,7 @@ final class WorkspaceStoreTests: XCTestCase {
         let appPaths = AppStoragePaths(baseURL: tempRootURL.appendingPathComponent("app-state", isDirectory: true))
         try FileManager.default.copyItem(at: fixtureURL, to: tempWorkspaceURL)
         defer { try? FileManager.default.removeItem(at: tempRootURL) }
-        let store = WorkspaceStore(appPaths: appPaths)
+        let store = WorkspaceStore(appPaths: appPaths, database: try! WorkspaceLibraryDatabase(paths: appPaths), editorStore: EditorStateStore(), explorerStore: ExplorerStore())
 
         store.importWorkspace(from: tempWorkspaceURL)
 
@@ -83,22 +82,20 @@ final class WorkspaceStoreTests: XCTestCase {
         try FileManager.default.copyItem(at: fixtureURL, to: tempWorkspaceURL)
         defer { try? FileManager.default.removeItem(at: tempRootURL) }
 
-        let firstStore = WorkspaceStore(appPaths: appPaths)
+        let firstStore = WorkspaceStore(appPaths: appPaths, database: try! WorkspaceLibraryDatabase(paths: appPaths), editorStore: EditorStateStore(), explorerStore: ExplorerStore())
         firstStore.importWorkspace(from: tempWorkspaceURL)
-        firstStore.selectSidebarMode(.explorer)
         firstStore.searchText = "sample"
         firstStore.persistSearchTextChange()
         let managedWorkspaceURL = try XCTUnwrap(firstStore.currentWorkspaceRecord?.rootURL)
         let managedReadmeURL = managedWorkspaceURL.appendingPathComponent("README.md")
         firstStore.openExplorerFile(managedReadmeURL)
 
-        let restoredStore = WorkspaceStore(appPaths: appPaths)
+        let restoredStore = WorkspaceStore(appPaths: appPaths, database: try! WorkspaceLibraryDatabase(paths: appPaths), editorStore: EditorStateStore(), explorerStore: ExplorerStore())
 
         XCTAssertEqual(restoredStore.workspaceLibrary.count, 1)
         XCTAssertEqual(restoredStore.currentWorkspaceRecord?.rootPath, managedWorkspaceURL.standardizedFileURL.path)
         XCTAssertEqual(restoredStore.selectedExercise?.sourceURL.lastPathComponent, "challenge.rs")
         XCTAssertEqual(restoredStore.selectedExplorerFileURL, managedReadmeURL)
-        XCTAssertEqual(restoredStore.sidebarMode, .explorer)
         XCTAssertEqual(restoredStore.searchText, "sample")
         XCTAssertNil(restoredStore.selectedDifficultyFilter)
         XCTAssertEqual(restoredStore.currentOpenTabs.map(\.title), ["challenge.rs", "README.md"])
@@ -113,7 +110,7 @@ final class WorkspaceStoreTests: XCTestCase {
         try FileManager.default.copyItem(at: fixtureURL, to: tempWorkspaceURL)
         defer { try? FileManager.default.removeItem(at: tempRootURL) }
 
-        let store = WorkspaceStore(appPaths: appPaths)
+        let store = WorkspaceStore(appPaths: appPaths, database: try! WorkspaceLibraryDatabase(paths: appPaths), editorStore: EditorStateStore(), explorerStore: ExplorerStore())
         store.importWorkspace(from: tempWorkspaceURL)
 
         XCTAssertEqual(store.visibleExercises.count, 2)
@@ -128,12 +125,12 @@ final class WorkspaceStoreTests: XCTestCase {
     }
 
     func testAIRuntimeEventsUpdateStructuredState() {
-        let store = WorkspaceStore(appPaths: .temporary(rootName: UUID().uuidString))
+        let processStore = ProcessStore()
 
-        store.handleAITransportEvent(
+        processStore.handleAITransportEvent(
             .transportSelected(provider: .geminiCLI, transport: .acp, model: "gemini-2.5-pro")
         )
-        store.handleAITransportEvent(
+        processStore.handleAITransportEvent(
             .sessionReady(
                 provider: .geminiCLI,
                 transport: .acp,
@@ -142,32 +139,32 @@ final class WorkspaceStoreTests: XCTestCase {
                 logFilePath: "/tmp/acp.log"
             )
         )
-        store.handleAITransportEvent(
+        processStore.handleAITransportEvent(
             .toolCall(provider: .geminiCLI, id: "tool-1", title: "Read file", status: "completed")
         )
 
-        XCTAssertEqual(store.aiRuntimeProviderTitle, AIProviderKind.geminiCLI.title)
-        XCTAssertEqual(store.aiRuntimeTransport, .acp)
-        XCTAssertEqual(store.aiRuntimeModel, "gemini-2.5-pro")
-        XCTAssertEqual(store.aiRuntimeSessionID, "session-123")
-        XCTAssertEqual(store.aiRuntimeAuthStatus, "Ready")
-        XCTAssertEqual(store.aiRuntimeLogPath, "/tmp/acp.log")
-        XCTAssertEqual(store.aiRuntimeToolCalls.first?.title, "Read file")
-        XCTAssertEqual(store.aiRuntimeToolCalls.first?.status, "completed")
-        XCTAssertFalse(store.aiRuntimeEvents.isEmpty)
+        XCTAssertEqual(processStore.aiRuntimeProviderTitle, AIProviderKind.geminiCLI.title)
+        XCTAssertEqual(processStore.aiRuntimeTransport, .acp)
+        XCTAssertEqual(processStore.aiRuntimeModel, "gemini-2.5-pro")
+        XCTAssertEqual(processStore.aiRuntimeSessionID, "session-123")
+        XCTAssertEqual(processStore.aiRuntimeAuthStatus, "Ready")
+        XCTAssertEqual(processStore.aiRuntimeLogPath, "/tmp/acp.log")
+        XCTAssertEqual(processStore.aiRuntimeToolCalls.first?.title, "Read file")
+        XCTAssertEqual(processStore.aiRuntimeToolCalls.first?.status, "completed")
+        XCTAssertFalse(processStore.aiRuntimeEvents.isEmpty)
     }
 
     func testAIRuntimeErrorUpdatesFailureState() {
-        let store = WorkspaceStore(appPaths: .temporary(rootName: UUID().uuidString))
+        let processStore = ProcessStore()
 
-        store.handleAITransportEvent(
+        processStore.handleAITransportEvent(
             .transportError(provider: .openCodeCLI, message: "ACP process exited", logFilePath: "/tmp/opencode.log")
         )
 
-        XCTAssertEqual(store.aiRuntimeProviderTitle, AIProviderKind.openCodeCLI.title)
-        XCTAssertEqual(store.aiRuntimeProcessStatus, "Failed")
-        XCTAssertEqual(store.aiRuntimeLastError, "ACP process exited")
-        XCTAssertEqual(store.aiRuntimeLogPath, "/tmp/opencode.log")
+        XCTAssertEqual(processStore.aiRuntimeProviderTitle, AIProviderKind.openCodeCLI.title)
+        XCTAssertEqual(processStore.aiRuntimeProcessStatus, "Failed")
+        XCTAssertEqual(processStore.aiRuntimeLastError, "ACP process exited")
+        XCTAssertEqual(processStore.aiRuntimeLogPath, "/tmp/opencode.log")
     }
 
     func testResetSelectedWarmSessionClearsBackendSessionID() throws {
@@ -180,7 +177,7 @@ final class WorkspaceStoreTests: XCTestCase {
             credentialStore: CredentialStore(),
             appPaths: appPaths
         )
-        let store = WorkspaceStore(appPaths: appPaths, database: database, defaults: defaults)
+        let store = WorkspaceStore(appPaths: appPaths, database: database, editorStore: EditorStateStore(), explorerStore: ExplorerStore(), defaults: defaults)
         let chatStore = ChatStore(database: database, providerManager: providerManager)
         store.attachChatStore(chatStore)
 
@@ -216,7 +213,7 @@ final class WorkspaceStoreTests: XCTestCase {
         try FileManager.default.copyItem(at: fixtureURL, to: tempWorkspaceURL)
         defer { try? FileManager.default.removeItem(at: tempRootURL) }
 
-        let store = WorkspaceStore(appPaths: appPaths)
+        let store = WorkspaceStore(appPaths: appPaths, database: try! WorkspaceLibraryDatabase(paths: appPaths), editorStore: EditorStateStore(), explorerStore: ExplorerStore())
         store.importWorkspace(from: tempWorkspaceURL)
 
         XCTAssertEqual(store.availableDifficultyFilters, [])
@@ -233,7 +230,7 @@ final class WorkspaceStoreTests: XCTestCase {
         try fileManager.copyItem(at: fixtureURL, to: tempWorkspaceURL)
         defer { try? fileManager.removeItem(at: tempRootURL) }
 
-        let store = WorkspaceStore(appPaths: appPaths)
+        let store = WorkspaceStore(appPaths: appPaths, database: try! WorkspaceLibraryDatabase(paths: appPaths), editorStore: EditorStateStore(), explorerStore: ExplorerStore())
         store.importWorkspace(from: tempWorkspaceURL)
 
         XCTAssertEqual(store.modifiedWorkspaceRelativePaths, [])
@@ -264,7 +261,7 @@ final class WorkspaceStoreTests: XCTestCase {
             credentialStore: CredentialStore(),
             appPaths: appPaths
         )
-        let store = WorkspaceStore(appPaths: appPaths, database: database, defaults: defaults)
+        let store = WorkspaceStore(appPaths: appPaths, database: database, editorStore: EditorStateStore(), explorerStore: ExplorerStore(), defaults: defaults)
         let chatStore = ChatStore(database: database, providerManager: providerManager)
         store.attachChatStore(chatStore)
         store.importWorkspace(from: tempWorkspaceURL)
@@ -301,7 +298,7 @@ final class WorkspaceStoreTests: XCTestCase {
             credentialStore: CredentialStore(),
             appPaths: appPaths
         )
-        let store = WorkspaceStore(appPaths: appPaths, database: database, defaults: defaults)
+        let store = WorkspaceStore(appPaths: appPaths, database: database, editorStore: EditorStateStore(), explorerStore: ExplorerStore(), defaults: defaults)
         let chatStore = ChatStore(database: database, providerManager: providerManager)
         store.attachChatStore(chatStore)
         store.importWorkspace(from: tempWorkspaceURL)
@@ -348,7 +345,7 @@ final class WorkspaceStoreTests: XCTestCase {
             credentialStore: CredentialStore(),
             appPaths: appPaths
         )
-        let store = WorkspaceStore(appPaths: appPaths, database: database, defaults: defaults)
+        let store = WorkspaceStore(appPaths: appPaths, database: database, editorStore: EditorStateStore(), explorerStore: ExplorerStore(), defaults: defaults)
         let chatStore = ChatStore(database: database, providerManager: providerManager)
         store.attachChatStore(chatStore)
         store.importWorkspace(from: tempWorkspaceURL)
@@ -374,7 +371,7 @@ final class WorkspaceStoreTests: XCTestCase {
             credentialStore: CredentialStore(),
             appPaths: appPaths
         )
-        let store = WorkspaceStore(appPaths: appPaths, database: database, defaults: defaults)
+        let store = WorkspaceStore(appPaths: appPaths, database: database, editorStore: EditorStateStore(), explorerStore: ExplorerStore(), defaults: defaults)
         let chatStore = ChatStore(database: database, providerManager: providerManager)
         store.attachChatStore(chatStore)
 
@@ -407,7 +404,7 @@ final class WorkspaceStoreTests: XCTestCase {
             """
         )
 
-        let store = WorkspaceStore(appPaths: appPaths)
+        let store = WorkspaceStore(appPaths: appPaths, database: try! WorkspaceLibraryDatabase(paths: appPaths), editorStore: EditorStateStore(), explorerStore: ExplorerStore())
         store.importWorkspace(from: tempWorkspaceURL)
 
         let target = try XCTUnwrap(store.resolveSelectedExerciseTestTarget())
@@ -423,7 +420,7 @@ final class WorkspaceStoreTests: XCTestCase {
 
         try createExerciseWorkspace(at: tempWorkspaceURL)
 
-        let store = WorkspaceStore(appPaths: appPaths)
+        let store = WorkspaceStore(appPaths: appPaths, database: try! WorkspaceLibraryDatabase(paths: appPaths), editorStore: EditorStateStore(), explorerStore: ExplorerStore())
         store.importWorkspace(from: tempWorkspaceURL)
 
         let target = try XCTUnwrap(store.resolveSelectedExerciseTestTarget())

@@ -20,6 +20,8 @@ struct AutoGrowingTextEditor: NSViewRepresentable {
     var isFocused: Bool = false
     var onSubmit: () -> Void = {}
     var onTextChange: ((String) -> Void)? = nil
+    /// Called when the underlying NSTextView gains or loses first-responder status.
+    var onFocusChange: ((Bool) -> Void)? = nil
 
     // MARK: - NSViewRepresentable
 
@@ -53,6 +55,13 @@ struct AutoGrowingTextEditor: NSViewRepresentable {
         textView.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
         textView.delegate = context.coordinator
         textView.string = text
+        // Wire focus callbacks
+        textView.onFocusGained = { [weak coordinator = context.coordinator] in
+            coordinator?.parent.onFocusChange?(true)
+        }
+        textView.onFocusLost = { [weak coordinator = context.coordinator] in
+            coordinator?.parent.onFocusChange?(false)
+        }
 
         context.coordinator.updatePlaceholderVisibility()
 
@@ -162,10 +171,32 @@ struct AutoGrowingTextEditor: NSViewRepresentable {
 
 // MARK: - PlaceholderTextView
 
-/// NSTextView subclass that draws placeholder text when empty.
+/// NSTextView subclass that draws placeholder text when empty,
+/// and fires focus-change callbacks when it becomes/resigns first responder.
 final class PlaceholderTextView: NSTextView {
     var placeholderString: String = "" {
         didSet { needsDisplay = true }
+    }
+
+    /// Called (on main thread) when this view becomes first responder.
+    var onFocusGained: (() -> Void)?
+    /// Called (on main thread) when this view resigns first responder.
+    var onFocusLost: (() -> Void)?
+
+    override func becomeFirstResponder() -> Bool {
+        let result = super.becomeFirstResponder()
+        if result {
+            DispatchQueue.main.async { [weak self] in self?.onFocusGained?() }
+        }
+        return result
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let result = super.resignFirstResponder()
+        if result {
+            DispatchQueue.main.async { [weak self] in self?.onFocusLost?() }
+        }
+        return result
     }
 
     override func draw(_ dirtyRect: NSRect) {

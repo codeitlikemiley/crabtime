@@ -24,18 +24,28 @@ final class ExercismStore {
         self.credentialStore = credentialStore
         self.defaults = defaults
 
-        self.exercismDownloadedExercises = Set((defaults.string(forKey: "exercismDownloadedExercises") ?? "").split(separator: ",").map(String.init))
-        self.exercismCompletedExercises = Set((defaults.string(forKey: "exercismCompletedExercises") ?? "").split(separator: ",").map(String.init))
+        // Migrate legacy comma-CSV storage to native string arrays on first launch
+        let migrateSet: (String) -> Set<String> = { key in
+            if let array = defaults.stringArray(forKey: key) {
+                return Set(array)
+            }
+            let legacyCSV = defaults.string(forKey: key) ?? ""
+            let migrated = Set(legacyCSV.split(separator: ",").map(String.init).filter { !$0.isEmpty })
+            defaults.setValue(Array(migrated), forKey: key)
+            return migrated
+        }
+        self.exercismDownloadedExercises = migrateSet("exercismDownloadedExercises")
+        self.exercismCompletedExercises = migrateSet("exercismCompletedExercises")
     }
 
     func markExercismDownloaded(_ slug: String) {
         exercismDownloadedExercises.insert(slug)
-        defaults.set(exercismDownloadedExercises.joined(separator: ","), forKey: "exercismDownloadedExercises")
+        defaults.setValue(Array(exercismDownloadedExercises), forKey: "exercismDownloadedExercises")
     }
 
     func markExercismCompleted(_ slug: String) {
         exercismCompletedExercises.insert(slug)
-        defaults.set(exercismCompletedExercises.joined(separator: ","), forKey: "exercismCompletedExercises")
+        defaults.setValue(Array(exercismCompletedExercises), forKey: "exercismCompletedExercises")
     }
 
     func canSubmitSelectedExerciseToExercism(using store: WorkspaceStore) -> Bool {

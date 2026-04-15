@@ -89,6 +89,8 @@ struct WorkspaceSceneRoot: View {
     @State private var todoStore: TodoExplorerStore
     @State private var exercismStore: ExercismStore
     @State private var processStore: ProcessStore
+    @State private var editorStore: EditorStateStore
+    @State private var explorerStore: ExplorerStore
     @State private var navigationStore: NavigationStore
     @State private var submissionService: ExerciseSubmissionService
     @State private var didApplyInitialWorkspace = false
@@ -97,9 +99,14 @@ struct WorkspaceSceneRoot: View {
         self.services = services
         self.initialWorkspaceRootPath = initialWorkspaceRootPath
 
+        let editorStore = EditorStateStore()
+        let explorerStore = ExplorerStore()
+
         let workspaceStore = WorkspaceStore(
             appPaths: services.appPaths,
-            database: services.database
+            database: services.database,
+            editorStore: editorStore,
+            explorerStore: explorerStore
         )
         let chatStore = ChatStore(
             database: services.database,
@@ -116,6 +123,8 @@ struct WorkspaceSceneRoot: View {
         _todoStore = State(initialValue: todoStore)
         _exercismStore = State(initialValue: exercismStore)
         _processStore = State(initialValue: processStore)
+        _editorStore = State(initialValue: editorStore)
+        _explorerStore = State(initialValue: explorerStore)
         _navigationStore = State(initialValue: NavigationStore())
         _submissionService = State(initialValue: ExerciseSubmissionService())
     }
@@ -131,6 +140,8 @@ struct WorkspaceSceneRoot: View {
                     .environment(todoStore)
                     .environment(exercismStore)
                     .environment(processStore)
+                    .environment(editorStore)
+                    .environment(explorerStore)
                     .environment(services.aiSettingsStore)
                     .environment(services.modelCatalogStore)
                     .environment(navigationStore)

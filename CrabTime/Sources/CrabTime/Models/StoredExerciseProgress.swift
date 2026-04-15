@@ -9,4 +9,5 @@ struct StoredExerciseProgress: Equatable, Codable, Sendable {
     var lastRunStatus: RunState
     var lastOpenedAt: Date
     var checkStatuses: [String: CheckStatus]
+    var isMarkedDone: Bool = false
 }

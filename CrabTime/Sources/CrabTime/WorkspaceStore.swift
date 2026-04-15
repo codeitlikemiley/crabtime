@@ -25,25 +25,55 @@ final class WorkspaceStore {
     var workspace: ExerciseWorkspace?
     var selectedWorkspaceRootPath: String?
     var selectedExerciseID: ExerciseDocument.ID?
-    var selectedExplorerFileURL: URL?
-    var selectedExplorerNodePath: String?
-    var openTabs: [ActiveDocumentTab] = []
-    var editorText: String = ""
-    var editorCursorLine: Int = 1
-    /// Current cursor byte offset in the active text view, updated on every selection change.
-    /// Always reflects the last known good position regardless of first-responder state.
-    var editorCursorOffset: Int = 0
-    /// Per-file cursor offset (NSRange.location) keyed by standardized file path.
-    var cursorPositionByPath: [String: Int] = [:]
-    /// Token to trigger cursor restoration after tab switch.
-    var restoreCursorToken: Int = 0
-    /// The cursor offset to restore when switching tabs.
-    var restoreCursorOffset: Int? = nil
-    var explorerPreviewText: String = ""
+    // MARK: - Explorer State (Forwarded to ExplorerStore)
+    var selectedExplorerFileURL: URL? {
+        get { explorerStore.selectedFileURL }
+        set { explorerStore.selectedFileURL = newValue }
+    }
+    var selectedExplorerNodePath: String? {
+        get { explorerStore.selectedNodePath }
+        set { explorerStore.selectedNodePath = newValue }
+    }
+    var openTabs: [ActiveDocumentTab] {
+        get { explorerStore.openTabs }
+        set { explorerStore.openTabs = newValue }
+    }
+    // MARK: - Editor State (Forwarded to EditorStateStore)
+    var editorText: String {
+        get { editorStore.text }
+        set { editorStore.text = newValue }
+    }
+    var editorCursorLine: Int {
+        get { editorStore.cursorLine }
+        set { editorStore.cursorLine = newValue }
+    }
+    var editorCursorOffset: Int {
+        get { editorStore.cursorOffset }
+        set { editorStore.cursorOffset = newValue }
+    }
+    var cursorPositionByPath: [String: Int] {
+        get { editorStore.cursorPositionByPath }
+        set { editorStore.cursorPositionByPath = newValue }
+    }
+    var restoreCursorToken: Int {
+        get { editorStore.restoreCursorToken }
+        set { editorStore.restoreCursorToken = newValue }
+    }
+    var restoreCursorOffset: Int? {
+        get { editorStore.restoreCursorOffset }
+        set { editorStore.restoreCursorOffset = newValue }
+    }
+    var explorerPreviewText: String {
+        get { explorerStore.previewText }
+        set { explorerStore.previewText = newValue }
+    }
     var currentDiffText: String = ""
 
     var searchText: String = ""
-    var explorerSearchText: String = ""
+    var explorerSearchText: String {
+        get { explorerStore.searchText }
+        set { explorerStore.searchText = newValue }
+    }
     var selectedDifficultyFilter: ExerciseDifficulty?
     var showsOnlyTestExercises: Bool = false
     var completionFilter: ExerciseCompletionFilter = .open
@@ -59,54 +89,48 @@ final class WorkspaceStore {
     }
     var sessionLog: [String] = []
 
-    var runState: RunState = .idle
-    var lastCommandDescription: String = ""
-    var lastTerminationStatus: Int32?
     var rightSidebarTab: RightSidebarTab = .inspector
     var rightSidebarWidth: CGFloat = CrabTimeTheme.Layout.inspectorWidth
     var isSolutionVisible: Bool = false
-    var isEditorDirty: Bool = false
+    var isEditorDirty: Bool {
+        get { editorStore.isDirty }
+        set { editorStore.isDirty = newValue }
+    }
     /// Paths of exercise files currently being AI-enriched in the background.
     var enrichingExercisePaths: Set<String> = []
     var isCloneSheetPresented: Bool = false
     var cloneRepositoryURL: String = ""
     var cloneErrorMessage: String?
     var isCloningRepository: Bool = false
-    var isSubmittingExercism: Bool = false
     var selectedChatSessionID: UUID?
     var chatComposerFocusToken: Int = 0
     var exerciseSearchFocusToken: Int = 0
     var exercismSearchFocusToken: Int = 0
-    var explorerSearchFocusToken: Int = 0
+    var explorerSearchFocusToken: Int {
+        get { explorerStore.searchFocusToken }
+        set { explorerStore.searchFocusToken = newValue }
+    }
     var inspectorListFocusToken: Int = 0
     var todoFocusToken: Int = 0
     /// Tracks the last intentional keyboard-driven focus target for ping-pong toggling.
     var lastFocusTarget: FocusTarget = .editor
-    var explorerKeyboardFocusActive: Bool = false
+    var explorerKeyboardFocusActive: Bool {
+        get { explorerStore.isKeyboardFocusActive }
+        set { explorerStore.isKeyboardFocusActive = newValue }
+    }
     var exerciseKeyboardFocusActive: Bool = false
     var selectedExerciseListIndex: Int = 0
-    var expandedExplorerDirectoryPaths: Set<String> = []
+    var expandedExplorerDirectoryPaths: Set<String> {
+        get { explorerStore.expandedDirectoryPaths }
+        set { explorerStore.expandedDirectoryPaths = newValue }
+    }
     var showLineNumbers: Bool = true
     var isCommandPalettePresented: Bool = false
     var commandPaletteSelectionDelta: Int = 0
     var goToLineTarget: Int? = nil
     var goToLineToken: Int = 0
 
-    // MARK: - TODO Explorer State
-    var todoItems: [TodoItem] = []
-    var todoSearchText: String = ""
-    var todoScopeCurrentFile: Bool = false
-    var selectedTodoIndex: Int = 0
 
-    // MARK: - Exercism Browser State
-    var exercismExercises: [ExercismExercise] = []
-    var exercismSearchText: String = ""
-    var exercismFilters: Set<String> = []
-    var isLoadingExercismExercises: Bool = false
-    var selectedExercismIndex: Int = 0
-    private(set) var exercismDownloadedExercises: Set<String> = []
-    private(set) var exercismCompletedExercises: Set<String> = []
-    private(set) var locallyCompletedExercises: Set<String> = []
 
     @ObservationIgnored private let importer: WorkspaceImporter
     @ObservationIgnored private let exercismAPIService = ExercismAPIService()
@@ -125,15 +149,22 @@ final class WorkspaceStore {
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var isRestoringState = false
     @ObservationIgnored private var workspaceFileBaseline: [String: Data] = [:]
-    @ObservationIgnored private var draftEditorTextByPath: [String: String] = [:]
+    @ObservationIgnored var draftEditorTextByPath: [String: String] {
+        get { editorStore.draftTextByPath }
+        set { editorStore.draftTextByPath = newValue }
+    }
     @ObservationIgnored var chatStore: ChatStore?
+    @ObservationIgnored let editorStore: EditorStateStore
+    @ObservationIgnored let explorerStore: ExplorerStore
 
     init(
         appPaths: AppStoragePaths = .live(),
         importer: WorkspaceImporter = WorkspaceImporter(),
         cargoRunner: CargoRunner = CargoRunner(),
         sourcePresentationBuilder: SourcePresentationBuilder = SourcePresentationBuilder(),
-        database: WorkspaceLibraryDatabase? = nil,
+        database: WorkspaceLibraryDatabase,
+        editorStore: EditorStateStore,
+        explorerStore: ExplorerStore,
         repositoryCloner: RepositoryCloner? = nil,
         exercismCLI: ExercismCLI? = nil,
         fileChangeService: WorkspaceFileChangeService = WorkspaceFileChangeService(),
@@ -142,43 +173,32 @@ final class WorkspaceStore {
     ) {
         self.defaults = defaults
         self.appPaths = appPaths
+        self.editorStore = editorStore
+        self.explorerStore = explorerStore
         self.importer = importer
         self.cargoRunner = cargoRunner
         self.sourcePresentationBuilder = sourcePresentationBuilder
-        var bootstrapMessages: [String] = []
-
-        let resolvedDatabase: WorkspaceLibraryDatabase
-        if let database {
-            resolvedDatabase = database
-        } else {
-            do {
-                resolvedDatabase = try WorkspaceLibraryDatabase(paths: appPaths)
-            } catch {
-                let fallbackPaths = AppStoragePaths.temporary(rootName: "\(AppBrand.fallbackStoragePrefix)-\(UUID().uuidString)")
-                do {
-                    resolvedDatabase = try WorkspaceLibraryDatabase(paths: fallbackPaths)
-                } catch {
-                do {
-                        resolvedDatabase = try WorkspaceLibraryDatabase(paths: nil)
-                    } catch {
-                        fatalError("Critical: SQLite in-memory workspace database failed to open: \(error)")
-                    }
-                }
-                bootstrapMessages.append("Database fallback enabled: \(error.localizedDescription)")
-            }
-        }
-
-        self.database = resolvedDatabase
+        
+        self.database = database
         self.repositoryCloner = repositoryCloner ?? RepositoryCloner(cloneLibraryURL: appPaths.cloneLibraryURL)
         self.exercismCLI = exercismCLI ?? ExercismCLI()
         self.fileChangeService = fileChangeService
         self.baselineStore = WorkspaceBaselineStore(baselineLibraryURL: appPaths.baselineLibraryURL)
         self.rustlingsWorkspaceScaffolder = rustlingsWorkspaceScaffolder
-        self.sessionLog = bootstrapMessages
+        self.sessionLog = []
 
-        self.exercismDownloadedExercises = Set((defaults.string(forKey: "exercismDownloadedExercises") ?? "").split(separator: ",").map(String.init))
-        self.exercismCompletedExercises = Set((defaults.string(forKey: "exercismCompletedExercises") ?? "").split(separator: ",").map(String.init))
-        self.locallyCompletedExercises = Set((defaults.string(forKey: "locallyCompletedExercises") ?? "").split(separator: ",").map(String.init))
+        // Migrate legacy comma-CSV storage to native string arrays on first launch
+        let migrateSet: (String) -> Set<String> = { key in
+            if let array = defaults.stringArray(forKey: key) {
+                return Set(array)
+            }
+            // One-time migration from old comma-separated format
+            let legacyCSV = defaults.string(forKey: key) ?? ""
+            let migrated = Set(legacyCSV.split(separator: ",").map(String.init).filter { !$0.isEmpty })
+            defaults.setValue(Array(migrated), forKey: key)
+            // Initialize defaults migrations
+            return migrated
+        }
 
         restorePersistedLibrary()
     }
@@ -195,11 +215,7 @@ final class WorkspaceStore {
         selectedExerciseID != nil && !currentOpenTabs.isEmpty
     }
 
-    var isRunning: Bool {
-        runState == .running
-    }
-
-    /// True when the file currently displayed in the editor is being AI-enriched.
+/// True when the file currently displayed in the editor is being AI-enriched.
     /// Checks the active URL (exercise or solution file) against the enrichment set.
     var isCurrentExerciseEnriching: Bool {
         let activeURL = selectedExplorerFileURL ?? selectedExercise?.sourceURL
@@ -462,15 +478,6 @@ final class WorkspaceStore {
         }
     }
 
-    var canSubmitSelectedExerciseToExercism: Bool {
-        isExercismWorkspace
-            && hasSelection
-            && runState == .succeeded
-            && !isRunning
-            && !isSubmittingExercism
-            && (!modifiedWorkspaceRelativePaths.isEmpty || isEditorDirty)
-    }
-
     var canResetCurrentWorkspace: Bool {
         currentWorkspaceRecord != nil
     }
@@ -633,20 +640,12 @@ final class WorkspaceStore {
     }
 
 
-    func markExercismDownloaded(_ slug: String) {
-        exercismDownloadedExercises.insert(slug)
-        defaults.set(exercismDownloadedExercises.joined(separator: ","), forKey: "exercismDownloadedExercises")
-    }
-
-    func markExercismCompleted(_ slug: String) {
-        exercismCompletedExercises.insert(slug)
-        defaults.set(exercismCompletedExercises.joined(separator: ","), forKey: "exercismCompletedExercises")
-    }
 
 
-    func markExerciseCompleted(_ key: String) {
-        locallyCompletedExercises.insert(key)
-        defaults.set(locallyCompletedExercises.joined(separator: ","), forKey: "locallyCompletedExercises")
+    func markExerciseCompleted(_ id: URL) {
+        guard let idx = workspace?.exercises.firstIndex(where: { $0.id == id }) else { return }
+        workspace?.exercises[idx].isMarkedDone = true
+        persistCurrentWorkspaceSnapshot()
     }
 
     func importWorkspace(from url: URL, sourceKind: WorkspaceSourceKind = .imported, cloneURL: String? = nil) {
@@ -1055,71 +1054,6 @@ final class WorkspaceStore {
 
 
 
-    // MARK: - TODO Explorer
-
-    var visibleTodoItems: [TodoItem] {
-        var items = todoItems
-
-        // Scope filter: current file only
-        if todoScopeCurrentFile,
-           let currentPath = selectedExplorerFileURL?.standardizedFileURL.path,
-           let rootPath = workspace?.rootURL.standardizedFileURL.path {
-            let relativePath = currentPath.hasPrefix(rootPath + "/")
-                ? String(currentPath.dropFirst(rootPath.count + 1))
-                : currentPath
-            items = items.filter { $0.filePath == relativePath }
-        }
-
-        // Text search
-        if !todoSearchText.isEmpty {
-            let query = todoSearchText.lowercased()
-            items = items.filter {
-                $0.text.lowercased().contains(query) ||
-                $0.fileName.lowercased().contains(query) ||
-                $0.kind.label.lowercased().contains(query)
-            }
-        }
-
-        return items
-    }
-
-    func refreshTodoItems() {
-        guard let rootURL = workspace?.rootURL else {
-            todoItems = []
-            return
-        }
-        todoItems = todoScanner.scanWorkspace(rootURL: rootURL)
-        selectedTodoIndex = 0
-    }
-
-    func moveTodoSelectionUp() {
-        guard !visibleTodoItems.isEmpty else { return }
-        selectedTodoIndex = max(selectedTodoIndex - 1, 0)
-    }
-
-    func moveTodoSelectionDown() {
-        guard !visibleTodoItems.isEmpty else { return }
-        selectedTodoIndex = min(selectedTodoIndex + 1, visibleTodoItems.count - 1)
-    }
-
-    func activateSelectedTodo() {
-        let items = visibleTodoItems
-        guard items.indices.contains(selectedTodoIndex) else { return }
-        activateTodoItem(items[selectedTodoIndex])
-    }
-
-    func activateTodoItem(_ item: TodoItem) {
-        guard let rootURL = workspace?.rootURL else { return }
-        let fileURL = rootURL.appendingPathComponent(item.filePath)
-
-        // Ensure the file is opened and focused
-        activateDocument(at: fileURL, persistState: true)
-
-        // Go to the line
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-            self?.goToLine(item.line)
-        }
-    }
 
     func jumpToTestCheck(_ check: ExerciseCheck) {
         guard let workspace else { return }
@@ -1134,7 +1068,7 @@ final class WorkspaceStore {
         ) else { return }
 
         // Find testing macro (e.g., #[test], #[tokio::test])
-        let testMacroRegex = try? NSRegularExpression(pattern: "^\\s*#\\[.*test.*\\]\\s*$", options: [])
+        // Note: compiled once as a static property — not per call.
 
         for case let fileURL as URL in enumerator {
             guard fileURL.pathExtension == "rs", !fileURL.path.contains("/target/") else { continue }
@@ -1170,15 +1104,9 @@ final class WorkspaceStore {
                 let isTest = pendingMacroLines.contains { macroIndex in
                     let attr = lines[macroIndex].trimmingCharacters(in: .whitespaces)
                     let nsRange = NSRange(attr.startIndex..<attr.endIndex, in: attr)
-                    return testMacroRegex?.firstMatch(in: attr, options: [], range: nsRange) != nil
+                    return Self.testMacroRegex.firstMatch(in: attr, options: [], range: nsRange) != nil
                 }
 
-                if isTest || pendingMacroLines.isEmpty {
-                    // We fall back conditionally if no testing macro was found just to be helpful, 
-                    // but prioritize test macro. Wait! Actually `isTest` should be checked to be safe.
-                    // But some tests might miss the parsing buffer if they had too much whitespace. Let's just require it.
-                }
-                
                 if isTest {
                     let macroIndexToJump = pendingMacroLines.first ?? index
                     
@@ -1198,56 +1126,7 @@ final class WorkspaceStore {
         }
     }
 
-    // MARK: - Exercism Browser
 
-    var visibleExercismExercises: [ExercismExercise] {
-        var items = exercismExercises
-        
-        if !exercismFilters.isEmpty {
-            let selectedDifficulties = exercismFilters.filter { ["easy", "medium", "hard"].contains($0) }
-            let needsDownloaded = exercismFilters.contains("downloaded")
-            let needsCompleted = exercismFilters.contains("completed")
-            
-            if !selectedDifficulties.isEmpty {
-                items = items.filter { selectedDifficulties.contains($0.difficulty) }
-            }
-            if needsDownloaded {
-                items = items.filter { exercismDownloadedExercises.contains($0.slug) }
-            }
-            if needsCompleted {
-                items = items.filter { exercismCompletedExercises.contains($0.slug) }
-            }
-        }
-        
-        if !exercismSearchText.isEmpty {
-            let search = exercismSearchText.lowercased()
-            items = items.filter {
-                $0.title.lowercased().contains(search) ||
-                $0.blurb.lowercased().contains(search) ||
-                $0.slug.lowercased().contains(search)
-            }
-        }
-        
-        return items
-    }
-
-    func fetchExercismCatalog() async {
-        guard let token = credentialStore.readSecret(for: "exercism_api_token"), !token.isEmpty else { return }
-        
-        // Return cached if we already have it to avoid spamming the API on every click
-        guard exercismExercises.isEmpty else { return }
-
-        isLoadingExercismExercises = true
-        defer { isLoadingExercismExercises = false }
-
-        do {
-            let exercises = try await exercismAPIService.fetchRustExercises(token: token)
-            // The API already naturally orders them well (practice, then tutorials).
-            exercismExercises = exercises
-        } catch {
-            consoleOutput += "Failed to fetch Exercism exercises: \(error.localizedDescription)\n"
-        }
-    }
 
 
 
@@ -1259,54 +1138,37 @@ final class WorkspaceStore {
         toggleProblemPaneVisibility()
     }
 
-    func showExplorerAndFocusSearch() {
-        if lastFocusTarget == .explorerSearch {
-            // Ping-pong: was on explorer search → return to editor
+    /// Toggles keyboard focus between a named target and the text editor (ping-pong pattern).
+    /// First press activates the target; second press returns focus to the editor.
+    private func toggleFocus(to target: FocusTarget, onActivate: () -> Void) {
+        if lastFocusTarget == target {
             lastFocusTarget = .editor
+            explorerKeyboardFocusActive = false
             NotificationCenter.default.post(name: .focusTextEditorRequested, object: nil)
         } else {
-            lastFocusTarget = .explorerSearch
-                explorerKeyboardFocusActive = false
-            explorerSearchFocusToken += 1
+            lastFocusTarget = target
+            explorerKeyboardFocusActive = false
+            onActivate()
         }
         persistCurrentWorkspaceSnapshot()
+    }
+
+    func showExplorerAndFocusSearch() {
+        toggleFocus(to: .explorerSearch) { explorerSearchFocusToken += 1 }
     }
 
     func showExerciseLibraryAndFocusSearch() {
-        if lastFocusTarget == .exerciseSearch {
-            lastFocusTarget = .editor
-            NotificationCenter.default.post(name: .focusTextEditorRequested, object: nil)
-        } else {
-            lastFocusTarget = .exerciseSearch
-            explorerKeyboardFocusActive = false
-            exerciseSearchFocusToken += 1
-        }
-        persistCurrentWorkspaceSnapshot()
+        toggleFocus(to: .exerciseSearch) { exerciseSearchFocusToken += 1 }
     }
 
     func showExercismCatalogAndFocusSearch() {
-        if lastFocusTarget == .exercismSearch {
-            lastFocusTarget = .editor
-            NotificationCenter.default.post(name: .focusTextEditorRequested, object: nil)
-        } else {
-            lastFocusTarget = .exercismSearch
-                explorerKeyboardFocusActive = false
-            exercismSearchFocusToken += 1
-        }
-        persistCurrentWorkspaceSnapshot()
+        toggleFocus(to: .exercismSearch) { exercismSearchFocusToken += 1 }
     }
 
     func showTodoAndFocus() {
-        if lastFocusTarget == .todo {
-            lastFocusTarget = .editor
-            NotificationCenter.default.post(name: .focusTextEditorRequested, object: nil)
-        } else {
-            lastFocusTarget = .todo
-            explorerKeyboardFocusActive = false
-            refreshTodoItems()
+        toggleFocus(to: .todo) {
             todoFocusToken += 1
         }
-        persistCurrentWorkspaceSnapshot()
     }
 
     func focusInspectorList() {
@@ -1374,12 +1236,10 @@ final class WorkspaceStore {
             return .localReply(try await createWorkspaceChallenge(named: argument))
         case "/verify":
             return try await verifySelectedExercise()
+        case "/try-again":
+            return .localReply(try await retryEnrichChallenge(argument: argument))
         default:
-            throw NSError(
-                domain: "WorkspaceStore",
-                code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Unknown chat command `\(command)`. Supported: `/challenge <name>`, `/verify`."]
-            )
+            throw ChatCommandError.unknownCommand(command)
         }
     }
 
@@ -1416,10 +1276,8 @@ final class WorkspaceStore {
             }
             
             if output.terminationStatus == 0 {
-                let slug = workspace.rootURL.lastPathComponent
-                let key = "\(slug)/\(exercise.title)"
                 await MainActor.run {
-                    markExerciseCompleted(key)
+                    markExerciseCompleted(exercise.id)
                 }
             }
         }
@@ -1752,9 +1610,6 @@ final class WorkspaceStore {
             }
             draftEditorTextByPath = [:]
             selectedWorkspaceRootPath = rootPath
-            runState = .idle
-            lastCommandDescription = ""
-            lastTerminationStatus = nil
             isSolutionVisible = false
             currentDiffText = ""
             explorerSearchText = ""
@@ -2093,6 +1948,7 @@ final class WorkspaceStore {
             }
 
             var exercise = exercise
+            exercise.isMarkedDone = progress.isMarkedDone
             exercise.checks = exercise.checks.map { check in
                 var check = check
                 if let storedStatus = progress.checkStatuses[check.id] {
@@ -2156,7 +2012,8 @@ final class WorkspaceStore {
                     totalCheckCount: exercise.checks.count,
                     lastRunStatus: inferredRunState(for: exercise),
                     lastOpenedAt: Date(),
-                    checkStatuses: Dictionary(uniqueKeysWithValues: exercise.checks.map { ($0.id, $0.status) })
+                    checkStatuses: Dictionary(uniqueKeysWithValues: exercise.checks.map { ($0.id, $0.status) }),
+                    isMarkedDone: exercise.isMarkedDone
                 )
             }
             try database.saveProgress(progressEntries, for: selectedWorkspaceRootPath)
@@ -2187,10 +2044,7 @@ final class WorkspaceStore {
     }
 
     private func isExerciseCompleted(_ exercise: ExerciseDocument, in workspace: ExerciseWorkspace? = nil) -> Bool {
-        let slug = workspace?.rootURL.lastPathComponent ?? ""
-        let key = "\(slug)/\(exercise.title)"
-        
-        if locallyCompletedExercises.contains(key) {
+        if exercise.isMarkedDone {
             return true
         }
 
@@ -2550,6 +2404,82 @@ final class WorkspaceStore {
         try fileManager.copyItem(at: sourceRootURL, to: destinationRootURL)
     }
 
+    private func retryEnrichChallenge(argument rawArgument: String) async throws -> String {
+        guard let workspace, let record = currentWorkspaceRecord else {
+            throw NSError(
+                domain: "WorkspaceStore", code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Open a workspace before using `/try-again`."]
+            )
+        }
+
+        // Strip leading @ and whitespace to get the relative path
+        var relPath = rawArgument
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if relPath.hasPrefix("@") { relPath = String(relPath.dropFirst()) }
+        relPath = relPath.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !relPath.isEmpty else {
+            throw NSError(
+                domain: "WorkspaceStore", code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "Usage: `/try-again @exercises/lifetimes.rs`"]
+            )
+        }
+
+        let exerciseURL = workspace.rootURL.appendingPathComponent(relPath).standardizedFileURL
+
+        // Derive the solution URL by swapping exercises/ → solutions/
+        let solutionRelPath = relPath.replacingOccurrences(of: "exercises/", with: "solutions/")
+        let solutionURL = workspace.rootURL.appendingPathComponent(solutionRelPath).standardizedFileURL
+
+        guard FileManager.default.fileExists(atPath: exerciseURL.path) else {
+            throw NSError(
+                domain: "WorkspaceStore", code: 4,
+                userInfo: [NSLocalizedDescriptionKey: "File not found: \(relPath). Use @ to pick a file from the workspace."]
+            )
+        }
+
+        // Build a ChallengeResult from the resolved paths
+        let slugComponents = exerciseURL.deletingPathExtension().lastPathComponent
+        let title = slugComponents
+            .split(separator: "_")
+            .map { $0.capitalized }
+            .joined(separator: " ")
+        let result = RustlingsWorkspaceScaffolder.ChallengeResult(
+            title: title,
+            slug: slugComponents,
+            workspaceRootURL: workspace.rootURL,
+            exerciseURL: exerciseURL,
+            solutionURL: solutionURL,
+            devUpdateMessage: nil
+        )
+
+        let providerManager = chatStore?.providerManager
+        enrichingExercisePaths.insert(exerciseURL.standardizedFileURL.path)
+        enrichingExercisePaths.insert(solutionURL.standardizedFileURL.path)
+
+        rustlingsWorkspaceScaffolder.enrichChallengeInBackground(
+            result: result,
+            providerManager: providerManager,
+            onLog: { [weak self] msg in self?.appendSessionMessage(msg) },
+            onComplete: { [weak self] exerciseURL, solutionURL, message in
+                guard let self else { return }
+                self.enrichingExercisePaths.remove(exerciseURL.standardizedFileURL.path)
+                self.enrichingExercisePaths.remove(solutionURL.standardizedFileURL.path)
+                self.reloadDocumentState(afterExternalChangeAt: exerciseURL)
+                self.reloadDocumentState(afterExternalChangeAt: solutionURL)
+                if let data = try? Data(contentsOf: exerciseURL) {
+                    self.workspaceFileBaseline[exerciseURL.standardizedFileURL.path] = data
+                }
+                if let data = try? Data(contentsOf: solutionURL) {
+                    self.workspaceFileBaseline[solutionURL.standardizedFileURL.path] = data
+                }
+                self.appendSessionMessage(message)
+            }
+        )
+
+        return "🔄 Re-enriching **\(slugComponents)** with AI in background.\n\n- Exercise: `\(relPath)`\n- Solution: `\(solutionRelPath)`\n\n_The session log will update when enrichment completes._"
+    }
+
     private func createWorkspaceChallenge(named rawName: String) async throws -> String {
         guard let workspace, let record = currentWorkspaceRecord else {
             throw NSError(
@@ -2737,9 +2667,6 @@ final class WorkspaceStore {
         selectedExerciseID = nil
         workspaceFileBaseline = [:]
         draftEditorTextByPath = [:]
-        runState = .idle
-        lastCommandDescription = ""
-        lastTerminationStatus = nil
         searchText = ""
         explorerSearchText = ""
         clearActiveDocumentState()
@@ -2922,4 +2849,28 @@ private struct ExplorerVisibleEntry {
 
 // Restore toggleTerminalVisibility
 extension WorkspaceStore {
+}
+
+// MARK: - Static helpers
+
+extension WorkspaceStore {
+    /// Matches Rust testing attribute macros, e.g. `#[test]`, `#[tokio::test]`.
+    /// Compiled once at class load time rather than inside the file-enumeration loop.
+    static let testMacroRegex: NSRegularExpression = {
+        // swiftlint:disable:next force_try
+        try! NSRegularExpression(pattern: #"^\s*#\[.*test.*\]\s*$"#, options: [])
+    }()
+}
+
+// MARK: - Typed errors
+
+enum ChatCommandError: LocalizedError {
+    case unknownCommand(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .unknownCommand(let cmd):
+            "Unknown command `\(cmd)`. Supported: `/challenge <name>`, `/verify`."
+        }
+    }
 }

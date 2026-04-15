@@ -486,74 +486,62 @@ private struct SubmitActionCard: View {
     let onSubmit: () -> Void
 
     var body: some View {
-        if isCompleted && provider.supportsRemoteSubmit {
-            HStack(spacing: 8) {
-                if let url = feedbackURL {
-                    Button(action: {
-                        NSWorkspace.shared.open(url)
-                    }) {
-                        Label("View Feedback", systemImage: "arrow.up.right.square")
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(
-                        Capsule().fill(CrabTimeTheme.Palette.buttonFill)
-                    )
-                    .overlay {
-                        Capsule().stroke(CrabTimeTheme.Palette.divider, lineWidth: 1)
-                    }
-                    .foregroundStyle(CrabTimeTheme.Palette.ink)
-                    .interactivePointer()
-                } else if provider.actionLabel.contains("Exercism") {
-                    // Fallback for exercism
-                    Button(action: {
-                        // For a real solution, the URL needs to be passed correctly, 
-                        // but this works for now if feedback URL is missing
-                    }) {
-                        Label("Completed", systemImage: "checkmark.circle")
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(
-                        Capsule().fill(CrabTimeTheme.Palette.buttonFill)
-                    )
-                    .overlay {
-                        Capsule().stroke(CrabTimeTheme.Palette.divider, lineWidth: 1)
-                    }
-                    .foregroundStyle(CrabTimeTheme.Palette.ink)
-                } else {
-                    Text("Completed")
+        if isCompleted {
+            if provider.supportsRemoteSubmit {
+                // Remote provider: show feedback URL + re-submit icon
+                HStack(spacing: 8) {
+                    if let url = feedbackURL {
+                        Button(action: {
+                            NSWorkspace.shared.open(url)
+                        }) {
+                            Label("View Feedback", systemImage: "arrow.up.right.square")
+                        }
+                        .buttonStyle(.plain)
                         .font(.footnote.weight(.semibold))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 10)
                         .background(Capsule().fill(CrabTimeTheme.Palette.buttonFill))
+                        .overlay {
+                            Capsule().stroke(CrabTimeTheme.Palette.divider, lineWidth: 1)
+                        }
                         .foregroundStyle(CrabTimeTheme.Palette.ink)
-                }
-
-                Button(action: onSubmit) {
-                    if isSubmitting {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Image(systemName: "arrow.triangle.2.circlepath")
+                        .interactivePointer()
                     }
+
+                    Button(action: onSubmit) {
+                        if isSubmitting {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Capsule().fill(CrabTimeTheme.Palette.buttonFill))
+                    .overlay {
+                        Capsule().stroke(CrabTimeTheme.Palette.divider, lineWidth: 1)
+                    }
+                    .foregroundStyle(CrabTimeTheme.Palette.textMuted)
+                    .disabled(isSubmitting)
+                    .help("Submit Update")
+                    .interactivePointer()
                 }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule().fill(CrabTimeTheme.Palette.buttonFill)
-                )
-                .overlay {
-                    Capsule().stroke(CrabTimeTheme.Palette.divider, lineWidth: 1)
-                }
-                .foregroundStyle(CrabTimeTheme.Palette.textMuted)
-                .disabled(isSubmitting)
-                .help("Submit Update")
-                .interactivePointer()
+            } else {
+                // Local provider: static "Done" badge
+                Label("Done", systemImage: "checkmark.circle.fill")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(CrabTimeTheme.Palette.moss)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity)
+                    .background(Capsule().fill(CrabTimeTheme.Palette.moss.opacity(0.12)))
+                    .overlay {
+                        Capsule().stroke(CrabTimeTheme.Palette.moss.opacity(0.4), lineWidth: 1)
+                    }
             }
-        } else if !isCompleted || !provider.supportsRemoteSubmit {
+        } else {
+            // Not yet completed: show submit button
             Button(action: onSubmit) {
                 HStack(spacing: 6) {
                     if isSubmitting {
@@ -565,11 +553,11 @@ private struct SubmitActionCard: View {
                 }
             }
             .buttonStyle(.plain)
+            .font(.footnote.weight(.semibold))
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(
-                Capsule().fill(CrabTimeTheme.Palette.buttonFill)
-            )
+            .frame(maxWidth: .infinity)
+            .background(Capsule().fill(CrabTimeTheme.Palette.buttonFill))
             .overlay {
                 Capsule().stroke(CrabTimeTheme.Palette.divider, lineWidth: 1)
             }
