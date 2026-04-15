@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct WorkspaceEmptyStateView: View {
     let title: String
     let systemImage: String

@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 
+@MainActor
 struct ReadonlyTextPreviewView: NSViewRepresentable {
     let text: String
     var fileExtension: String? = nil

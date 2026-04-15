@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct WorkspaceShellHeaderView: View {
     @Environment(WorkspaceStore.self) private var store
 
@@ -35,6 +36,7 @@ struct WorkspaceShellHeaderView: View {
     }
 }
 
+@MainActor
 private struct SmallShellIcon: View {
     let systemImage: String
 

@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 
+@MainActor
 struct WorkspaceExplorerView: View {
     @Environment(WorkspaceStore.self) private var store
     @Environment(NavigationStore.self) private var navigationStore
@@ -73,6 +74,7 @@ struct WorkspaceExplorerView: View {
     }
 }
 
+@MainActor
 private struct ExplorerSearchField: View {
     @Environment(WorkspaceStore.self) private var store
     @Environment(NavigationStore.self) private var navigationStore
@@ -136,6 +138,7 @@ private struct ExplorerSearchField: View {
     }
 }
 
+@MainActor
 private struct ExplorerSearchKeyBridge: NSViewRepresentable {
     let isEnabled: Bool
     let onMoveUp: () -> Void
@@ -246,6 +249,7 @@ private struct ExplorerSearchKeyBridge: NSViewRepresentable {
     }
 }
 
+@MainActor
 private struct WorkspaceExplorerNodeView: View {
     @Environment(WorkspaceStore.self) private var store
     @Environment(NavigationStore.self) private var navigationStore
@@ -355,6 +359,7 @@ private struct WorkspaceExplorerNodeView: View {
     }
 }
 
+@MainActor
 private struct ExplorerKeyEventBridge: NSViewRepresentable {
     let isEnabled: Bool
     let onKeyPress: (String) -> Void

@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct ProblemBrowserView: View {
     @Environment(WorkspaceStore.self) private var store
     @Environment(NavigationStore.self) private var navigationStore
@@ -66,6 +67,7 @@ struct ProblemBrowserView: View {
     }
 }
 
+@MainActor
 private struct ProblemSearchField: View {
     @Environment(WorkspaceStore.self) private var store
     @Environment(NavigationStore.self) private var navigationStore
@@ -128,6 +130,7 @@ private struct ProblemSearchField: View {
     }
 }
 
+@MainActor
 private struct ExerciseListKeyBridge: NSViewRepresentable {
     let isEnabled: Bool
     let onMoveUp: () -> Void
@@ -217,6 +220,7 @@ private struct ExerciseListKeyBridge: NSViewRepresentable {
     }
 }
 
+@MainActor
 private struct ExerciseSearchKeyBridge: NSViewRepresentable {
     let isEnabled: Bool
     let onMoveUp: () -> Void

@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct MainSplitView: View {
     @Environment(WorkspaceStore.self) private var store
     @Environment(NavigationStore.self) private var navigationStore
@@ -106,6 +107,7 @@ struct MainSplitView: View {
     }
 }
 
+@MainActor
 private struct WindowCommandBridge: NSViewRepresentable {
     let shouldHandleCloseFile: Bool
     let hasOpenTabs: Bool
@@ -401,6 +403,7 @@ private struct WindowCommandBridge: NSViewRepresentable {
     }
 }
 
+@MainActor
 private struct WindowTitleBridge: NSViewRepresentable {
     let title: String
 

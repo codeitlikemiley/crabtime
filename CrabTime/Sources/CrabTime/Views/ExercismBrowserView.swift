@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct ExercismBrowserView: View {
     @Environment(WorkspaceStore.self) private var workspaceStore
     @Environment(NavigationStore.self) private var navigationStore
@@ -196,6 +197,7 @@ struct ExercismBrowserView: View {
     }
 }
 
+@MainActor
 private struct FilterBadge: View {
     let title: String
     let isSelected: Bool
@@ -222,6 +224,7 @@ private struct FilterBadge: View {
     }
 }
 
+@MainActor
 private struct ExercismExerciseCard: View {
     let exercise: ExercismExercise
     let isSelected: Bool
@@ -345,6 +348,7 @@ private struct ExercismExerciseCard: View {
 
 // MARK: - Keyboard Bridge
 
+@MainActor
 private struct ExercismKeyBridge: NSViewRepresentable {
     let isEnabled: Bool
     let onMoveUp: () -> Void
@@ -438,6 +442,7 @@ private struct ExercismKeyBridge: NSViewRepresentable {
     }
 }
 
+@MainActor
 private struct ExercismSearchKeyBridge: NSViewRepresentable {
     let isEnabled: Bool
     let onMoveUp: () -> Void

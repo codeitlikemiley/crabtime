@@ -793,6 +793,7 @@ private struct ChatSlashCommand: Identifiable {
     var id: String { command }
 }
 
+@MainActor
 private struct ChatComposerKeyBridge: NSViewRepresentable {
     let isEnabled: Bool
     let isShowingMenu: Bool
@@ -928,6 +929,7 @@ private struct ChatComposerKeyBridge: NSViewRepresentable {
     }
 }
 
+@MainActor
 private struct ChatMessageBubble: View {
     @Environment(ChatStore.self) private var chatStore
     let message: ExerciseChatMessage
@@ -1076,6 +1078,7 @@ private struct ChatMessageBubble: View {
     }
 }
 
+@MainActor
 private struct ThinkingDisclosureView: View {
     let thinking: String
     @Binding var isExpanded: Bool
@@ -1138,6 +1141,7 @@ private struct ThinkingDisclosureView: View {
     }
 }
 
+@MainActor
 private struct ErrorDisclosureView: View {
     let errorDetail: String
     @Binding var isExpanded: Bool
@@ -1200,6 +1204,7 @@ private struct ErrorDisclosureView: View {
     }
 }
 
+@MainActor
 private struct AssistantMarkdownText: View {
     let markdown: String
     @State private var contentHeight: CGFloat = 40

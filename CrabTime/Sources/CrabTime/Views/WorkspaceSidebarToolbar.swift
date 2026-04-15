@@ -1,12 +1,14 @@
 import AppKit
 import SwiftUI
 
+@MainActor
 struct WorkspaceSidebarToolbar: View {
     var body: some View {
         WorkspacePaletteButton()
     }
 }
 
+@MainActor
 private struct WorkspacePaletteButton: View {
     @Environment(WorkspaceStore.self) private var store
 
@@ -58,6 +60,7 @@ private struct WorkspacePaletteButton: View {
     }
 }
 
+@MainActor
 struct WorkspaceCommandPaletteView: View {
     @Environment(WorkspaceStore.self) private var store
     @Environment(\.openWindow) private var openWindow
@@ -132,7 +135,7 @@ struct WorkspaceCommandPaletteView: View {
 
             Spacer()
 
-            Button(action: { Task { await store.hideWorkspacePalette() } }) {
+            Button(action: { Task { @MainActor in store.hideWorkspacePalette() } }) {
                 Image(systemName: "xmark")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(CrabTimeTheme.Palette.textMuted)
@@ -312,6 +315,7 @@ struct WorkspaceCommandPaletteView: View {
     }
 }
 
+@MainActor
 private struct WorkspacePaletteKeyBridge: NSViewRepresentable {
     let isEnabled: Bool
     let onMoveUp: () -> Void
@@ -425,6 +429,7 @@ private struct WorkspacePaletteKeyBridge: NSViewRepresentable {
     }
 }
 
+@MainActor
 struct DifficultyFilterStrip: View {
     @Environment(WorkspaceStore.self) private var store
 
@@ -459,6 +464,7 @@ struct DifficultyFilterStrip: View {
     }
 }
 
+@MainActor
 private struct CompletionVisibilityChip: View {
     let title: String
     let isSelected: Bool
@@ -485,6 +491,7 @@ private struct CompletionVisibilityChip: View {
     }
 }
 
+@MainActor
 private struct DifficultyFilterChip: View {
     let title: String
     let tint: Color

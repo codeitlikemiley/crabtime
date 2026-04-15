@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct InspectorSidebarView: View {
     @Environment(WorkspaceStore.self) private var store
     @Environment(ProcessStore.self) private var processStore
@@ -251,6 +252,7 @@ struct InspectorSidebarView: View {
     }
 }
 
+@MainActor
 private struct InspectorProgressCard: View {
     let statusTitle: String
     let statusSymbol: String
@@ -349,6 +351,7 @@ private struct InspectorProgressCard: View {
     }
 }
 
+@MainActor
 private struct InspectorSection<Content: View>: View {
     let title: String
     @ViewBuilder let content: Content
@@ -372,6 +375,7 @@ private struct InspectorSection<Content: View>: View {
     }
 }
 
+@MainActor
 private struct StatusBadge: View {
     let text: String
     let tint: Color
@@ -388,6 +392,7 @@ private struct StatusBadge: View {
 
 // MARK: - Inspector Keyboard Navigation Bridge
 
+@MainActor
 private struct InspectorKeyBridge: NSViewRepresentable {
     let isEnabled: Bool
     let checks: [ExerciseCheck]
@@ -493,6 +498,7 @@ private struct InspectorKeyBridge: NSViewRepresentable {
     }
 }
 
+@MainActor
 private struct SubmitActionCard: View {
     let provider: any ExerciseSubmissionProvider
     let isSubmitting: Bool

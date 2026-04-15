@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct ExerciseCatalogView: View {
     @Environment(WorkspaceStore.self) private var store
 
@@ -54,6 +55,7 @@ struct ExerciseCatalogView: View {
     }
 }
 
+@MainActor
 private struct ExerciseCard: View {
     let index: Int
     let exercise: ExerciseDocument
@@ -167,6 +169,7 @@ private struct ExerciseCard: View {
     }
 }
 
+@MainActor
 private struct MetaChip: View {
     let text: String
     let tint: Color

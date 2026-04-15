@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct RightSidebarView: View {
     @Environment(WorkspaceStore.self) private var store
 

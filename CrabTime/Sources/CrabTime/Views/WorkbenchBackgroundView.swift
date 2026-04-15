@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct WorkbenchBackgroundView: View {
     var body: some View {
         ZStack {

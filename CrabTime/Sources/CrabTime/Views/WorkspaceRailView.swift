@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct WorkspaceRailView: View {
     @Environment(WorkspaceStore.self) private var store
     @Environment(NavigationStore.self) private var navigationStore
@@ -85,6 +86,7 @@ struct WorkspaceRailView: View {
     }
 }
 
+@MainActor
 private struct MiniRailBadge: View {
     let systemImage: String
 
@@ -114,6 +116,7 @@ private struct MiniRailBadge: View {
     }
 }
 
+@MainActor
 private struct StatusDot: View {
     let isActive: Bool
     let tint: Color

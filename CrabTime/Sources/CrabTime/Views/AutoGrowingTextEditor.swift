@@ -12,6 +12,7 @@ import AppKit
 //   • Cmd+Return fires `onSubmit`.
 //   • Supports placeholder text, focus state, and SwiftUI text binding.
 
+@MainActor
 struct AutoGrowingTextEditor: NSViewRepresentable {
     @Binding var text: String
     var placeholder: String = ""

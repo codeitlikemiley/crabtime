@@ -612,6 +612,7 @@ struct CommandPaletteView: View {
 
 // MARK: - Keyboard handler (Arrow keys, Ctrl+N/P, Tab)
 
+@MainActor
 private struct PaletteKeyboardHandler: NSViewRepresentable {
     let onMoveUp: () -> Void
     let onMoveDown: () -> Void

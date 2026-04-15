@@ -215,6 +215,7 @@ struct ConsolePanelView: View {
     }
 }
 
+@MainActor
 private struct AIRuntimeConsoleView: View {
     @Environment(WorkspaceStore.self) private var store
     @Environment(NavigationStore.self) private var navigationStore
@@ -423,6 +424,7 @@ private struct AIRuntimeConsoleView: View {
 
 // MARK: - Diagnostic Card (clickable)
 
+@MainActor
 private struct DiagnosticCard: View {
     let diagnostic: Diagnostic
     var isSelected: Bool = false
@@ -496,6 +498,7 @@ private struct DiagnosticCard: View {
 
 // MARK: - ANSI Text Rendering
 
+@MainActor
 private struct ANSITextView: View {
     let text: String
 
@@ -591,6 +594,7 @@ private struct ANSITextView: View {
 
 // MARK: - Console Tab Button
 
+@MainActor
 private struct ConsoleTabButton: View {
     let title: String
     let isSelected: Bool
@@ -631,6 +635,7 @@ private struct ConsoleTabButton: View {
 
 // MARK: - Diagnostics Keyboard Navigation
 
+@MainActor
 private struct DiagnosticsKeyBridge: NSViewRepresentable {
     let isEnabled: Bool
     let onMoveUp: () -> Void

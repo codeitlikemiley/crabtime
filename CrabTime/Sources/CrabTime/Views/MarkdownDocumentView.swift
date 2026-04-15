@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct MarkdownDocumentView: View {
     enum SizingMode {
         case intrinsicHeight

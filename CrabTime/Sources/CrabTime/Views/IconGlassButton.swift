@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct IconGlassButton: View {
     let systemImage: String
     let helpText: String

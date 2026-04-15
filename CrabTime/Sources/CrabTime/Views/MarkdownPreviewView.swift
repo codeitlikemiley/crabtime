@@ -3,6 +3,7 @@ import SwiftUI
 import WebKit
 
 
+@MainActor
 struct MarkdownPreviewView: NSViewRepresentable {
     let markdown: String
     var sourceURL: URL?
@@ -97,24 +98,24 @@ extension MarkdownPreviewView {
             }
         }
 
-        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        nonisolated func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             switch message.name {
             case Self.heightMessageName:
-                guard parent?.sizingMode == .intrinsicHeight,
+                guard MainActor.assumeIsolated({ parent?.sizingMode == .intrinsicHeight }),
                       let value = message.body as? NSNumber
                 else {
                     return
                 }
 
-                DispatchQueue.main.async {
-                    self.contentHeight = max(140, CGFloat(truncating: value))
+                Task { @MainActor [weak self] in
+                    self?.contentHeight = max(140, CGFloat(truncating: value))
                 }
             case Self.copyCodeMessageName:
                 guard let code = message.body as? String else {
                     return
                 }
 
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     let pasteboard = NSPasteboard.general
                     pasteboard.clearContents()
                     pasteboard.setString(code, forType: .string)
@@ -124,17 +125,19 @@ extension MarkdownPreviewView {
             }
         }
 
-        func webView(
+        nonisolated func webView(
             _ webView: WKWebView,
             decidePolicyFor navigationAction: WKNavigationAction,
-            decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void
+            decisionHandler: @escaping @Sendable (WKNavigationActionPolicy) -> Void
         ) {
             guard navigationAction.navigationType == .linkActivated, let url = navigationAction.request.url else {
                 decisionHandler(.allow)
                 return
             }
 
-            NSWorkspace.shared.open(url)
+            Task { @MainActor in
+                NSWorkspace.shared.open(url)
+            }
             decisionHandler(.cancel)
         }
     }

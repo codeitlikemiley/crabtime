@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 
+@MainActor
 struct CloneRepositorySheetView: View {
     @Environment(WorkspaceStore.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -57,6 +58,7 @@ struct CloneRepositorySheetView: View {
     }
 }
 
+@MainActor
 private struct CloneRepositoryURLField: NSViewRepresentable {
     @Binding var text: String
     let placeholder: String

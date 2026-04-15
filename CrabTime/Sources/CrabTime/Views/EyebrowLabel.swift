@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct EyebrowLabel: View {
     let text: String
     var tint: Color = CrabTimeTheme.Palette.panelTint

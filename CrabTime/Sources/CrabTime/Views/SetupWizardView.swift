@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct SetupWizardView: View {
     let status: DependencyManager.Status
     let onInstall: () -> Void
@@ -109,6 +110,7 @@ struct SetupWizardView: View {
     }
 }
 
+@MainActor
 private struct MissingDependencyRow: View {
     let name: String
     let icon: String

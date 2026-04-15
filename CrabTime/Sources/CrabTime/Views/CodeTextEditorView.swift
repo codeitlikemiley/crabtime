@@ -8,6 +8,7 @@ extension Notification.Name {
     static let restoreCursorPositionRequested = Notification.Name("restoreCursorPositionRequested")
 }
 
+@MainActor
 struct CodeTextEditorView: NSViewRepresentable {
     @Binding var text: String
     var onRun: (() -> Void)? = nil

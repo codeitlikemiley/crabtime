@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct TodoExplorerView: View {
     @Environment(WorkspaceStore.self) private var workspaceStore
     @Environment(NavigationStore.self) private var navigationStore
@@ -188,6 +189,7 @@ struct TodoExplorerView: View {
 
 // MARK: - Todo Item Row
 
+@MainActor
 private struct TodoItemRow: View {
     let item: TodoItem
     let isSelected: Bool
@@ -262,6 +264,7 @@ private struct TodoItemRow: View {
 
 // MARK: - Keyboard Bridge
 
+@MainActor
 private struct TodoKeyBridge: NSViewRepresentable {
     let isEnabled: Bool
     let onMoveUp: () -> Void
@@ -353,6 +356,7 @@ private struct TodoKeyBridge: NSViewRepresentable {
     }
 }
 
+@MainActor
 private struct TodoSearchKeyBridge: NSViewRepresentable {
     let isEnabled: Bool
     let onMoveUp: () -> Void

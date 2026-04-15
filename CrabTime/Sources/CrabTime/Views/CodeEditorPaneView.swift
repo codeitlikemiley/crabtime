@@ -224,6 +224,7 @@ struct CodeEditorPaneView: View {
 
 // MARK: - Enrichment Banner
 
+@MainActor
 private struct EnrichmentBanner: View {
     @State private var isAnimating = false
 
@@ -267,6 +268,7 @@ private struct EnrichmentBanner: View {
 
 // MARK: - Open File Tabs
 
+@MainActor
 private struct OpenFileTabsView: View {
     @Environment(WorkspaceStore.self) private var store
     @Environment(NavigationStore.self) private var navigationStore
@@ -351,6 +353,7 @@ private struct OpenFileTabsView: View {
 
 // MARK: - Run Button
 
+@MainActor
 private struct RunCapsuleButton: View {
     let action: () -> Void
     var isEnabled: Bool = true

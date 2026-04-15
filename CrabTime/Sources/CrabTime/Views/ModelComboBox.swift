@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 
+@MainActor
 struct ModelComboBox: NSViewRepresentable {
     @Binding var text: String
     let items: [String]
