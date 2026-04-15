@@ -8,7 +8,6 @@ Crab Time is a focused coding workspace built for Rust learners. It replaces bro
 
 <img src="assets/screenshot.png" alt="CrabTime Workspace Showcase" width="100%"/>
 
-*(Please drop your UI screenshot into `assets/screenshot.png` to populate this!)*
 
 ## Requirements
 
