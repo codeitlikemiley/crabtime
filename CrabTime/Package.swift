@@ -1,11 +1,11 @@
-// swift-tools-version: 6.2
+// swift-tools-version: 5.10
 
 import PackageDescription
 
 let package = Package(
     name: "CrabTime",
     platforms: [
-        .macOS(.v26)
+        .macOS(.v14)
     ],
     targets: [
         .executableTarget(
