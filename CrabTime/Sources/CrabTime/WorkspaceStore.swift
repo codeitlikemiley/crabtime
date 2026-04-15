@@ -1274,12 +1274,7 @@ final class WorkspaceStore {
                     solutionCode = code
                 }
             }
-            
-            if output.terminationStatus == 0 {
-                await MainActor.run {
-                    markExerciseCompleted(exercise.id)
-                }
-            }
+            // Note: /verify no longer auto-marks done. Only "Verify & Mark Done" (AI-confirmed) does.
         }
         
         let prompt = """
@@ -2044,11 +2039,9 @@ final class WorkspaceStore {
     }
 
     private func isExerciseCompleted(_ exercise: ExerciseDocument, in workspace: ExerciseWorkspace? = nil) -> Bool {
-        if exercise.isMarkedDone {
-            return true
-        }
-
-        return !exercise.checks.isEmpty && exercise.checks.allSatisfy { $0.status == .passed }
+        // Only an explicit "Mark as Done" (AI-verified) counts as completed.
+        // Passing test checks alone do NOT move an exercise to the Done tab.
+        return exercise.isMarkedDone
     }
 
     func applyCheckResults(from result: ProcessOutput) {
@@ -2478,6 +2471,167 @@ final class WorkspaceStore {
         )
 
         return "🔄 Re-enriching **\(slugComponents)** with AI in background.\n\n- Exercise: `\(relPath)`\n- Solution: `\(solutionRelPath)`\n\n_The session log will update when enrichment completes._"
+    }
+
+    // MARK: - AI-Verified Mark as Done
+
+    enum VerificationError: LocalizedError {
+        case noExercise
+        case compilationFailed(String)
+        case notCorrect(String)
+        case aiUnavailable
+
+        var errorDescription: String? {
+            switch self {
+            case .noExercise:
+                return "No exercise is currently selected."
+            case .compilationFailed(let feedback):
+                return "Code did not compile or run successfully.\n\n\(feedback)"
+            case .notCorrect(let feedback):
+                return feedback
+            case .aiUnavailable:
+                return "An AI provider is required to verify completion. Configure one in Settings."
+            }
+        }
+    }
+
+    /// Runs the selected exercise, asks the AI to evaluate correctness with a strict PASS/FAIL
+    /// response, and marks the exercise done only if the AI returns PASS.
+    func verifyAndMarkDone(for exerciseID: URL) async throws -> SubmissionResult {
+        guard let exercise = workspace?.exercises.first(where: { $0.id == exerciseID }) else {
+            throw VerificationError.noExercise
+        }
+
+        guard let providerManager = chatStore?.providerManager else {
+            appendSessionMessage("⚠️ No AI provider configured — cannot verify completion.")
+            throw VerificationError.aiUnavailable
+        }
+
+        // Save editor so we compile the latest buffer
+        saveSelectedExercise()
+
+        let target = resolveSelectedExerciseTestTarget()
+        let runExercise = target?.exercise ?? exercise
+        let runCursorLine = target?.cursorLine
+
+        appendSessionMessage("🔍 Verifying \(exercise.title)…")
+
+        let output = try await cargoRunner.run(exercise: runExercise, cursorLine: runCursorLine)
+
+        // Compilation / runtime failure → do not even ask AI
+        if output.terminationStatus != 0 {
+            let feedback = [output.stdout, output.stderr]
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+                .joined(separator: "\n")
+            appendSessionMessage("❌ \(exercise.title): code did not compile or run.\n\n```\n\(feedback)\n```")
+            throw VerificationError.compilationFailed(feedback)
+        }
+
+        // Load source + solution for the AI evaluation
+        let sourceCode = (try? String(contentsOf: exercise.sourceURL, encoding: .utf8)) ?? ""
+        var solutionCode = ""
+        if let workspace = workspace {
+            let srcPath = exercise.sourceURL.standardizedFileURL.path
+            let rootPath = workspace.rootURL.standardizedFileURL.path
+            if srcPath.hasPrefix(rootPath + "/exercises/") {
+                let rel = String(srcPath.dropFirst((rootPath + "/exercises/").count))
+                let solURL = workspace.rootURL.appendingPathComponent("solutions").appendingPathComponent(rel)
+                solutionCode = (try? String(contentsOf: solURL, encoding: .utf8)) ?? ""
+            }
+        }
+
+        let terminalOutput = [output.stdout, output.stderr]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+
+        let solutionBlock = solutionCode.isEmpty ? "" : """
+
+Reference solution:
+```rust
+\(solutionCode)
+```
+"""
+
+        let systemPrompt = """
+You are a strict Rust exercise evaluator. The student's code compiled and ran successfully. \
+Determine if it CORRECTLY fulfills the exercise objective.
+
+CRITICAL RULES:
+- If the code contains `todo!()` macros, immediately return FAIL.
+- If the code does not meaningfully implement the logic described in the comments or demonstrated by the solution, return FAIL.
+- If the code is correct and complete, return PASS.
+
+Respond with EXACTLY ONE of:
+- "PASS" — the code genuinely implements the objective.
+- "FAIL: [one-sentence reason]" — the code does not genuinely implement the objective.
+
+Do NOT add anything else. Do NOT explain. Do NOT teach.
+"""
+        let userMessage = """
+Exercise: \(exercise.title)
+
+Student code (\(exercise.sourceURL.lastPathComponent)):
+```rust
+\(sourceCode)
+```
+\(solutionBlock)
+
+Terminal output:
+```
+\(terminalOutput)
+```
+"""
+
+        appendSessionMessage("🤖 Asking AI to evaluate \(exercise.title)…")
+
+        // Strict 60s timeout for the evaluation call
+        let aiTask = Task {
+            try await providerManager.generate(
+                systemPrompt: systemPrompt,
+                userMessage: userMessage,
+                workspaceRootPath: workspace?.rootURL.path ?? ""
+            )
+        }
+        let timerTask = Task.detached {
+            try? await Task.sleep(for: .seconds(60))
+            aiTask.cancel()
+        }
+
+        let rawResponse: String
+        do {
+            rawResponse = try await aiTask.value
+            timerTask.cancel()
+        } catch is CancellationError {
+            timerTask.cancel()
+            appendSessionMessage("⏱ AI evaluation timed out for \(exercise.title).")
+            throw VerificationError.aiUnavailable
+        } catch {
+            timerTask.cancel()
+            appendSessionMessage("⚠️ AI error during evaluation: \(error.localizedDescription)")
+            throw VerificationError.aiUnavailable
+        }
+
+        let verdict = rawResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if verdict.uppercased().hasPrefix("PASS") {
+            markExerciseCompleted(exerciseID)
+            appendSessionMessage("✅ AI verified — **\(exercise.title)** is marked done!")
+            return .markedDone
+        } else {
+            // Extract the FAIL reason (after "FAIL: ")
+            let reason: String
+            if let colonIdx = verdict.firstIndex(of: ":") {
+                reason = String(verdict[verdict.index(after: colonIdx)...])
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            } else {
+                reason = verdict
+            }
+            let feedback = "**\(exercise.title)** is not yet complete.\n\n\(reason)"
+            appendSessionMessage("🔴 \(feedback)")
+            throw VerificationError.notCorrect(feedback)
+        }
     }
 
     private func createWorkspaceChallenge(named rawName: String) async throws -> String {

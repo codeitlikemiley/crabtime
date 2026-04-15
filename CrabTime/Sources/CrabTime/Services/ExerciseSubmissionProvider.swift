@@ -31,9 +31,11 @@ protocol ExerciseSubmissionProvider: Sendable {
 // MARK: - Local Completion Provider
 
 /// Provides local-only completion tracking (like completing a custom Rustlings exercise).
+/// Clicking "Verify & Mark Done" compiles the code, runs it, and asks the AI for a
+/// PASS/FAIL verdict before marking the exercise as done.
 struct LocalCompletionProvider: ExerciseSubmissionProvider {
-    var actionLabel: String { "Mark as Done" }
-    var actionIcon: String { "checkmark.circle" }
+    var actionLabel: String { "Verify & Mark Done" }
+    var actionIcon: String { "checkmark.seal" }
     var supportsRemoteSubmit: Bool { false }
     
     func canSubmit(store: WorkspaceStore) -> Bool {
@@ -45,9 +47,8 @@ struct LocalCompletionProvider: ExerciseSubmissionProvider {
             return .skipped(reason: "No active exercise")
         }
         
-        store.markExerciseCompleted(exercise.id)
-        store.appendSessionMessage("Marked \(exercise.title) as done")
-        return .markedDone
+        // Compile + AI evaluation → marks done only if AI returns PASS
+        return try await store.verifyAndMarkDone(for: exercise.id)
     }
 }
 
