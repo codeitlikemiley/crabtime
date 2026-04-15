@@ -75,13 +75,15 @@ struct AutoGrowingTextEditor: NSViewRepresentable {
 
         let textView = coordinator.textView
 
-        // Only update string if it differs (avoids cursor-jumping on every keystroke)
+        // Only update string if it differs (avoids cursor-jumping on every keystroke).
+        // This branch ONLY fires on programmatic/SwiftUI-driven text changes (e.g. applySlashCommand,
+        // replaceLastWord). User keystrokes keep textView.string in sync via textDidChange, so by the
+        // time updateNSView runs after a keystroke, textView.string == text and we skip this block.
+        // After a programmatic full-text replacement, move cursor to the end.
         if textView.string != text {
-            let savedRange = textView.selectedRange()
             textView.string = text
-            // Restore cursor as best we can
-            let safeLocation = min(savedRange.location, textView.string.count)
-            textView.setSelectedRange(NSRange(location: safeLocation, length: 0))
+            let endLoc = (text as NSString).length
+            textView.setSelectedRange(NSRange(location: endLoc, length: 0))
         }
 
         textView.isEditable = !isDisabled
