@@ -2530,6 +2530,20 @@ final class WorkspaceStore {
 
         // Load source + solution for the AI evaluation
         let sourceCode = (try? String(contentsOf: exercise.sourceURL, encoding: .utf8)) ?? ""
+
+        // Swift-side pre-check: detect actual todo!() macros in non-comment lines.
+        // This avoids sending code to the AI that trivially has placeholders, and prevents
+        // false negatives from comment text like "// TODO: Replace `todo!()`" matching.
+        let codeLines = sourceCode.components(separatedBy: "\n")
+        let nonCommentLines = codeLines
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
+        if nonCommentLines.contains("todo!()") {
+            let msg = "\(exercise.title) still has unimplemented `todo!()` placeholders. Replace them with your Rust implementation."
+            appendSessionMessage("❌ \(msg)")
+            throw VerificationError.notCorrect(msg)
+        }
+
         var solutionCode = ""
         if let workspace = workspace {
             let srcPath = exercise.sourceURL.standardizedFileURL.path
@@ -2555,17 +2569,18 @@ Reference solution:
 """
 
         let systemPrompt = """
-You are a strict Rust exercise evaluator. The student's code compiled and ran successfully. \
+You are a strict Rust exercise evaluator. The student's code compiled and ran. \
 Determine if it CORRECTLY fulfills the exercise objective.
 
-CRITICAL RULES:
-- If the code contains `todo!()` macros, immediately return FAIL.
-- If the code does not meaningfully implement the logic described in the comments or demonstrated by the solution, return FAIL.
-- If the code is correct and complete, return PASS.
+EVALUATION CRITERIA:
+- Does the code implement the required logic shown in the exercise comments?
+- If a reference solution is provided, does the student's implementation achieve the same objective (even if it looks different)?
+- Is every function or constant that the exercise asks for meaningfully implemented?
+- Hardcoded values that only work for specific inputs but not the general case should FAIL.
 
 Respond with EXACTLY ONE of:
-- "PASS" — the code genuinely implements the objective.
-- "FAIL: [one-sentence reason]" — the code does not genuinely implement the objective.
+- "PASS" — the code correctly implements the exercise objective.
+- "FAIL: [one-sentence reason]" — the code does not correctly implement the objective.
 
 Do NOT add anything else. Do NOT explain. Do NOT teach.
 """
@@ -2628,8 +2643,10 @@ Terminal output:
             } else {
                 reason = verdict
             }
-            let feedback = "**\(exercise.title)** is not yet complete.\n\n\(reason)"
-            appendSessionMessage("🔴 \(feedback)")
+            // Don't double-log here — ExerciseSubmissionService will surface this
+            // as verificationFeedback in the Inspector UI.
+            let feedback = reason.isEmpty ? "\(exercise.title) does not yet correctly implement the exercise." : reason
+            appendSessionMessage("🔴 \(exercise.title): \(feedback)")
             throw VerificationError.notCorrect(feedback)
         }
     }

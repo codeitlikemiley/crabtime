@@ -90,6 +90,7 @@ struct InspectorSidebarView: View {
                         isSubmitting: submissionService.isSubmitting,
                         isCompleted: store.isCurrentExerciseCompleted,
                         feedbackURL: submissionService.submissionFeedbackURL,
+                        verificationFeedback: submissionService.verificationFeedback,
                         onSubmit: {
                             submissionService.submit(using: store, processStore: processStore, exercismStore: exercismStore)
                         }
@@ -483,6 +484,8 @@ private struct SubmitActionCard: View {
     let isSubmitting: Bool
     let isCompleted: Bool
     let feedbackURL: URL?
+    /// AI FAIL reason — shown below the button when verification was rejected.
+    var verificationFeedback: String? = nil
     let onSubmit: () -> Void
 
     var body: some View {
@@ -564,6 +567,16 @@ private struct SubmitActionCard: View {
             .foregroundStyle(CrabTimeTheme.Palette.ink)
             .disabled(isSubmitting)
             .interactivePointer()
+        }
+
+        // AI FAIL reason — only visible for local providers after a failed verification
+        if !isCompleted, !provider.supportsRemoteSubmit, let feedback = verificationFeedback {
+            Text(feedback)
+                .font(.caption)
+                .foregroundStyle(CrabTimeTheme.Palette.ember)
+                .padding(.horizontal, 4)
+                .padding(.top, 2)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
