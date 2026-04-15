@@ -1,10 +1,18 @@
 import XCTest
 @testable import CrabTime
 
+/// Resolves `<repo root>/tests/fixtures` at compile time, independent of clone location.
+private let fixturesURL: URL = URL(fileURLWithPath: #filePath)  // .../CrabTimeTests/CargoRunnerTests.swift
+    .deletingLastPathComponent()                                // .../CrabTimeTests/
+    .deletingLastPathComponent()                                // .../Tests/
+    .deletingLastPathComponent()                                // .../CrabTime/
+    .deletingLastPathComponent()                                // <repo root>/
+    .appendingPathComponent("tests/fixtures")
+
 final class CargoRunnerTests: XCTestCase {
     func testRunScript() async throws {
         let runner = CargoRunner()
-        let sourceURL = URL(fileURLWithPath: "/Volumes/goldcoders/rustgoblin/tests/fixtures/sample_challenge/challenge.rs")
+        let sourceURL = fixturesURL.appendingPathComponent("sample_challenge/challenge.rs")
 
         let output = try await runner.runScript(at: sourceURL)
 

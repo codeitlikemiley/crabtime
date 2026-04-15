@@ -1,11 +1,19 @@
 import XCTest
 @testable import CrabTime
 
+/// Resolves `<repo root>/tests/fixtures` at compile time, independent of clone location.
+private let fixturesURL: URL = URL(fileURLWithPath: #filePath)  // .../CrabTimeTests/WorkspaceStoreTests.swift
+    .deletingLastPathComponent()                                // .../CrabTimeTests/
+    .deletingLastPathComponent()                                // .../Tests/
+    .deletingLastPathComponent()                                // .../CrabTime/
+    .deletingLastPathComponent()                                // <repo root>/
+    .appendingPathComponent("tests/fixtures")
+
 @MainActor
 final class WorkspaceStoreTests: XCTestCase {
     func testSaveSelectedExerciseUpdatesWorkspaceAndSourceFile() throws {
         let fileManager = FileManager.default
-        let fixtureURL = URL(fileURLWithPath: "/Volumes/goldcoders/rustgoblin/tests/fixtures/sample_challenge")
+        let fixtureURL = fixturesURL.appendingPathComponent("sample_challenge")
         let tempRootURL = try makeTemporaryWorkspaceRoot()
         let tempWorkspaceURL = tempRootURL.appendingPathComponent("sample_challenge")
         let appPaths = AppStoragePaths(baseURL: tempRootURL.appendingPathComponent("app-state", isDirectory: true))
@@ -38,7 +46,7 @@ final class WorkspaceStoreTests: XCTestCase {
     }
 
     func testOpenExplorerFileLoadsPreviewContent() throws {
-        let fixtureURL = URL(fileURLWithPath: "/Volumes/goldcoders/rustgoblin/tests/fixtures/sample_challenge")
+        let fixtureURL = fixturesURL.appendingPathComponent("sample_challenge")
         let tempRootURL = try makeTemporaryWorkspaceRoot()
         let tempWorkspaceURL = tempRootURL.appendingPathComponent("sample_challenge")
         let appPaths = AppStoragePaths(baseURL: tempRootURL.appendingPathComponent("app-state", isDirectory: true))
@@ -60,7 +68,7 @@ final class WorkspaceStoreTests: XCTestCase {
     }
 
     func testSelectExerciseRegistersSourceAsOpenTab() throws {
-        let fixtureURL = URL(fileURLWithPath: "/Volumes/goldcoders/rustgoblin/tests/fixtures/sample_challenge")
+        let fixtureURL = fixturesURL.appendingPathComponent("sample_challenge")
         let tempRootURL = try makeTemporaryWorkspaceRoot()
         let tempWorkspaceURL = tempRootURL.appendingPathComponent("sample_challenge")
         let appPaths = AppStoragePaths(baseURL: tempRootURL.appendingPathComponent("app-state", isDirectory: true))
@@ -74,7 +82,7 @@ final class WorkspaceStoreTests: XCTestCase {
     }
 
     func testWorkspaceStateRestoresAcrossLaunches() throws {
-        let fixtureURL = URL(fileURLWithPath: "/Volumes/goldcoders/rustgoblin/tests/fixtures/sample_challenge")
+        let fixtureURL = fixturesURL.appendingPathComponent("sample_challenge")
         let tempRootURL = try makeTemporaryWorkspaceRoot()
         let tempWorkspaceURL = tempRootURL.appendingPathComponent("sample_challenge")
         let appPaths = AppStoragePaths(baseURL: tempRootURL.appendingPathComponent("app-state", isDirectory: true))
@@ -102,7 +110,7 @@ final class WorkspaceStoreTests: XCTestCase {
     }
 
     func testSearchFilterAppliesToVisibleExercises() throws {
-        let fixtureURL = URL(fileURLWithPath: "/Volumes/goldcoders/rustgoblin/tests/fixtures/rustlings_like")
+        let fixtureURL = fixturesURL.appendingPathComponent("rustlings_like")
         let tempRootURL = try makeTemporaryWorkspaceRoot()
         let tempWorkspaceURL = tempRootURL.appendingPathComponent("rustlings_like")
         let appPaths = AppStoragePaths(baseURL: tempRootURL.appendingPathComponent("app-state", isDirectory: true))
@@ -205,7 +213,7 @@ final class WorkspaceStoreTests: XCTestCase {
     }
 
     func testNonRustlingsWorkspaceHidesRustlingsOnlyDifficultyFilters() throws {
-        let fixtureURL = URL(fileURLWithPath: "/Volumes/goldcoders/rustgoblin/tests/fixtures/sample_challenge")
+        let fixtureURL = fixturesURL.appendingPathComponent("sample_challenge")
         let tempRootURL = try makeTemporaryWorkspaceRoot()
         let tempWorkspaceURL = tempRootURL.appendingPathComponent("sample_challenge")
         let appPaths = AppStoragePaths(baseURL: tempRootURL.appendingPathComponent("app-state", isDirectory: true))
@@ -222,7 +230,7 @@ final class WorkspaceStoreTests: XCTestCase {
 
     func testModifiedWorkspaceRelativePathsReflectSavedEditsAgainstLoadBaseline() throws {
         let fileManager = FileManager.default
-        let fixtureURL = URL(fileURLWithPath: "/Volumes/goldcoders/rustgoblin/tests/fixtures/sample_challenge")
+        let fixtureURL = fixturesURL.appendingPathComponent("sample_challenge")
         let tempRootURL = try makeTemporaryWorkspaceRoot()
         let tempWorkspaceURL = tempRootURL.appendingPathComponent("sample_challenge")
         let appPaths = AppStoragePaths(baseURL: tempRootURL.appendingPathComponent("app-state", isDirectory: true))

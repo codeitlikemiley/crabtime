@@ -1,10 +1,18 @@
 import XCTest
 @testable import CrabTime
 
+/// Resolves `<repo root>/tests/fixtures` at compile time, independent of clone location.
+private let fixturesURL: URL = URL(fileURLWithPath: #filePath)  // .../CrabTimeTests/WorkspaceImporterTests.swift
+    .deletingLastPathComponent()                                // .../CrabTimeTests/
+    .deletingLastPathComponent()                                // .../Tests/
+    .deletingLastPathComponent()                                // .../CrabTime/
+    .deletingLastPathComponent()                                // <repo root>/
+    .appendingPathComponent("tests/fixtures")
+
 final class WorkspaceImporterTests: XCTestCase {
     func testImportSingleChallengeDirectory() throws {
         let importer = WorkspaceImporter()
-        let fixtureURL = URL(fileURLWithPath: "/Volumes/goldcoders/rustgoblin/tests/fixtures/sample_challenge")
+        let fixtureURL = fixturesURL.appendingPathComponent("sample_challenge")
 
         let workspace = try importer.loadWorkspace(from: fixtureURL)
 
@@ -26,7 +34,7 @@ final class WorkspaceImporterTests: XCTestCase {
 
     func testImportSingleRustFile() throws {
         let importer = WorkspaceImporter()
-        let fixtureURL = URL(fileURLWithPath: "/Volumes/goldcoders/rustgoblin/tests/fixtures/sample_challenge/challenge.rs")
+        let fixtureURL = fixturesURL.appendingPathComponent("sample_challenge/challenge.rs")
 
         let workspace = try importer.loadWorkspace(from: fixtureURL)
 
@@ -37,7 +45,7 @@ final class WorkspaceImporterTests: XCTestCase {
 
     func testImportRustlingsStyleRepositoryDiscoversExerciseFilesInsteadOfRootCargoProject() throws {
         let importer = WorkspaceImporter()
-        let fixtureURL = URL(fileURLWithPath: "/Volumes/goldcoders/rustgoblin/tests/fixtures/rustlings_like")
+        let fixtureURL = fixturesURL.appendingPathComponent("rustlings_like")
 
         let workspace = try importer.loadWorkspace(from: fixtureURL)
 
