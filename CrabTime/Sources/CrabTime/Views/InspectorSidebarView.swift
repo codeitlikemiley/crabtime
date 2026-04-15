@@ -93,6 +93,11 @@ struct InspectorSidebarView: View {
                         verificationFeedback: submissionService.verificationFeedback,
                         onSubmit: {
                             submissionService.submit(using: store, processStore: processStore, exercismStore: exercismStore)
+                        },
+                        onUnmark: {
+                            if let ex = store.selectedExercise {
+                                store.unmarkExerciseCompleted(ex.id)
+                            }
                         }
                     )
                 }
@@ -487,6 +492,8 @@ private struct SubmitActionCard: View {
     /// AI FAIL reason — shown below the button when verification was rejected.
     var verificationFeedback: String? = nil
     let onSubmit: () -> Void
+    /// Called when the user taps the “Reopen” button to reset a wrongly-marked exercise.
+    var onUnmark: (() -> Void)? = nil
 
     var body: some View {
         if isCompleted {
@@ -531,17 +538,32 @@ private struct SubmitActionCard: View {
                     .interactivePointer()
                 }
             } else {
-                // Local provider: static "Done" badge
-                Label("Done", systemImage: "checkmark.circle.fill")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(CrabTimeTheme.Palette.moss)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .frame(maxWidth: .infinity)
-                    .background(Capsule().fill(CrabTimeTheme.Palette.moss.opacity(0.12)))
-                    .overlay {
-                        Capsule().stroke(CrabTimeTheme.Palette.moss.opacity(0.4), lineWidth: 1)
+                // Local provider: Done badge + small Reopen affordance
+                HStack(spacing: 8) {
+                    Label("Done", systemImage: "checkmark.circle.fill")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(CrabTimeTheme.Palette.moss)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Capsule().fill(CrabTimeTheme.Palette.moss.opacity(0.12)))
+                        .overlay { Capsule().stroke(CrabTimeTheme.Palette.moss.opacity(0.4), lineWidth: 1) }
+
+                    if let unmark = onUnmark {
+                        Button(action: unmark) {
+                            Image(systemName: "arrow.uturn.backward.circle")
+                        }
+                        .buttonStyle(.plain)
+                        .font(.footnote)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 10)
+                        .background(Capsule().fill(CrabTimeTheme.Palette.buttonFill))
+                        .overlay { Capsule().stroke(CrabTimeTheme.Palette.divider, lineWidth: 1) }
+                        .foregroundStyle(CrabTimeTheme.Palette.textMuted)
+                        .help("Reopen — reset to Open so you can re-verify")
+                        .interactivePointer()
                     }
+                }
             }
         } else {
             // Not yet completed: show submit button

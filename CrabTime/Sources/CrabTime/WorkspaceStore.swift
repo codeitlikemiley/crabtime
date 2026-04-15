@@ -648,6 +648,15 @@ final class WorkspaceStore {
         persistCurrentWorkspaceSnapshot()
     }
 
+    /// Resets the exercise back to Open status (clears isMarkedDone in DB).
+    /// Used when an exercise was incorrectly marked done (e.g. stale data from before AI verification).
+    func unmarkExerciseCompleted(_ id: URL) {
+        guard let idx = workspace?.exercises.firstIndex(where: { $0.id == id }) else { return }
+        workspace?.exercises[idx].isMarkedDone = false
+        persistCurrentWorkspaceSnapshot()
+        appendSessionMessage("🔄 \(workspace?.exercises[idx].title ?? "Exercise") reset to Open.")
+    }
+
     func importWorkspace(from url: URL, sourceKind: WorkspaceSourceKind = .imported, cloneURL: String? = nil) {
         if isEditorDirty {
             saveSelectedExercise()
