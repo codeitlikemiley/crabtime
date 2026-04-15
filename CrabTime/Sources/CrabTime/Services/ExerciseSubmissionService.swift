@@ -40,6 +40,19 @@ final class ExerciseSubmissionService {
                 self.lastSubmissionResult = result
                 self.verificationFeedback = nil  // clear on success
 
+                // For ALL successful outcomes, ensure isMarkedDone is set so the
+                // Done filter picks it up — regardless of which provider handled it.
+                // (LocalCompletionProvider sets it inside verifyAndMarkDone,
+                //  CodeCrafters sets it inside the provider, Exercism does not.)
+                switch result {
+                case .markedDone, .submitted:
+                    if let exercise = store.selectedExercise {
+                        store.markExerciseCompleted(exercise.id)
+                    }
+                case .skipped:
+                    break
+                }
+
             } catch let verErr as WorkspaceStore.VerificationError {
                 // Verification errors are already logged to the session by verifyAndMarkDone.
                 // Surface the human-readable reason directly in the Inspector.
