@@ -7,6 +7,7 @@ struct ExercismBrowserView: View {
     @Environment(ProcessStore.self) private var processStore
     @FocusState private var isSearchFocused: Bool
 
+    @MainActor
     private func toggleFilter(_ filter: String?) {
         guard let filter else {
             store.exercismFilters.removeAll()

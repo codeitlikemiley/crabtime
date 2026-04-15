@@ -7,26 +7,32 @@ struct InspectorSidebarView: View {
     @Environment(ExerciseSubmissionService.self) private var submissionService
     @State private var focusedCheckID: String?
 
+    @MainActor
     private var testChecks: [ExerciseCheck] {
         store.currentChecks.filter { $0.id != "manual-run" }
     }
 
+    @MainActor
     private var hasTestChecks: Bool {
         !testChecks.isEmpty
     }
 
+    @MainActor
     private var testChecksHaveResults: Bool {
         testChecks.contains { $0.status != .idle }
     }
 
+    @MainActor
     private var passedChecks: Int {
         testChecks.filter { $0.status == .passed }.count
     }
 
+    @MainActor
     private var totalChecks: Int {
         testChecks.count
     }
 
+    @MainActor
     private var completionRatio: Double {
         guard totalChecks > 0, testChecksHaveResults else {
             return 0
@@ -180,6 +186,7 @@ struct InspectorSidebarView: View {
         }
     }
 
+    @MainActor
     private var statusTitle: String {
         switch processStore.runState {
         case .idle:
@@ -193,6 +200,7 @@ struct InspectorSidebarView: View {
         }
     }
 
+    @MainActor
     private var statusSymbol: String {
         switch processStore.runState {
         case .idle:
@@ -206,6 +214,7 @@ struct InspectorSidebarView: View {
         }
     }
 
+    @MainActor
     private var statusTint: Color {
         switch processStore.runState {
         case .idle:

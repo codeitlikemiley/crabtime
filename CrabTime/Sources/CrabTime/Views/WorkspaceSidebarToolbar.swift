@@ -132,7 +132,7 @@ struct WorkspaceCommandPaletteView: View {
 
             Spacer()
 
-            Button(action: store.hideWorkspacePalette) {
+            Button(action: { Task { await store.hideWorkspacePalette() } }) {
                 Image(systemName: "xmark")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(CrabTimeTheme.Palette.textMuted)
@@ -150,8 +150,12 @@ struct WorkspaceCommandPaletteView: View {
                 .foregroundStyle(CrabTimeTheme.Palette.textMuted)
 
             TextField("Search workspaces", text: Binding(
-                get: { store.workspacePickerSearchText },
-                set: { store.workspacePickerSearchText = $0 }
+                get: { MainActor.assumeIsolated { store.workspacePickerSearchText } },
+                set: { text in
+                    Task { @MainActor in
+                        store.workspacePickerSearchText = text
+                    }
+                }
             ))
             .textFieldStyle(.plain)
             .focused($isSearchFocused)
@@ -261,6 +265,7 @@ struct WorkspaceCommandPaletteView: View {
         record.rootPath == selectedRootPath
     }
 
+    @MainActor
     private func syncSelectionToVisibleResults() {
         if let selectedRootPath,
            store.filteredWorkspaceLibrary.contains(where: { $0.rootPath == selectedRootPath }) {
@@ -270,6 +275,7 @@ struct WorkspaceCommandPaletteView: View {
         selectedRootPath = store.filteredWorkspaceLibrary.first?.rootPath
     }
 
+    @MainActor
     private func moveSelectionUp() {
         guard !store.filteredWorkspaceLibrary.isEmpty else {
             return
@@ -280,6 +286,7 @@ struct WorkspaceCommandPaletteView: View {
         selectedRootPath = store.filteredWorkspaceLibrary[nextIndex].rootPath
     }
 
+    @MainActor
     private func moveSelectionDown() {
         guard !store.filteredWorkspaceLibrary.isEmpty else {
             return
@@ -290,6 +297,7 @@ struct WorkspaceCommandPaletteView: View {
         selectedRootPath = store.filteredWorkspaceLibrary[nextIndex].rootPath
     }
 
+    @MainActor
     private func activateSelectedWorkspace(openInNewTab: Bool) {
         guard let rootPath = selectedRootPath ?? store.filteredWorkspaceLibrary.first?.rootPath else {
             return

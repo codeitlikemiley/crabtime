@@ -168,7 +168,7 @@ final class WorkspaceStore {
         repositoryCloner: RepositoryCloner? = nil,
         exercismCLI: ExercismCLI? = nil,
         fileChangeService: WorkspaceFileChangeService = WorkspaceFileChangeService(),
-        rustlingsWorkspaceScaffolder: RustlingsWorkspaceScaffolder = RustlingsWorkspaceScaffolder(),
+        rustlingsWorkspaceScaffolder: RustlingsWorkspaceScaffolder? = nil,
         defaults: UserDefaults = .standard
     ) {
         self.defaults = defaults
@@ -184,21 +184,9 @@ final class WorkspaceStore {
         self.exercismCLI = exercismCLI ?? ExercismCLI()
         self.fileChangeService = fileChangeService
         self.baselineStore = WorkspaceBaselineStore(baselineLibraryURL: appPaths.baselineLibraryURL)
-        self.rustlingsWorkspaceScaffolder = rustlingsWorkspaceScaffolder
+        self.rustlingsWorkspaceScaffolder = rustlingsWorkspaceScaffolder ?? RustlingsWorkspaceScaffolder()
         self.sessionLog = []
 
-        // Migrate legacy comma-CSV storage to native string arrays on first launch
-        let migrateSet: (String) -> Set<String> = { key in
-            if let array = defaults.stringArray(forKey: key) {
-                return Set(array)
-            }
-            // One-time migration from old comma-separated format
-            let legacyCSV = defaults.string(forKey: key) ?? ""
-            let migrated = Set(legacyCSV.split(separator: ",").map(String.init).filter { !$0.isEmpty })
-            defaults.setValue(Array(migrated), forKey: key)
-            // Initialize defaults migrations
-            return migrated
-        }
 
         restorePersistedLibrary()
     }
@@ -2407,7 +2395,7 @@ final class WorkspaceStore {
     }
 
     private func retryEnrichChallenge(argument rawArgument: String) async throws -> String {
-        guard let workspace, let record = currentWorkspaceRecord else {
+        guard let workspace = workspace, currentWorkspaceRecord != nil else {
             throw NSError(
                 domain: "WorkspaceStore", code: 2,
                 userInfo: [NSLocalizedDescriptionKey: "Open a workspace before using `/try-again`."]

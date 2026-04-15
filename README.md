@@ -6,7 +6,9 @@ Crab Time is a focused coding workspace built for Rust learners. It replaces bro
 
 ## Screenshots
 
-> _Preview image coming soon._
+<img src="assets/screenshot.png" alt="CrabTime Workspace Showcase" width="100%"/>
+
+*(Please drop your UI screenshot into `assets/screenshot.png` to populate this!)*
 
 ## Requirements
 
@@ -50,6 +52,29 @@ make install
 # Remove build artifacts and dist/
 make clean
 ```
+
+---
+
+## Usage Examples
+
+### Learning with Rustlings
+CrabTime is designed to be the perfect native companion for the [Rustlings](https://github.com/rust-lang/rustlings) course.
+1. Clone the repository locally: `git clone https://github.com/rust-lang/rustlings.git`
+2. Open CrabTime, click **Import Workspace**, and select the downloaded `rustlings` directory.
+3. CrabTime automatically detects the structured `exercises/` folder and organizes your sidebar.
+4. Click on an exercise to begin. You can run checks natively in the Inspector, view diagnostics interactively, ask the AI for concept explanations, and track your progress without ever opening a separate terminal!
+
+### Learning with Exercism
+1. Ensure the `exercism` CLI tool is installed and authenticated via the Setup Wizard.
+2. Inside CrabTime, open the **Exercism Browser View** to explore tracks and download exercises directly.
+3. The workspace explorer will track your code state. If you get stuck, simply use the **View Solution** tool to peek at reference implementations alongside your code.
+4. When your tests pass, press **Submit** located right inside the Inspector to magically upload your code to Exercism, receive remote feedback, and mark the exercise structurally as `Done`.
+
+### Using with CodeCrafters
+1. Initialize a CodeCrafters challenge repository locally (containing the `.codecrafters/` directory).
+2. Import the folder as a Workspace in CrabTime. CrabTime's core integration will instantly recognize the environment!
+3. Run your incremental project tests locally using the Console Output tab.
+4. Hit **Submit** in the Inspector to execute a seamless `git push`, triggering CodeCrafters' remote CI validation without breaking your flow.
 
 ---
 
