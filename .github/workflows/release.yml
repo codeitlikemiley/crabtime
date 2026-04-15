@@ -1,0 +1,57 @@
+name: Release CrabTime
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-and-release:
+    runs-on: macos-14
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Apple Certificate
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: "actions_keychain_password"
+        run: |
+          # Create variables
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          # Import certificate from secrets
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+
+          # Create temporary keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Import certificate to keychain
+          security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          
+          # List the keychains and identities for debugging visibility
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          security find-identity -v
+
+      - name: Build, Sign, and Notarize App
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+          RELEASE_SIGNING_IDENTITY: ${{ secrets.RELEASE_SIGNING_IDENTITY }}
+        run: |
+          # Extract version from the git tag (e.g., v1.2.1 -> 1.2.1)
+          VERSION=${GITHUB_REF_NAME#v}
+          # Make the publish target, overriding the VERSION dynamically
+          make publish VERSION=$VERSION
+
+      - name: Upload Release to GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Crab Time-*.dmg
+          generate_release_notes: true

@@ -16,7 +16,25 @@ endif
 
 APP_NAME = Crab Time
 BUNDLE_ID = dev.crab.time
-VERSION ?= 1.0.0
+VERSION_FILE := .version
+ifeq ($(wildcard $(VERSION_FILE)),)
+  CURRENT_VERSION := 1.0.0
+else
+  CURRENT_VERSION := $(shell cat $(VERSION_FILE))
+endif
+
+ifeq (release,$(firstword $(MAKECMDGOALS)))
+  RELEASE_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+  $(eval $(RELEASE_ARGS):;@:)
+
+  ifneq ($(RELEASE_ARGS),)
+    VERSION := $(RELEASE_ARGS)
+  else
+    VERSION := $(shell echo $(CURRENT_VERSION) | awk -F. '{print $$1"."$$2"."$$3+1}')
+  endif
+else
+  VERSION ?= $(CURRENT_VERSION)
+endif
 SWIFT_PACKAGE_DIR = CrabTime
 SWIFT_BUILD_DIR = $(SWIFT_PACKAGE_DIR)/.build/release
 EXECUTABLE_NAME = CrabTime
@@ -153,7 +171,14 @@ install: publish
 	ditto "$(APP_BUNDLE)" "$(INSTALL_APP_BUNDLE)"
 	@echo "Installed: $(INSTALL_APP_BUNDLE)"
 
-release: publish
+release:
+	@echo $(VERSION) > $(VERSION_FILE)
+	@echo "Bumping version to $(VERSION) and triggering GitHub Actions..."
+	git add $(VERSION_FILE)
+	git commit -m "Bump version to v$(VERSION)"
+	git push origin HEAD
+	git tag "v$(VERSION)"
+	git push origin --tags
 
 run:
 	cd $(SWIFT_PACKAGE_DIR) && swift run
