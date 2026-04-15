@@ -1,4 +1,3 @@
-// swift-interface-format-version: 1.0
 // swift-tools-version: 6.2
 
 import PackageDescription
