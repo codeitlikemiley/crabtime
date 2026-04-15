@@ -33,8 +33,8 @@ struct ToolingHealthService {
                             subtitle: "Rust exercise runner",
                             executableName: "cargo",
                             versionArguments: ["runner", "--help"],
-                            installHint: "Install cargo-runner and make sure `cargo runner` resolves in PATH.",
-                            installCommand: "cargo install cargo-runner"
+                            installHint: "Install cargo-runner-cli and make sure `cargo runner` resolves in PATH.",
+                            installCommand: "cargo binstall cargo-runner-cli"
                         )
                     }
                     group.addTask {

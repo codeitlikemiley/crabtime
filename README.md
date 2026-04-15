@@ -16,7 +16,7 @@ Crab Time is a focused coding workspace built for Rust learners. It replaces bro
 | macOS | 14.0 + | Required by Swift Observation framework |
 | Xcode / Swift toolchain | Swift 6.2 + | `swift build` |
 | Rust toolchain | stable | `rustc`, `cargo` |
-| `cargo-runner` | latest | Installed automatically by Setup Wizard |
+| `cargo-runner` | latest | Installed automatically by Setup Wizard (`cargo binstall cargo-runner-cli`) |
 | `exercism` CLI | latest | Optional — required for Exercism integration |
 | CodeCrafters CLI | latest | Optional — required for CodeCrafters integration |
 
