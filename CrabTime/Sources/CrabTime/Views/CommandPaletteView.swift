@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct CommandPaletteView: View {
     @Environment(WorkspaceStore.self) private var store
     @Environment(NavigationStore.self) private var navigationStore

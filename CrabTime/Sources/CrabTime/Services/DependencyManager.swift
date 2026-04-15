@@ -166,7 +166,7 @@ final class DependencyManager: @unchecked Sendable {
         uname(&sysinfo)
         let machineString = withUnsafePointer(to: &sysinfo.machine) {
             $0.withMemoryRebound(to: CChar.self, capacity: 1) { ptr in
-                String(validatingCString: ptr)
+                String(cString: ptr)
             }
         } ?? "unknown"
         

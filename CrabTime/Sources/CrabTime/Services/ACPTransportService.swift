@@ -248,16 +248,18 @@ private actor ACPConnection {
         eventSink?(.processState(provider: provider, status: "Launching", logFilePath: logFileURL.path))
 
         stdoutReadHandle?.readabilityHandler = { [weak self] handle in
+            guard let self else { return }
             let data = handle.availableData
             Task {
-                await self?.handleStdoutData(data)
+                await self.handleStdoutData(data)
             }
         }
 
         stderrReadHandle?.readabilityHandler = { [weak self] handle in
+            guard let self else { return }
             let data = handle.availableData
             Task {
-                await self?.handleStderrData(data)
+                await self.handleStderrData(data)
             }
         }
 

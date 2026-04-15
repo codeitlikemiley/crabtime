@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 
+@MainActor
 struct ChatSidebarView: View {
     @Environment(WorkspaceStore.self) private var store
     @Environment(NavigationStore.self) private var navigationStore
@@ -765,7 +766,7 @@ struct ChatSidebarView: View {
     }
 
     private func replaceLastWord(with newText: String) {
-        var text = chatStore.composerText
+        let text = chatStore.composerText
         if let lastSpace = text.lastIndex(where: \.isWhitespace) {
             let prefix = text[...lastSpace]
             chatStore.composerText = String(prefix) + newText

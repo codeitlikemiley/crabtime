@@ -80,6 +80,7 @@ extension FocusedValues {
 private struct FocusedExercismStoreKey: FocusedValueKey { typealias Value = ExercismStore }
 private struct FocusedProcessStoreKey: FocusedValueKey { typealias Value = ProcessStore }
 
+@MainActor
 struct WorkspaceSceneRoot: View {
     let services: AppServices
     let initialWorkspaceRootPath: String?
@@ -179,6 +180,7 @@ struct WorkspaceSceneRoot: View {
     }
 }
 
+@MainActor
 struct CrabTimeAppCommands: Commands {
     @FocusedValue(\.workspaceStore) private var workspaceStore
     @FocusedValue(\.navigationStore) private var navigationStore

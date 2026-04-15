@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct AppSettingsView: View {
     @Environment(AISettingsStore.self) private var settingsStore
     @Environment(AIModelCatalogStore.self) private var modelCatalogStore

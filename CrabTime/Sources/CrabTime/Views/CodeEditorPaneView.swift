@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct CodeEditorPaneView: View {
     @Environment(WorkspaceStore.self) private var store
     @Environment(NavigationStore.self) private var navigationStore
