@@ -1,52 +1,189 @@
 # Crab Time
-> An AI-native IDE specifically tailored for learning Rust via community Rustlings challenges and Exercism.
 
-Crab Time provides a focused context-rich environment that strips away the complexity of traditional IDEs. It replaces generic AI web chat with deeply integrated coding features designed *specifically* for Rust students:
+> A native macOS Rust practice environment with an integrated AI coach, terminal, and submission pipeline.
 
-- Real-time compiler diagnostics overlaid directly on your code
-- Instant test feedback via an integrated `cargo runner` terminal experience
-- Immediate side-by-side solutions via AI generated implementations
-- Direct Exercism API integration for fetching and submitting assignments
+Crab Time is a focused coding workspace built for Rust learners. It replaces browser-tab workflows with a tight native loop: edit code, run it, inspect diagnostics, ask an AI for help, and submit — without leaving the app.
 
-![Crab Time](.github/preview.png)
+## Screenshots
+
+> _Preview image coming soon._
+
+## Requirements
+
+| Dependency | Version | Notes |
+|---|---|---|
+| macOS | 14.0 + | Required by Swift Observation framework |
+| Xcode / Swift toolchain | Swift 6.2 + | `swift build` |
+| Rust toolchain | stable | `rustc`, `cargo` |
+| `cargo-runner` | latest | Installed automatically by Setup Wizard |
+| `exercism` CLI | latest | Optional — required for Exercism integration |
+| CodeCrafters CLI | latest | Optional — required for CodeCrafters integration |
+
+> The **Setup Wizard** detects missing tools on first launch and offers to install them automatically.
+
+---
 
 ## Installation
 
-Crab Time requires **macOS 14.0+** and relies on system Rust dependencies.
+### Download (recommended)
 
-1. Download the latest `.dmg` release from the [Releases](https://github.com/codeitlikemiley/crabtime/releases) page.
-2. Drag `Crab Time.app` to your Applications folder.
-3. On first launch, if you lack `rustc`, `cargo`, or the `exercism` CLI, Crab Time's Setup Wizard will automatically download and install these dependencies locally.
+1. Download the latest `.dmg` from [Releases](https://github.com/codeitlikemiley/crabtime/releases).
+2. Drag **Crab Time.app** to `/Applications`.
+3. Launch. The Setup Wizard handles any missing dependencies.
 
-### Manual Building
-
-If you wish to build Crab Time from source:
+### Build from source
 
 ```bash
 git clone https://github.com/codeitlikemiley/crabtime.git
-cd crabtime/CrabTime
-swift build -c release
-```
+cd crabtime
 
-The resulting app bundle will exist in `dist/` after running:
+# Run directly (debug build)
+make run
 
-```bash
+# Build a signed, notarized .dmg for distribution
+# Requires .env with APPLE_ID, APPLE_TEAM_ID, RELEASE_SIGNING_IDENTITY, APP_PASSWORD
 make publish
+
+# Install to /Applications
+make install
+
+# Remove build artifacts and dist/
+make clean
 ```
+
+---
 
 ## Features
-- **Integrated AI Chat**: Built-in support for Anthropic (Claude), OpenAI, and Gemini — grounded exclusively against your active workspace, current diagnostics, and exercise context.
-- **AI-Verified Completion**: "Verify & Mark Done" compiles your code, runs it, and asks the AI for a PASS/FAIL verdict before marking an exercise as done.
-- **ACP Session Reuse**: Gemini CLI and OpenCode run through ACP-backed warm sessions so the first load is cold, then follow-up turns reuse the same agent session.
-- **Slash Commands**: `/verify`, `/challenge`, `/try-again` — trigger AI workflows directly from the chat composer.
-- **Dependency Manager Wizard**: Installs Rust tooling seamlessly on startup for an out-of-the-box learning experience.
-- **Exercism Integration**: One-click download of assignments and integrated submission straight from the editor.
-- **CodeCrafters Integration**: Run `git push`-based submissions with remote CI feedback, directly from the Inspector.
-- **Fast Native UI**: Built entirely in Swift/SwiftUI with AppKit-backed components for low-latency editing and terminal output.
 
-## Architecture
+### Workspace Management
 
-For an in-depth look at how Crab Time manages state, processes, AI context, and terminal emulation, see [ARCHITECTURE.md](./ARCHITECTURE.md).
+- **Import any folder** as a local workspace — structured Rustlings-style layouts (`exercises/`, `solutions/`) are detected automatically.
+- **Clone repositories** directly from a URL (Exercism, CodeCrafters, GitHub) into a managed workspace.
+- **Multi-workspace library**: workspaces are persisted in a local SQLite database. Switch between them without losing editor state.
+- **Workspace Explorer**: sidebar tree view showing all exercise files. Filter by `Open` or `Done`.
+- **Custom challenges**: generate a new exercise scaffold from a name using `/challenge <name>` in chat.
+
+### Code Editor
+
+- Syntax-highlighted Rust editor backed by `NSTextView` with a custom `SyntaxHighlighter`.
+- Auto-growing composer for multi-line chat messages with `NSTextView` (not `TextEditor`) for reliable AppKit focus.
+- File role detection (`challenge.rs`, `solution.rs`, `hint.md`) determines what the Inspector and console display.
+- TODO item scanner that indexes `// TODO:` annotations across the workspace.
+
+### Terminal & Compiler Feedback
+
+- **CargoRunner**: runs `cargo runner run <file>` for exercise execution, `cargo test` for test targets, and `cargo check` for lightweight diagnostics.
+- **PTY emulation**: spawns exercises in a pseudo-terminal so ANSI color codes render correctly in the Output tab.
+- **Diagnostic parser**: structured `Diagnostic` models (error, warning, note) overlaid onto the Inspector and Diagnostics tab.
+- **Console tabs**: `Output`, `Diagnostics`, `Session`, `AI Runtime` — all live-updated during build/run cycles.
+
+### Inspector (Exercise Progress)
+
+- **Exercise Progress panel**: shows test check results (`passed`, `failed`, `running`) with per-check detail.
+- **Signals**: real-time warning/error count badge pulled from the diagnostic parser.
+- **View Solution**: opens the reference `solutions/` file beside your working file.
+- **Verify & Mark Done**: compiles the exercise, runs it, checks for `todo!()` placeholders, then asks the AI for a PASS/FAIL verdict against the reference solution — marks Complete only on AI approval.
+- **Reopen button**: resets a Done exercise back to Open if it was incorrectly marked (stale DB data).
+- **Done filter**: the `Done` tab only shows exercises explicitly AI-verified and marked complete — passing tests alone is not enough.
+
+### AI Chat & Context
+
+- **Sidebar chat** grounded against your open exercise, current diagnostics, and selected `@file` references.
+- **Explicit context tokens**: type `@` to fuzzy-pick a specific file, `#` to attach diagnostic/output logs — avoids sending the entire workspace on every turn.
+- **Slash commands** (type `/` to open the picker):
+  - `/challenge <name>` — scaffold a new exercise with AI-generated challenge, solution, and hint
+  - `/verify` — run the exercise and get an AI evaluation in chat (does _not_ mark done)
+  - `/try-again @file` — re-enrich an existing exercise with a fresh AI pass
+- **Arrow key navigation** in the slash/@ picker; Enter to accept; menu auto-dismisses after selection.
+
+### AI Providers
+
+Configurable from **Settings → AI**:
+
+| Provider | Transport | Notes |
+|---|---|---|
+| Anthropic (Claude) | Direct API | API key via Keychain |
+| OpenAI (GPT-4o, o1, …) | Direct API | API key via Keychain |
+| Gemini (Google) | Direct API or ACP | ACP enables warm session reuse |
+| Gemini CLI | ACP | Persistent agent session with tool use |
+| OpenCode | ACP | Persistent agent session |
+| Ollama | Local HTTP | Any locally-served model |
+
+**ACP warm sessions**: CLI-backed providers persist a `backendSessionID` so subsequent turns reuse the same agent process instead of cold-starting the CLI every time.
+
+**AI Runtime tab**: live view of active provider, transport kind, warm session ID, auth state, and rolling tool-call log. Raw ACP traffic written to `~/Library/Application Support/crab-time/logs/acp/`.
+
+### Exercism Integration
+
+- Browse your Exercism track library inside the app (`ExercismBrowserView`).
+- Download exercises with one click via the Exercism API.
+- Submit solutions directly from the Inspector — the `ExercismSubmissionProvider` calls the CLI and opens the feedback URL on success.
+- Successful remote submission sets `isMarkedDone` so exercises appear in the Done tab.
+
+### CodeCrafters Integration
+
+- Detects CodeCrafters workspaces automatically via `.codecrafters/` directory presence.
+- Submit via `CodeCraftersCLI` (`git push` backed) from the Inspector.
+- Remote CI result determines pass/fail; on success the exercise is marked done.
+
+### Security
+
+- API keys stored in the **macOS Keychain** via `CredentialStore`, never written to disk as plaintext.
+- `.env` is gitignored — required only for distribution signing (`make publish`).
+
+---
+
+## Project Structure
+
+```
+crabtime/
+├── CrabTime/                   # Swift Package (main app target)
+│   ├── Package.swift
+│   ├── Sources/CrabTime/
+│   │   ├── CrabTimeApp.swift   # App entry point
+│   │   ├── WorkspaceStore.swift # Central @Observable state machine
+│   │   ├── Models/             # Value types (ExerciseDocument, Diagnostic, …)
+│   │   ├── Services/           # CargoRunner, AI providers, CLI wrappers,
+│   │   │                       # ExerciseSubmissionService, DependencyManager, …
+│   │   ├── Stores/             # EditorStateStore, ExplorerStore
+│   │   ├── Views/              # SwiftUI views (MainSplitView, ChatSidebarView,
+│   │   │                       # InspectorSidebarView, ConsolePanelView, …)
+│   │   ├── Styling/            # CrabTimeTheme (Palette, Layout, Typography)
+│   │   └── Resources/          # Markdown templates, bundled assets
+│   └── Tests/CrabTimeTests/    # Unit tests (CargoRunner, Exercism CLI,
+│                               # WorkspaceStore, WorkspaceImporter, …)
+├── tests/
+│   └── fixtures/               # Rustlings-like fixture + sample challenge
+├── assets/                     # Brand SVG/PNG assets
+├── ARCHITECTURE.md             # Internal architecture deep-dive
+├── Makefile                    # publish / install / run / clean
+└── .gitignore
+```
+
+---
+
+## Architecture Overview
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for a detailed walkthrough of:
+
+- `WorkspaceStore` — the central `@MainActor @Observable` state machine
+- `CargoRunner` + PTY process isolation
+- `AIProviderManager` + `ExerciseContextBuilder` context assembly
+- ACP session transport (warm sessions, auth, tool-call handling)
+- `DependencyManager` — ambient PATH resolution and tool health checks
+
+---
+
+## Contributing
+
+1. Fork the repository.
+2. Create a feature branch: `git checkout -b feat/my-feature`
+3. Build and run locally: `make run`
+4. Run the test suite: `cd CrabTime && swift test`
+5. Open a pull request.
+
+---
 
 ## License
+
 MIT License.
