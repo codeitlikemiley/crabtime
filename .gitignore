@@ -27,3 +27,13 @@ example/
 
 # Generated test fixture binaries
 tests/fixtures/sample_challenge/challenge
+
+# Runtime and build logs
+*.log
+
+# Distributable output
+dist/
+
+# Python
+__pycache__/
+*.pyc
