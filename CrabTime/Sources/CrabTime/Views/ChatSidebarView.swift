@@ -27,7 +27,7 @@ struct ChatSidebarView: View {
             command: "verify",
             title: "/verify",
             detail: "Run the tests for the selected exercise and verify your solution.",
-            template: "/verify"
+            template: "/verify "  // trailing space auto-closes the slash menu via syncMenuState's hasSuffix guard
         ),
         ChatSlashCommand(
             command: "try-again",
@@ -884,14 +884,18 @@ private struct ChatComposerKeyBridge: NSViewRepresentable {
 
                 let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
                 let characters = event.charactersIgnoringModifiers?.lowercased()
+                // Arrow keys on macOS often carry the .function flag; strip it for navigation checks.
+                let navModifiers = modifiers.subtracting([.function, .numericPad])
 
                 if self.isShowingMenu {
-                    if modifiers.isEmpty, event.keyCode == 125 {
+                    // ↓ Down arrow (keyCode 125) — may have .function set
+                    if navModifiers.isEmpty, event.keyCode == 125 {
                         self.onMoveDown()
                         return nil
                     }
 
-                    if modifiers.isEmpty, event.keyCode == 126 {
+                    // ↑ Up arrow (keyCode 126)
+                    if navModifiers.isEmpty, event.keyCode == 126 {
                         self.onMoveUp()
                         return nil
                     }
@@ -907,7 +911,7 @@ private struct ChatComposerKeyBridge: NSViewRepresentable {
                     }
 
                     // 48 is tab, 36 is return, 76 is enter
-                    if modifiers.isEmpty, [36, 48, 76].contains(event.keyCode), self.onAcceptMenu() {
+                    if navModifiers.isEmpty, [36, 48, 76].contains(event.keyCode), self.onAcceptMenu() {
                         return nil
                     }
                 // Cmd+Return → submit
